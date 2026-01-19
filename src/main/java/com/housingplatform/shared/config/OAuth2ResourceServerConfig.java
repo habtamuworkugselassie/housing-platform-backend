@@ -135,6 +135,7 @@ public class OAuth2ResourceServerConfig {
                 .requestMatchers("/api/v1/payments/**").hasAnyAuthority("SCOPE_banker", "SCOPE_admin")
                 
                 // All other API requests - scope-based access control handled by ScopeAuthorizationFilter
+                // Allow all API requests to proceed - ScopeAuthorizationFilter will check UNSECURED annotations
                 .requestMatchers("/api/**").permitAll()
                 
                 .anyRequest().permitAll()
@@ -144,40 +145,62 @@ public class OAuth2ResourceServerConfig {
                     .decoder(jwtDecoder())
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
                 )
-                .bearerTokenResolver(request -> {
-                    // For public endpoints, return null to skip JWT processing
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    // For API endpoints, let ScopeAuthorizationFilter handle access control
+                    // Don't block here - let the filter chain continue
                     String path = request.getRequestURI();
-                    if (path.startsWith("/api/v1/auth") || 
-                        path.startsWith("/swagger-ui") ||
-                        path.startsWith("/api-docs") ||
-                        path.startsWith("/v3/api-docs") ||
-                        path.startsWith("/actuator/health") ||
-                        path.equals("/error")) {
-                        return null; // Skip JWT processing for public endpoints
+                    if (path.startsWith("/api/")) {
+                        // Allow request to proceed - ScopeAuthorizationFilter will handle it
+                        return;
                     }
-                    // For other endpoints, extract bearer token if present
+                    // For other paths, return 403
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                })
+                .bearerTokenResolver(request -> {
+                    // Extract bearer token if present, otherwise return null
+                    // ScopeAuthorizationFilter will handle UNSECURED endpoints
                     String authHeader = request.getHeader("Authorization");
                     if (authHeader != null && authHeader.startsWith("Bearer ")) {
                         return authHeader.substring(7);
                     }
-                    return null; // No token present
+                    return null; // No token present - let ScopeAuthorizationFilter handle it
                 })
                 .authenticationEntryPoint((request, response, authException) -> {
                     try {
-                        // For public endpoints or when no token is present, don't fail
-                        // This allows requests to proceed without authentication
+                        // For endpoints that might be public (UNSECURED), don't fail immediately
+                        // Let ScopeAuthorizationFilter handle it
                         String path = request.getRequestURI();
-                        if (path.startsWith("/api/v1/auth") || 
-                            path.startsWith("/swagger-ui") ||
-                            path.startsWith("/api-docs") ||
-                            path.startsWith("/v3/api-docs") ||
-                            path.startsWith("/actuator/health") ||
-                            path.equals("/error")) {
-                            // Allow public endpoints to proceed without authentication
-                            // Don't write anything, just let it continue
-                            return;
+                        
+                        // For API endpoints, always allow requests to proceed
+                        // ScopeAuthorizationFilter will check if it's UNSECURED and handle accordingly
+                        if (path.startsWith("/api/")) {
+                            // Check if there's actually a token in the request
+                            String authHeader = request.getHeader("Authorization");
+                            boolean hasToken = authHeader != null && authHeader.startsWith("Bearer ");
+                            
+                            // If no token is present, let it proceed to ScopeAuthorizationFilter
+                            // If token is present but invalid, still let it proceed (filter will handle it)
+                            // Only block if it's a critical security issue
+                            if (!hasToken) {
+                                // No token - let ScopeAuthorizationFilter handle UNSECURED endpoints
+                                return;
+                            }
+                            
+                            // Token present but invalid - check if it's a validation error
+                            boolean isJwtValidationError = authException.getCause() instanceof JwtException ||
+                                                          (authException.getMessage() != null && 
+                                                           (authException.getMessage().contains("JWT") || 
+                                                            authException.getMessage().contains("token")));
+                            
+                            // For API endpoints, let ScopeAuthorizationFilter handle even invalid tokens
+                            // It will check UNSECURED and allow or deny accordingly
+                            if (isJwtValidationError) {
+                                // Invalid token - still let it proceed, filter will handle
+                                return;
+                            }
                         }
                         
+                        // For other cases or JWT validation errors, return error
                         // Check if it's a JWT-related exception
                         boolean isJwtError = authException instanceof AuthenticationServiceException ||
                                            authException.getCause() instanceof JwtException ||
