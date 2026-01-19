@@ -21,8 +21,12 @@ public class BillOfQuantities extends BaseAuditEntity {
     @Column(name = "property_id")
     private UUID propertyId;
     
-    @Column(name = "project_id")
+    @Column(name = "project_id", insertable = false, updatable = false)
     private UUID projectId;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
+    private ConstructionProject project;
     
     @Column(nullable = false)
     private String name;
