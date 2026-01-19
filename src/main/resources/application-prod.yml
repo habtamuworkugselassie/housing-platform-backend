@@ -1,0 +1,9 @@
+spring:
+  jpa:
+    show-sql: false
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://housing_platform:Hd1kNI5wLW7OaS1z3u8OM6iK9XfBTcX5@dpg-d5n4qh75r7bs73dhebd0-a/housing_platform_shvt}
+logging:
+  level:
+    root: WARN
+    com.housingplatform: INFO

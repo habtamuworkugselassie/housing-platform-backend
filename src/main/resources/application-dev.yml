@@ -1,0 +1,23 @@
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/housing_platform}
+    username: ${DATABASE_USERNAME:housing_platform}
+    password: ${DATABASE_PASSWORD:housing_platform}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # For development, you can use a mock OAuth2 server or disable security
+          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:8080/auth/realms/housing-platform}
+
+logging:
+  level:
+    com.housingplatform: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
