@@ -2,7 +2,7 @@ spring:
   jpa:
     show-sql: false
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://dpg-d5n4qh75r7bs73dhebd0-a:5432/housing_platform_shvt}
+    url: ${DATABASE_URL:jdbc:postgresql://dpg-d5n4qh75r7bs73dhebd0-a.virginia-postgres.render.com:5432/housing_platform_shvt}
     username: ${DATABASE_USERNAME:housing_platform}
     password: ${DATABASE_PASSWORD:Hd1kNI5wLW7OaS1z3u8OM6iK9XfBTcX5}
 logging:
