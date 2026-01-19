@@ -267,7 +267,12 @@ public class OAuth2ResourceServerConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         // Use allowedOriginPatterns instead of allowedOrigins when allowCredentials is true
         // This allows pattern matching while still supporting credentials
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedOriginPatterns(List.of(
+            "http://localhost:*", 
+            "http://127.0.0.1:*",
+            "https://housing-platform-frontend.onrender.com",
+            "https://*.onrender.com"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
