@@ -82,13 +82,19 @@ public class PropertyServiceImpl implements PropertyService {
     public Page<PropertyResponse> getAllProperties(String status, String city, Pageable pageable, boolean publicOnly) {
         Specification<Property> spec = Specification.where(null);
         
-        // For public access, only show AVAILABLE properties
+        // For public access, only show AVAILABLE properties (ignore status parameter for security)
+        // For authenticated users, respect the status parameter
         if (publicOnly) {
             spec = spec.and((root, query, cb) -> 
                 cb.equal(root.get("status"), Property.PropertyStatus.AVAILABLE));
-        } else if (status != null) {
-            spec = spec.and((root, query, cb) -> 
-                cb.equal(root.get("status"), Property.PropertyStatus.valueOf(status.toUpperCase())));
+        } else if (status != null && !status.trim().isEmpty()) {
+            try {
+                Property.PropertyStatus statusEnum = Property.PropertyStatus.valueOf(status.toUpperCase());
+                spec = spec.and((root, query, cb) -> 
+                    cb.equal(root.get("status"), statusEnum));
+            } catch (IllegalArgumentException e) {
+                // Invalid status value, ignore it
+            }
         }
         
         if (city != null) {

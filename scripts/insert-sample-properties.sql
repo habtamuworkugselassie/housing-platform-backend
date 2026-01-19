@@ -78,7 +78,7 @@ BEGIN
     -- Now insert sample properties
     -- Property 1: Modern Apartment
     INSERT INTO properties (
-        id, title, description, type, status, verification_status, price,
+        id, title, description, type, status, verification_status, price_etb,
         address, city, state, country, zip_code, latitude, longitude,
         bedrooms, bathrooms, area, floor_number, total_floors,
         real_estate_company_id, construction_status, agent_id
@@ -109,7 +109,7 @@ BEGIN
     
     -- Property 2: Luxury Villa
     INSERT INTO properties (
-        id, title, description, type, status, verification_status, price,
+        id, title, description, type, status, verification_status, price_etb,
         address, city, state, country, zip_code, latitude, longitude,
         bedrooms, bathrooms, area, floor_number, total_floors,
         real_estate_company_id, construction_status, agent_id
@@ -140,7 +140,7 @@ BEGIN
     
     -- Property 3: Townhouse
     INSERT INTO properties (
-        id, title, description, type, status, verification_status, price,
+        id, title, description, type, status, verification_status, price_etb,
         address, city, state, country, zip_code, latitude, longitude,
         bedrooms, bathrooms, area, floor_number, total_floors,
         real_estate_company_id, construction_status, agent_id
@@ -171,7 +171,7 @@ BEGIN
     
     -- Property 4: Land for Sale
     INSERT INTO properties (
-        id, title, description, type, status, verification_status, price,
+        id, title, description, type, status, verification_status, price_etb,
         address, city, state, country, zip_code, latitude, longitude,
         bedrooms, bathrooms, area,
         real_estate_company_id, construction_status, agent_id
@@ -200,7 +200,7 @@ BEGIN
     
     -- Property 5: Condominium Under Construction
     INSERT INTO properties (
-        id, title, description, type, status, verification_status, price,
+        id, title, description, type, status, verification_status, price_etb,
         address, city, state, country, zip_code, latitude, longitude,
         bedrooms, bathrooms, area, floor_number, total_floors,
         real_estate_company_id, construction_status, agent_id
@@ -231,7 +231,7 @@ BEGIN
     
     -- Property 6: Reserved House
     INSERT INTO properties (
-        id, title, description, type, status, verification_status, price,
+        id, title, description, type, status, verification_status, price_etb,
         address, city, state, country, zip_code, latitude, longitude,
         bedrooms, bathrooms, area, floor_number, total_floors,
         real_estate_company_id, construction_status, agent_id
@@ -270,7 +270,7 @@ SELECT
     p.title,
     p.type,
     p.status,
-    p.price,
+    p.price_etb as price,
     p.city,
     p.bedrooms,
     p.bathrooms,

@@ -144,7 +144,7 @@ BEGIN
             
             -- Create a sample property if none exists
             INSERT INTO properties (
-                title, description, type, status, verification_status, price,
+                title, description, type, status, verification_status, price_etb,
                 address, city, country, bedrooms, bathrooms, area,
                 construction_status, category, construction_percentage, is_fully_furnished,
                 real_estate_company_id
