@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.context.request.WebRequest;
 import io.jsonwebtoken.ExpiredJwtException;
 
@@ -124,6 +125,31 @@ public class GlobalExceptionHandler {
                 .error("Resource Not Found")
                 .message("The requested resource was not found")
                 .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+    
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoHandlerFoundException(
+            NoHandlerFoundException ex, WebRequest request) {
+        // Handle 404 for API endpoints that don't exist
+        // Log at debug level to reduce noise
+        log.debug("No handler found for: {} {}", ex.getHttpMethod(), request.getDescription(false));
+        
+        String path = request.getDescription(false).replace("uri=", "");
+        String message = "The requested endpoint was not found. API endpoints are available under /api/v1/";
+        
+        // Special message for root path
+        if (path.equals("/") || path.isEmpty()) {
+            message = "API is running. Available endpoints: /api/v1/, /actuator/health, /swagger-ui.html";
+        }
+        
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Endpoint Not Found")
+                .message(message)
+                .path(path)
                 .build();
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
     }

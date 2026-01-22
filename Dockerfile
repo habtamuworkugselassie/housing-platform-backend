@@ -26,4 +26,5 @@ EXPOSE 8080
 
 ENV SPRING_PROFILES_ACTIVE=prod
 
-ENTRYPOINT java -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-prod} -jar app.jar
+# Use PORT environment variable if set (for Render.com), otherwise use default 8080
+ENTRYPOINT java -Dserver.port=${PORT:-8080} -Dserver.address=0.0.0.0 -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-prod} -jar app.jar

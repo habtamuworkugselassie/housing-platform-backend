@@ -72,6 +72,10 @@ public class OAuth2ResourceServerConfig {
         http
             .securityMatcher(request -> {
                 String path = request.getRequestURI();
+                // Root endpoint
+                if (path.equals("/") || path.isEmpty()) {
+                    return true;
+                }
                 // Public auth endpoints
                 if (path.equals("/api/v1/auth/register") || 
                     path.equals("/api/v1/auth/login") || 
