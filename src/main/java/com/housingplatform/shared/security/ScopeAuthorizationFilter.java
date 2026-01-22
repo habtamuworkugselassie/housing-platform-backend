@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.security.access.AccessDeniedException;
@@ -36,7 +37,8 @@ public class ScopeAuthorizationFilter extends OncePerRequestFilter {
     
     private final RequestMappingHandlerMapping requestHandlerMapping;
     
-    public ScopeAuthorizationFilter(@Lazy RequestMappingHandlerMapping requestHandlerMapping) {
+    public ScopeAuthorizationFilter(
+            @Lazy @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping requestHandlerMapping) {
         this.requestHandlerMapping = requestHandlerMapping;
     }
     
@@ -110,6 +112,15 @@ public class ScopeAuthorizationFilter extends OncePerRequestFilter {
             return;
         } catch (Exception e) {
             // For other exceptions, log but don't block the request during initialization
+            // Check if it's a bean resolution issue (multiple handler mappings)
+            if (e.getMessage() != null && 
+                (e.getMessage().contains("No qualifying bean") || 
+                 e.getMessage().contains("expected single matching bean but found"))) {
+                log.debug("Handler mapping resolution issue for path: {} - allowing request: {}", path, e.getMessage());
+                filterChain.doFilter(request, response);
+                return;
+            }
+            
             log.warn("Error resolving endpoint scope annotations for path: {} - {}", path, e.getMessage());
             // During initialization, allow requests to proceed
             if (e.getCause() instanceof NullPointerException || 

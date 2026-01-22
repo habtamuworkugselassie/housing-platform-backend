@@ -1,0 +1,37 @@
+spring:
+  datasource:
+    url: ${TEST_DATABASE_URL:jdbc:postgresql://localhost:5432/test_housing_platform}
+    username: ${TEST_DATABASE_USERNAME:postgres}
+    password: ${TEST_DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+  cache:
+    type: simple
+
+rate:
+  limit:
+    auth:
+      enabled: false
+
+jwt:
+  secret: test-secret-key-for-testing-purposes-only-minimum-32-characters
+  expiration: 3600
+  issuer: housing-platform-test
+
+logging:
+  level:
+    root: WARN
+    com.housingplatform: INFO

@@ -6,6 +6,8 @@ import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ public class UserService {
     private final UserMapper userMapper;
     
     @Transactional(readOnly = true)
+    @Cacheable(value = "users", key = "#id")
     public UserResponse getUserById(UUID id) {
         com.housingplatform.identity.domain.User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
@@ -37,6 +40,7 @@ public class UserService {
         return getUserById(userId);
     }
     
+    @CacheEvict(value = "users", key = "#id")
     public UserResponse updateUser(UUID id, UserUpdateRequest request) {
         com.housingplatform.identity.domain.User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));

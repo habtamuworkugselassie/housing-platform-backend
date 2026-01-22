@@ -14,6 +14,8 @@ import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -71,6 +74,7 @@ public class PropertyServiceImpl implements PropertyService {
     
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "properties", key = "#id")
     public PropertyResponse getPropertyById(UUID id) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
@@ -105,16 +109,16 @@ public class PropertyServiceImpl implements PropertyService {
         // Get all properties matching the criteria
         List<Property> allProperties = propertyRepository.findAll(spec);
         
-        // Fetch all organizations for company name
-        Map<UUID, Organization> organizationsMap = allProperties.stream()
+        // Fetch all organizations for company name (optimized: single query instead of N+1)
+        Set<UUID> organizationIds = allProperties.stream()
             .map(Property::getRealEstateCompanyId)
             .filter(java.util.Objects::nonNull)
-            .distinct()
-            .collect(Collectors.toMap(
-                Function.identity(),
-                orgId -> organizationRepository.findById(orgId).orElse(null),
-                (existing, replacement) -> existing
-            ));
+            .collect(Collectors.toSet());
+        
+        Map<UUID, Organization> organizationsMap = organizationIds.isEmpty() 
+            ? java.util.Collections.emptyMap()
+            : organizationRepository.findAllById(organizationIds).stream()
+                .collect(Collectors.toMap(Organization::getId, Function.identity()));
         
         // Fetch all active sponsorship applications
         List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
@@ -187,6 +191,7 @@ public class PropertyServiceImpl implements PropertyService {
     }
     
     @Override
+    @CacheEvict(value = "properties", key = "#id")
     public PropertyResponse updateProperty(UUID id, PropertyRequest request, UUID agentId) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
@@ -221,6 +226,7 @@ public class PropertyServiceImpl implements PropertyService {
     }
     
     @Override
+    @CacheEvict(value = "properties", key = "#id")
     public void deleteProperty(UUID id, UUID agentId) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
@@ -319,16 +325,16 @@ public class PropertyServiceImpl implements PropertyService {
                     .collect(Collectors.toList());
         }
         
-        // Fetch organizations for company names
-        Map<UUID, Organization> organizationsMap = properties.stream()
+        // Fetch organizations for company names (optimized: single query instead of N+1)
+        Set<UUID> organizationIds = properties.stream()
                 .map(Property::getRealEstateCompanyId)
                 .filter(java.util.Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toMap(
-                    Function.identity(),
-                    orgId -> organizationRepository.findById(orgId).orElse(null),
-                    (existing, replacement) -> existing
-                ));
+                .collect(Collectors.toSet());
+        
+        Map<UUID, Organization> organizationsMap = organizationIds.isEmpty()
+            ? java.util.Collections.emptyMap()
+            : organizationRepository.findAllById(organizationIds).stream()
+                .collect(Collectors.toMap(Organization::getId, Function.identity()));
         
         // Map to response and enrich with company names
         return properties.stream()

@@ -5,7 +5,46 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://dpg-d5n4qh75r7bs73dhebd0-a.virginia-postgres.render.com:5432/housing_platform_shvt}
     username: ${DATABASE_USERNAME:housing_platform}
     password: ${DATABASE_PASSWORD:Hd1kNI5wLW7OaS1z3u8OM6iK9XfBTcX5}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+
 logging:
   level:
     root: WARN
     com.housingplatform: INFO
+    org.springframework.security: WARN
+    org.springframework.security.web: WARN
+    org.springframework.security.web.FilterChainProxy: WARN
+    org.springframework.security.oauth2: WARN
+    org.springframework.security.oauth2.server.resource: WARN
+    org.springframework.web: WARN
+    org.springframework.web.filter: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+
+server:
+  error:
+    include-message: on-param
+    include-binding-errors: on-param
+    include-stacktrace: never
+    include-exception: false
+
+management:
+  health:
+    redis:
+      enabled: false
+    mail:
+      enabled: false

@@ -29,6 +29,8 @@ spring:
   
   data:
     redis:
+      # Redis is only used for rate limiting, not for caching
+      # Cache uses Caffeine (in-memory)
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       timeout: 2000ms
@@ -37,6 +39,14 @@ spring:
           max-active: 8
           max-idle: 8
           min-idle: 0
+      # Disable Redis cache auto-configuration
+      repositories:
+        enabled: false
+  
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=30m
   
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
@@ -74,6 +84,29 @@ server:
     include-message: always
     include-binding-errors: always
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: false
+    mail:
+      enabled: false
+    defaults:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
 springdoc:
   api-docs:
     path: /api-docs
@@ -84,14 +117,16 @@ springdoc:
 logging:
   level:
     root: INFO
-    com.housingplatform: TRACE
-    org.springframework.security: TRACE
-    org.springframework.security.oauth2: TRACE
-    org.springframework.security.oauth2.server.resource: TRACE
-    org.springframework.web: TRACE
-    org.springframework.web.filter: TRACE
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.housingplatform: INFO
+    org.springframework.security: WARN
+    org.springframework.security.web: WARN
+    org.springframework.security.web.FilterChainProxy: WARN
+    org.springframework.security.oauth2: WARN
+    org.springframework.security.oauth2.server.resource: WARN
+    org.springframework.web: INFO
+    org.springframework.web.filter: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
     # Suppress error logging for expected JWT expiration exceptions
     org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider: WARN
     org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter: WARN
@@ -100,3 +135,10 @@ jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-change-this-in-production-minimum-32-characters-long}
   expiration: ${JWT_EXPIRATION:3600}
   issuer: ${JWT_ISSUER:housing-platform}
+
+rate:
+  limit:
+    auth:
+      enabled: ${RATE_LIMIT_AUTH_ENABLED:false}
+      max-requests: ${RATE_LIMIT_AUTH_MAX_REQUESTS:5}
+      window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}

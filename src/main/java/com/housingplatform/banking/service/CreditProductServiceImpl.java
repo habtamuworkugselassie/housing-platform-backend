@@ -6,6 +6,8 @@ import com.housingplatform.banking.dto.CreditProductResponse;
 import com.housingplatform.banking.repository.CreditProductRepository;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,7 @@ public class CreditProductServiceImpl implements CreditProductService {
     
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "creditProducts", key = "#id")
     public CreditProductResponse getCreditProductById(UUID id) {
         CreditProduct product = creditProductRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CreditProduct", id));
@@ -61,6 +64,7 @@ public class CreditProductServiceImpl implements CreditProductService {
     }
     
     @Override
+    @CacheEvict(value = "creditProducts", key = "#productId")
     public CreditProductResponse updateCreditProduct(UUID bankId, UUID productId, CreditProductRequest request) {
         CreditProduct product = creditProductRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("CreditProduct", productId));
@@ -75,6 +79,7 @@ public class CreditProductServiceImpl implements CreditProductService {
     }
     
     @Override
+    @CacheEvict(value = "creditProducts", key = "#productId")
     public void deleteCreditProduct(UUID bankId, UUID productId) {
         CreditProduct product = creditProductRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("CreditProduct", productId));

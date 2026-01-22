@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import com.housingplatform.shared.security.ScopeAuthorizationFilter;
+import com.housingplatform.shared.security.RateLimitingFilter;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
@@ -51,9 +52,15 @@ public class OAuth2ResourceServerConfig {
     private String jwtIssuer;
     
     private final ScopeAuthorizationFilter scopeAuthorizationFilter;
+    private RateLimitingFilter rateLimitingFilter;
     
     public OAuth2ResourceServerConfig(ScopeAuthorizationFilter scopeAuthorizationFilter) {
         this.scopeAuthorizationFilter = scopeAuthorizationFilter;
+    }
+    
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setRateLimitingFilter(RateLimitingFilter rateLimitingFilter) {
+        this.rateLimitingFilter = rateLimitingFilter;
     }
     
     @Bean
@@ -73,6 +80,10 @@ public class OAuth2ResourceServerConfig {
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()
             );
+        // Add rate limiting filter only if it's enabled
+        if (rateLimitingFilter != null) {
+            http.addFilterBefore(rateLimitingFilter, BearerTokenAuthenticationFilter.class);
+        }
         return http.build();
     }
     
@@ -241,6 +252,10 @@ public class OAuth2ResourceServerConfig {
             .addFilterBefore(new com.housingplatform.shared.security.JwtExceptionHandlerFilter(), 
                            BearerTokenAuthenticationFilter.class)
             .addFilterBefore(scopeAuthorizationFilter, UsernamePasswordAuthenticationFilter.class);
+        // Add rate limiting filter only if it's enabled
+        if (rateLimitingFilter != null) {
+            http.addFilterBefore(rateLimitingFilter, BearerTokenAuthenticationFilter.class);
+        }
         
         return http.build();
     }
