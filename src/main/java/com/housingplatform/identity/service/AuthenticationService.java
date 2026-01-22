@@ -4,7 +4,9 @@ import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AuthResponse;
 import com.housingplatform.identity.dto.LoginRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
+import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,6 +28,7 @@ import java.util.stream.Collectors;
 public class AuthenticationService {
     
     private final UserRepository userRepository;
+    private final RealEstateAgentRepository realEstateAgentRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     
@@ -55,12 +59,20 @@ public class AuthenticationService {
                 .map(Enum::name)
                 .collect(Collectors.toList());
         
+        // Get organization_id if user is a real estate agent
+        UUID organizationId = null;
+        Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(user.getId());
+        if (agent.isPresent()) {
+            organizationId = agent.get().getOrganizationId();
+        }
+        
         // Generate tokens
         String accessToken = jwtTokenProvider.generateToken(
                 user.getId(),
                 user.getEmail(),
                 scopes,
-                roles
+                roles,
+                organizationId
         );
         
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
@@ -90,14 +102,30 @@ public class AuthenticationService {
     }
     
     public AuthResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            throw new BusinessException("Refresh token is required");
+        }
+        
         try {
             var claims = jwtTokenProvider.parseClaims(refreshToken);
             
-            if (!"refresh".equals(claims.get("type"))) {
-                throw new BusinessException("Invalid refresh token");
+            // Check if token has the refresh type claim
+            Object typeClaim = claims.get("type");
+            if (typeClaim == null || !"refresh".equals(typeClaim.toString())) {
+                throw new BusinessException("Invalid refresh token: token is not a refresh token");
             }
             
-            UUID userId = UUID.fromString(claims.getSubject());
+            // Check if token is expired
+            if (claims.getExpiration() != null && claims.getExpiration().before(new java.util.Date())) {
+                throw new BusinessException("Refresh token has expired. Please login again.");
+            }
+            
+            String subject = claims.getSubject();
+            if (subject == null || subject.trim().isEmpty()) {
+                throw new BusinessException("Invalid refresh token: missing user ID");
+            }
+            
+            UUID userId = UUID.fromString(subject);
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new BusinessException("User not found"));
             
@@ -116,12 +144,20 @@ public class AuthenticationService {
                     .map(Enum::name)
                     .collect(Collectors.toList());
             
+            // Get organization_id if user is a real estate agent
+            UUID organizationId = null;
+            Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(user.getId());
+            if (agent.isPresent()) {
+                organizationId = agent.get().getOrganizationId();
+            }
+            
             // Generate new tokens
             String newAccessToken = jwtTokenProvider.generateToken(
                     user.getId(),
                     user.getEmail(),
                     scopes,
-                    roles
+                    roles,
+                    organizationId
             );
             
             String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
@@ -138,8 +174,18 @@ public class AuthenticationService {
                     .scopes(scopes)
                     .roles(roles)
                     .build();
+        } catch (BusinessException e) {
+            // Re-throw business exceptions as-is
+            throw e;
+        } catch (IllegalArgumentException e) {
+            // UUID parsing error
+            throw new BusinessException("Invalid refresh token: malformed user ID");
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            throw new BusinessException("Refresh token has expired. Please login again.");
+        } catch (io.jsonwebtoken.JwtException e) {
+            throw new BusinessException("Invalid refresh token: " + (e.getMessage() != null ? e.getMessage() : "Token validation failed"));
         } catch (Exception e) {
-            throw new BusinessException("Invalid refresh token");
+            throw new BusinessException("Invalid refresh token: " + (e.getMessage() != null ? e.getMessage() : "Token validation failed"));
         }
     }
     
@@ -190,12 +236,20 @@ public class AuthenticationService {
                 .map(Enum::name)
                 .collect(Collectors.toList());
         
+        // Get organization_id if user is a real estate agent (unlikely for new registrations, but check anyway)
+        UUID organizationId = null;
+        Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(savedUser.getId());
+        if (agent.isPresent()) {
+            organizationId = agent.get().getOrganizationId();
+        }
+        
         // Generate tokens
         String accessToken = jwtTokenProvider.generateToken(
                 savedUser.getId(),
                 savedUser.getEmail(),
                 scopes,
-                roleNames
+                roleNames,
+                organizationId
         );
         
         String refreshToken = jwtTokenProvider.generateRefreshToken(savedUser.getId());

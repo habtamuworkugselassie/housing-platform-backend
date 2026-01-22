@@ -37,9 +37,26 @@ public class AuthController {
     }
     
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh token", description = "Refresh access token using refresh token")
-    public ResponseEntity<AuthResponse> refreshToken(@RequestHeader("Authorization") String authorization) {
-        String refreshToken = authorization.replace("Bearer ", "").trim();
+    @Operation(summary = "Refresh token", description = "Refresh access token using refresh token. Token can be provided in Authorization header or request body.")
+    public ResponseEntity<AuthResponse> refreshToken(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody(required = false) com.housingplatform.identity.dto.RefreshTokenRequest request) {
+        
+        String refreshToken = null;
+        
+        // Try to get token from request body first
+        if (request != null && request.getRefreshToken() != null && !request.getRefreshToken().trim().isEmpty()) {
+            refreshToken = request.getRefreshToken().trim();
+        } 
+        // Fallback to Authorization header
+        else if (authorization != null && !authorization.trim().isEmpty()) {
+            refreshToken = authorization.replace("Bearer ", "").trim();
+        }
+        
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            throw new com.housingplatform.shared.exception.BusinessException("Refresh token is required. Provide it in the request body as 'refreshToken' or in the Authorization header as 'Bearer <token>'");
+        }
+        
         AuthResponse response = authenticationService.refreshToken(refreshToken);
         return ResponseEntity.ok(response);
     }

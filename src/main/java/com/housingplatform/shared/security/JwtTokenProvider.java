@@ -31,6 +31,10 @@ public class JwtTokenProvider {
     }
     
     public String generateToken(UUID userId, String email, List<String> scopes, List<String> roles) {
+        return generateToken(userId, email, scopes, roles, null);
+    }
+    
+    public String generateToken(UUID userId, String email, List<String> scopes, List<String> roles, UUID organizationId) {
         Instant now = Instant.now();
         Instant expiration = now.plus(jwtExpiration, ChronoUnit.SECONDS);
         
@@ -50,6 +54,11 @@ public class JwtTokenProvider {
         // Add roles before building
         if (roles != null && !roles.isEmpty()) {
             claimsBuilder.add("roles", roles);
+        }
+        
+        // Add organization_id if provided
+        if (organizationId != null) {
+            claimsBuilder.add("organization_id", organizationId.toString());
         }
         
         Claims claims = claimsBuilder.build();

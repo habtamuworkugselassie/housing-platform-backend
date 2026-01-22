@@ -54,7 +54,7 @@ public class PropertyRequest {
     private Integer floorNumber;
     private Integer totalFloors;
     
-    @NotNull(message = "Real estate company ID is required")
+    // Optional for updates, validated at service level for creates
     private UUID realEstateCompanyId;
     
     private UUID agentId; // Optional: will be set from current user's agent profile
@@ -62,10 +62,10 @@ public class PropertyRequest {
     private UUID buildingId; // Optional: if property is part of a building
     private String unitNumber; // Optional: unit number within building (e.g., "A-101", "Unit 5B")
     
-    @NotNull(message = "Construction status is required")
+    // Optional for updates, validated at service level for creates
     private Property.ConstructionStatus constructionStatus;
     
-    @NotNull(message = "Category is required")
+    // Optional for updates, validated at service level for creates
     private Property.PropertyCategory category;
     
     @Min(value = 0, message = "Construction percentage must be between 0 and 100")

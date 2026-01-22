@@ -70,9 +70,32 @@ public class OAuth2ResourceServerConfig {
         // This MUST be ordered first (lower order number = higher priority)
         // Note: /api/v1/auth/logout is excluded as it requires authentication
         http
-            .securityMatcher("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
-                           "/swagger-ui/**", "/swagger-ui.html", 
-                           "/api-docs/**", "/v3/api-docs/**", "/actuator/health", "/error")
+            .securityMatcher(request -> {
+                String path = request.getRequestURI();
+                // Public auth endpoints
+                if (path.equals("/api/v1/auth/register") || 
+                    path.equals("/api/v1/auth/login") || 
+                    path.equals("/api/v1/auth/refresh")) {
+                    return true;
+                }
+                // Swagger/API docs
+                if (path.startsWith("/swagger-ui") || 
+                    path.equals("/swagger-ui.html") ||
+                    path.startsWith("/api-docs") ||
+                    path.startsWith("/v3/api-docs")) {
+                    return true;
+                }
+                // Actuator health
+                if (path.equals("/actuator/health") || path.equals("/error")) {
+                    return true;
+                }
+                // Property image file endpoints (public access for viewing)
+                // Pattern: /api/v1/properties/{propertyId}/images/{imageId}/file
+                if (path.matches("/api/v1/properties/[^/]+/images/[^/]+/file")) {
+                    return true;
+                }
+                return false;
+            })
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> 
@@ -107,6 +130,10 @@ public class OAuth2ResourceServerConfig {
                 // Exclude public auth endpoints, but include logout
                 if (path.startsWith("/api/v1/auth")) {
                     return path.equals("/api/v1/auth/logout");
+                }
+                // Exclude property image file endpoints (public access for viewing)
+                if (path.matches("/api/v1/properties/[^/]+/images/[^/]+/file")) {
+                    return false;
                 }
                 // All other /api/** paths go through this chain
                 return path.startsWith("/api/");

@@ -1,8 +1,10 @@
 package com.housingplatform.shared.security.grant_types.password;
 
 import com.housingplatform.identity.domain.User;
+import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.dto.LoginRequest;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
@@ -35,6 +37,7 @@ import java.util.stream.Collectors;
 public class OAuth2PasswordAuthenticationProvider implements AuthenticationProvider {
     
     private final UserRepository userRepository;
+    private final RealEstateAgentRepository realEstateAgentRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     
@@ -89,12 +92,20 @@ public class OAuth2PasswordAuthenticationProvider implements AuthenticationProvi
                     .map(Enum::name)
                     .collect(Collectors.toList());
             
+            // Get organization_id if user is a real estate agent
+            UUID organizationId = null;
+            Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(user.getId());
+            if (agent.isPresent()) {
+                organizationId = agent.get().getOrganizationId();
+            }
+            
             // Generate access token
             String accessTokenValue = jwtTokenProvider.generateToken(
                     user.getId(),
                     user.getEmail(),
                     scopes,
-                    roles
+                    roles,
+                    organizationId
             );
             
             // Parse the JWT to get expiration
@@ -112,7 +123,7 @@ public class OAuth2PasswordAuthenticationProvider implements AuthenticationProvi
             );
             
             // Create JWT for authentication token
-            Jwt jwt = org.springframework.security.oauth2.jwt.Jwt.withTokenValue(accessTokenValue)
+            var jwtBuilder = org.springframework.security.oauth2.jwt.Jwt.withTokenValue(accessTokenValue)
                     .header("alg", "HS256")
                     .header("typ", "JWT")
                     .issuedAt(issuedAt)
@@ -120,8 +131,14 @@ public class OAuth2PasswordAuthenticationProvider implements AuthenticationProvi
                     .subject(user.getId().toString())
                     .claim("email", user.getEmail())
                     .claim("scope", String.join(" ", scopes))
-                    .claim("roles", roles)
-                    .build();
+                    .claim("roles", roles);
+            
+            // Add organization_id if present
+            if (organizationId != null) {
+                jwtBuilder.claim("organization_id", organizationId.toString());
+            }
+            
+            Jwt jwt = jwtBuilder.build();
             
             // Create authorities from scopes
             var authorities = scopes.stream()

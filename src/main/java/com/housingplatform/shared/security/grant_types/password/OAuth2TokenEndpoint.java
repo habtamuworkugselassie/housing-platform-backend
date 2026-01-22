@@ -1,6 +1,8 @@
 package com.housingplatform.shared.security.grant_types.password;
 
 import com.housingplatform.identity.domain.User;
+import com.housingplatform.identity.domain.RealEstateAgent;
+import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 public class OAuth2TokenEndpoint {
     
     private final OAuth2PasswordAuthenticationProvider passwordAuthenticationProvider;
+    private final RealEstateAgentRepository realEstateAgentRepository;
     private final JwtTokenProvider jwtTokenProvider;
     
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -73,11 +76,19 @@ public class OAuth2TokenEndpoint {
                     .map(Enum::name)
                     .collect(Collectors.toList());
             
+            // Get organization_id if user is a real estate agent
+            UUID organizationId = null;
+            Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(user.getId());
+            if (agent.isPresent()) {
+                organizationId = agent.get().getOrganizationId();
+            }
+            
             String accessTokenValue = jwtTokenProvider.generateToken(
                     user.getId(),
                     user.getEmail(),
                     scopeList,
-                    roles
+                    roles,
+                    organizationId
             );
             
             String refreshTokenValue = jwtTokenProvider.generateRefreshToken(user.getId());

@@ -108,7 +108,7 @@ public class Property extends BaseAuditEntity {
     }
     
     public enum ConstructionStatus {
-        READY_TO_MOVE, UNDER_CONSTRUCTION, PLANNED
+        READY_TO_MOVE, UNDER_CONSTRUCTION, PLANNED, COMPLETED
     }
     
     public enum PropertyCategory {

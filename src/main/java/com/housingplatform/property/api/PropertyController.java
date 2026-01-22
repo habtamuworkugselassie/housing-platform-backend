@@ -17,10 +17,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -129,6 +131,42 @@ public class PropertyController {
             @RequestParam(defaultValue = "50") Integer limit) {
         List<PropertyResponse> properties = propertyService.searchProperties(companyName, city, state, country, title, limit);
         return ResponseEntity.ok(properties);
+    }
+    
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
+    @AuthActionScope("properties.update")
+    @Operation(summary = "Upload property images/videos", description = "Upload photos or videos for a property")
+    public ResponseEntity<PropertyResponse> uploadPropertyMedia(
+            @PathVariable UUID id,
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(required = false) List<String> captions) {
+        UUID userId = UserContext.getCurrentUserId();
+        UUID agentId = getAgentIdForUser(userId);
+        PropertyResponse updated = propertyService.uploadPropertyMedia(id, files, captions, agentId);
+        return ResponseEntity.ok(updated);
+    }
+    
+    @DeleteMapping("/{id}/images/{imageId}")
+    @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
+    @AuthActionScope("properties.update")
+    @Operation(summary = "Delete property image", description = "Delete a specific image from a property")
+    public ResponseEntity<PropertyResponse> deletePropertyImage(
+            @PathVariable UUID id,
+            @PathVariable UUID imageId) {
+        UUID userId = UserContext.getCurrentUserId();
+        UUID agentId = getAgentIdForUser(userId);
+        PropertyResponse updated = propertyService.deletePropertyImage(id, imageId, agentId);
+        return ResponseEntity.ok(updated);
+    }
+    
+    @GetMapping("/{id}/images/{imageId}/file")
+    @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+    @Operation(summary = "Get property image/video file", description = "Retrieve the actual image or video file from database")
+    public ResponseEntity<byte[]> getPropertyImageFile(
+            @PathVariable UUID id,
+            @PathVariable UUID imageId) {
+        return propertyService.getPropertyImageFile(id, imageId);
     }
     
     private boolean isAuthenticated() {

@@ -66,6 +66,9 @@ public class InternalJwtDecoder implements JwtDecoder {
             if (claims.get("roles") != null) {
                 jwtBuilder.claim("roles", claims.get("roles"));
             }
+            if (claims.get("organization_id") != null) {
+                jwtBuilder.claim("organization_id", claims.get("organization_id"));
+            }
             
             return jwtBuilder.build();
         } catch (Exception e) {

@@ -9,7 +9,9 @@ import com.housingplatform.property.domain.Building;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
+import com.housingplatform.property.domain.PropertyImage;
 import com.housingplatform.property.repository.BuildingRepository;
+import com.housingplatform.property.repository.PropertyImageRepository;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
@@ -21,7 +23,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -41,9 +46,23 @@ public class PropertyServiceImpl implements PropertyService {
     private final RealEstateAgentService agentService;
     private final OrganizationRepository organizationRepository;
     private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
+    private final PropertyImageRepository propertyImageRepository;
+    
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     
     @Override
     public PropertyResponse createProperty(PropertyRequest request, UUID agentId) {
+        // Validate required fields for create operation
+        if (request.getRealEstateCompanyId() == null) {
+            throw new BusinessException("Real estate company ID is required");
+        }
+        if (request.getCategory() == null) {
+            throw new BusinessException("Category is required");
+        }
+        if (request.getConstructionStatus() == null) {
+            throw new BusinessException("Construction status is required");
+        }
+        
         // Validate agent can manage properties for this company
         if (agentId != null) {
             agentService.validateAgentCanManageProperty(agentId, request.getRealEstateCompanyId());
@@ -135,16 +154,18 @@ public class PropertyServiceImpl implements PropertyService {
                 }
             ));
         
-        // Sort by sponsorship priority: Premier > Basic > None
+        // Sort by sponsorship priority: Premier (0) > Basic (1) > None (2)
         // Then by creation date (newest first)
+        // This ensures sponsored properties always appear at the top of every page
         List<Property> sortedProperties = allProperties.stream()
             .sorted(Comparator
                 .comparing((Property p) -> {
                     SponsorshipApplication application = applicationMap.get(p.getRealEstateCompanyId());
                     if (application != null && application.isActive()) {
+                        // Premier gets highest priority (0), Basic gets second priority (1)
                         return application.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER ? 0 : 1;
                     }
-                    return 2; // Non-sponsored
+                    return 2; // Non-sponsored properties get lowest priority
                 })
                 .thenComparing(Property::getCreatedAt, Comparator.reverseOrder())
             )
@@ -215,7 +236,7 @@ public class PropertyServiceImpl implements PropertyService {
             }
             
             // Only validate agent can manage property if not super agent (super agents can manage all org properties)
-            if (!isSuperAgent) {
+            if (!isSuperAgent && request.getRealEstateCompanyId() != null) {
                 agentService.validateAgentCanManageProperty(agentId, request.getRealEstateCompanyId());
             }
         }
@@ -336,16 +357,201 @@ public class PropertyServiceImpl implements PropertyService {
             : organizationRepository.findAllById(organizationIds).stream()
                 .collect(Collectors.toMap(Organization::getId, Function.identity()));
         
-        // Map to response and enrich with company names
-        return properties.stream()
+        // Fetch all active sponsorship applications
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+            .collect(Collectors.toMap(
+                app -> app.getOrganization().getId(),
+                Function.identity(),
+                (existing, replacement) -> {
+                    // If multiple active applications exist, prefer PREMIER over BASIC
+                    if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                        return replacement;
+                    }
+                    return existing;
+                }
+            ));
+        
+        // Sort by sponsorship priority: Premier > Basic > None, then by creation date (newest first)
+        List<Property> sortedProperties = properties.stream()
+            .sorted(Comparator
+                .comparing((Property p) -> {
+                    SponsorshipApplication application = applicationMap.get(p.getRealEstateCompanyId());
+                    if (application != null && application.isActive()) {
+                        return application.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER ? 0 : 1;
+                    }
+                    return 2; // Non-sponsored properties get lowest priority
+                })
+                .thenComparing(Property::getCreatedAt, Comparator.reverseOrder())
+            )
+            .collect(Collectors.toList());
+        
+        // Map to response and enrich with company names and sponsorship info
+        return sortedProperties.stream()
                 .map(property -> {
                     PropertyResponse response = propertyMapper.toResponseWithImages(property);
-                    Organization org = organizationsMap.get(property.getRealEstateCompanyId());
-                    if (org != null) {
-                        response.setRealEstateCompanyName(org.getName());
-                    }
+                    enrichWithSponsorshipInfo(response, property, organizationsMap, applicationMap);
                     return response;
                 })
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    @CacheEvict(value = "properties", key = "#id")
+    public PropertyResponse uploadPropertyMedia(UUID id, List<MultipartFile> files, List<String> captions, UUID agentId) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property", id));
+        
+        // Validate agent can manage this property
+        if (agentId != null) {
+            com.housingplatform.identity.dto.AgentResponse agent = agentService.getAgentById(agentId);
+            boolean isSuperAgent = Boolean.TRUE.equals(agent.getIsSuperAgent()) && 
+                    agent.getOrganizationId().equals(property.getRealEstateCompanyId());
+            
+            if (!property.getAgentId().equals(agentId) && !isSuperAgent) {
+                throw new BusinessException("Agent can only update properties they manage or if they are super agent of the organization");
+            }
+        }
+        
+        if (files == null || files.isEmpty()) {
+            throw new BusinessException("At least one file must be provided");
+        }
+        
+        // Get current max display order
+        List<PropertyImage> existingImages = propertyImageRepository.findByPropertyIdOrderByDisplayOrderAsc(id);
+        int nextDisplayOrder = existingImages.isEmpty() ? 0 : 
+                existingImages.stream().mapToInt(PropertyImage::getDisplayOrder).max().orElse(0) + 1;
+        
+        List<PropertyImage> newImages = new ArrayList<>();
+        
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            
+            if (file.isEmpty()) {
+                continue;
+            }
+            
+            // Validate file size
+            if (file.getSize() > MAX_FILE_SIZE) {
+                throw new BusinessException("File " + file.getOriginalFilename() + " exceeds maximum size of 10MB");
+            }
+            
+            // Validate file type (images and videos)
+            String contentType = file.getContentType();
+            if (contentType == null || (!contentType.startsWith("image/") && !contentType.startsWith("video/"))) {
+                throw new BusinessException("File " + file.getOriginalFilename() + " must be an image or video");
+            }
+            
+            try {
+                // Read file bytes
+                byte[] fileData = file.getBytes();
+                
+                // Create image entity with file data stored in database
+                String caption = (captions != null && i < captions.size()) ? captions.get(i) : null;
+                
+                PropertyImage propertyImage = PropertyImage.builder()
+                        .property(property)
+                        .fileData(fileData)
+                        .contentType(contentType)
+                        .fileName(file.getOriginalFilename())
+                        .caption(caption)
+                        .displayOrder(nextDisplayOrder + i)
+                        .isPrimary(existingImages.isEmpty() && i == 0) // First image is primary if no existing images
+                        .build();
+                
+                newImages.add(propertyImage);
+            } catch (IOException e) {
+                throw new BusinessException("Failed to read file " + file.getOriginalFilename() + ": " + e.getMessage());
+            }
+        }
+        
+        // Save all new images
+        if (!newImages.isEmpty()) {
+            propertyImageRepository.saveAll(newImages);
+        }
+        
+        Property updated = propertyRepository.findById(id).orElse(property);
+        return propertyMapper.toResponseWithImages(updated);
+    }
+    
+    @Override
+    @CacheEvict(value = "properties", key = "#id")
+    public PropertyResponse deletePropertyImage(UUID id, UUID imageId, UUID agentId) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property", id));
+        
+        PropertyImage image = propertyImageRepository.findById(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("PropertyImage", imageId));
+        
+        if (!image.getProperty().getId().equals(id)) {
+            throw new BusinessException("Image does not belong to this property");
+        }
+        
+        // Validate agent can manage this property
+        if (agentId != null) {
+            com.housingplatform.identity.dto.AgentResponse agent = agentService.getAgentById(agentId);
+            boolean isSuperAgent = Boolean.TRUE.equals(agent.getIsSuperAgent()) && 
+                    agent.getOrganizationId().equals(property.getRealEstateCompanyId());
+            
+            if (!property.getAgentId().equals(agentId) && !isSuperAgent) {
+                throw new BusinessException("Agent can only update properties they manage or if they are super agent of the organization");
+            }
+        }
+        
+        // Delete from database (file data is stored in DB, so deletion is automatic)
+        propertyImageRepository.delete(image);
+        
+        // If this was the primary image, set the first remaining image as primary
+        if (image.getIsPrimary()) {
+            List<PropertyImage> remainingImages = propertyImageRepository.findByPropertyIdOrderByDisplayOrderAsc(id);
+            if (!remainingImages.isEmpty()) {
+                PropertyImage newPrimary = remainingImages.get(0);
+                newPrimary.setIsPrimary(true);
+                propertyImageRepository.save(newPrimary);
+            }
+        }
+        
+        Property updated = propertyRepository.findById(id).orElse(property);
+        return propertyMapper.toResponseWithImages(updated);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.http.ResponseEntity<byte[]> getPropertyImageFile(UUID id, UUID imageId) {
+        // Verify property exists
+        if (!propertyRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Property", id);
+        }
+        
+        PropertyImage image = propertyImageRepository.findById(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("PropertyImage", imageId));
+        
+        if (!image.getProperty().getId().equals(id)) {
+            throw new BusinessException("Image does not belong to this property");
+        }
+        
+        if (!image.hasFileData()) {
+            throw new ResourceNotFoundException("Image file data not found");
+        }
+        
+        // Determine content type
+        String contentType = image.getContentType();
+        if (contentType == null || contentType.isEmpty()) {
+            contentType = "application/octet-stream";
+        }
+        
+        // Set headers for proper file serving
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType(contentType));
+        headers.setContentLength(image.getFileData().length);
+        
+        // Add content disposition for download (optional, can be inline for display)
+        if (image.getFileName() != null) {
+            headers.setContentDispositionFormData("inline", image.getFileName());
+        }
+        
+        return org.springframework.http.ResponseEntity.ok()
+                .headers(headers)
+                .body(image.getFileData());
     }
 }
