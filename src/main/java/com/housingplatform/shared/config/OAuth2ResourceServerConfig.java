@@ -23,6 +23,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.http.HttpMethod;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -170,6 +171,12 @@ public class OAuth2ResourceServerConfig {
                 // Admin Portal APIs
                 .requestMatchers("/api/v1/organizations/*/approve").hasAuthority("SCOPE_admin")
                 .requestMatchers("/api/v1/organizations/*/reject").hasAuthority("SCOPE_admin")
+                .requestMatchers("/api/v1/organizations/*/suspend").hasAuthority("SCOPE_admin")
+                // Secure endpoints that should not be public
+                .requestMatchers("/api/v1/organizations/my-company").hasAnyAuthority("SCOPE_admin", "SCOPE_banker", "SCOPE_realtor", "SCOPE_supplier")
+                .requestMatchers("/api/v1/organizations/my-bank").hasAnyAuthority("SCOPE_admin", "SCOPE_banker", "SCOPE_realtor", "SCOPE_supplier")
+                // Allow unauthenticated access to GET /api/v1/organizations/{id} only (UUID-based organization details)
+                .requestMatchers(HttpMethod.GET, "/api/v1/organizations/*").permitAll()
                 .requestMatchers("/api/v1/organizations/**").hasAnyAuthority("SCOPE_admin", "SCOPE_banker", "SCOPE_realtor", "SCOPE_supplier")
                 .requestMatchers("/api/v1/users/**").hasAnyAuthority("SCOPE_admin", "SCOPE_buyer", "SCOPE_banker", "SCOPE_realtor", "SCOPE_supplier")
                 

@@ -12,6 +12,7 @@ import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import com.housingplatform.shared.security.PortalScope;
 import com.housingplatform.shared.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -67,9 +68,9 @@ public class RealEstateAgentServiceImpl implements RealEstateAgentService {
             throw new BusinessException("User is already registered as an agent for this organization");
         }
         
-        // If registering for a different user, check if current user is a super agent of the organization
+        // If registering for a different user, check if current user is a super agent of the organization (skip if admin)
         UUID currentUserId = UserContext.getCurrentUserId();
-        if (!userId.equals(currentUserId)) {
+        if (!userId.equals(currentUserId) && !UserContext.isAdmin()) {
             // Current user is registering another user - must be a super agent
             if (!agentRepository.isSuperAgentOfOrganization(request.getOrganizationId(), currentUserId)) {
                 throw new BusinessException("Only super agents can register other agents for their organization");
@@ -92,12 +93,12 @@ public class RealEstateAgentServiceImpl implements RealEstateAgentService {
     
     @Override
     public AgentResponse createAgentForOrganization(CreateAgentRequest request) {
-        // Get current user and verify they are a super agent
+        // Get current user and verify they are a super agent (skip if admin)
         UUID currentUserId = UserContext.getCurrentUserId();
         RealEstateAgent currentAgent = agentRepository.findByUserId(currentUserId)
                 .orElseThrow(() -> new BusinessException("Current user is not registered as an agent"));
         
-        if (!currentAgent.getIsSuperAgent()) {
+        if (!UserContext.isAdmin() && !currentAgent.getIsSuperAgent()) {
             throw new BusinessException("Only super agents can create new agents for their organization");
         }
         
@@ -190,13 +191,15 @@ public class RealEstateAgentServiceImpl implements RealEstateAgentService {
         RealEstateAgent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResourceNotFoundException("RealEstateAgent", agentId));
         
-        // Check if current user is super agent of the agent's organization
-        UUID currentUserId = UserContext.getCurrentUserId();
-        RealEstateAgent currentAgent = agentRepository.findByUserId(currentUserId)
-                .orElseThrow(() -> new BusinessException("User is not a real estate agent"));
-        
-        if (!currentAgent.getIsSuperAgent() || !currentAgent.getOrganizationId().equals(agent.getOrganizationId())) {
-            throw new BusinessException("Only super agents can update agents in their organization");
+        // Check if current user is super agent of the agent's organization (skip if admin)
+        if (!UserContext.isAdmin()) {
+            UUID currentUserId = UserContext.getCurrentUserId();
+            RealEstateAgent currentAgent = agentRepository.findByUserId(currentUserId)
+                    .orElseThrow(() -> new BusinessException("User is not a real estate agent"));
+            
+            if (!currentAgent.getIsSuperAgent() || !currentAgent.getOrganizationId().equals(agent.getOrganizationId())) {
+                throw new BusinessException("Only super agents can update agents in their organization");
+            }
         }
         
         // Don't allow updating super agent status
@@ -224,6 +227,11 @@ public class RealEstateAgentServiceImpl implements RealEstateAgentService {
     @Override
     @Transactional(readOnly = true)
     public void validateAgentCanManageProperty(UUID agentId, UUID propertyCompanyId) {
+        // Skip validation if current user is admin
+        if (UserContext.isAdmin()) {
+            return;
+        }
+        
         RealEstateAgent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResourceNotFoundException("RealEstateAgent", agentId));
         

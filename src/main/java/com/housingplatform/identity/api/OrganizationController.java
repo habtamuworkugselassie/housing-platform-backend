@@ -2,7 +2,6 @@ package com.housingplatform.identity.api;
 
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
-import com.housingplatform.identity.dto.SponsorshipRequest;
 import com.housingplatform.identity.service.OrganizationService;
 import com.housingplatform.shared.security.annotation.AuthActionScope;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
@@ -27,11 +26,17 @@ public class OrganizationController {
     private final OrganizationService organizationService;
     
     @GetMapping
-    @Operation(summary = "List organizations", description = "Retrieve all organizations with optional filtering")
+    @Operation(summary = "List organizations", description = "Retrieve all organizations with optional filtering. Admins can see all organizations.")
     public ResponseEntity<List<OrganizationResponse>> getAllOrganizations(
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) String status) {
-        List<OrganizationResponse> organizations = organizationService.getAllOrganizations(type, status);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
+        // Normalize empty strings to null
+        String normalizedType = (type != null && type.trim().isEmpty()) ? null : type;
+        String normalizedStatus = (status != null && status.trim().isEmpty()) ? null : status;
+        String normalizedSearch = (search != null && search.trim().isEmpty()) ? null : search;
+        
+        List<OrganizationResponse> organizations = organizationService.getAllOrganizations(normalizedType, normalizedStatus, normalizedSearch);
         return ResponseEntity.ok(organizations);
     }
     
@@ -95,5 +100,16 @@ public class OrganizationController {
             @RequestBody(required = false) String reason) {
         OrganizationResponse rejected = organizationService.rejectOrganization(id, reason);
         return ResponseEntity.ok(rejected);
+    }
+    
+    @PutMapping("/{id}/suspend")
+    @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+    @AuthActionScope("organizations.suspend")
+    @Operation(summary = "Suspend organization", description = "Suspend an organization (admin only)")
+    public ResponseEntity<OrganizationResponse> suspendOrganization(
+            @PathVariable UUID id,
+            @RequestBody(required = false) String reason) {
+        OrganizationResponse suspended = organizationService.suspendOrganization(id, reason);
+        return ResponseEntity.ok(suspended);
     }
 }

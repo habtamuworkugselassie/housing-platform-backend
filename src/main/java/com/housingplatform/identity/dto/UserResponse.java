@@ -26,4 +26,17 @@ public class UserResponse {
     private Set<User.UserRole> roles;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    // Computed property for backward compatibility with frontend
+    // This will be serialized as "enabled" in JSON
+    public Boolean getEnabled() {
+        return status != null && status == User.UserStatus.ACTIVE;
+    }
+    
+    // Setter for backward compatibility (maps enabled to status)
+    public void setEnabled(Boolean enabled) {
+        if (enabled != null) {
+            this.status = enabled ? User.UserStatus.ACTIVE : User.UserStatus.INACTIVE;
+        }
+    }
 }

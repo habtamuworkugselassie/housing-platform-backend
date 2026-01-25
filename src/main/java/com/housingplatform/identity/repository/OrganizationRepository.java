@@ -2,6 +2,8 @@ package com.housingplatform.identity.repository;
 
 import com.housingplatform.identity.domain.Organization;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,4 +16,11 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
     List<Organization> findByType(Organization.OrganizationType type);
     List<Organization> findByStatus(Organization.OrganizationStatus status);
     List<Organization> findByTypeAndStatus(Organization.OrganizationType type, Organization.OrganizationStatus status);
+    
+    @Query("SELECT o FROM Organization o WHERE " +
+           "LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(o.registrationNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(o.city) LIKE LOWER(CONCAT('%', :search, '%'))")
+    List<Organization> searchOrganizations(@Param("search") String search);
 }

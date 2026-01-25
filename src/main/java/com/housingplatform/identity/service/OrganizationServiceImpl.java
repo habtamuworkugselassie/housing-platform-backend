@@ -10,6 +10,7 @@ import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import com.housingplatform.shared.security.PortalScope;
 import com.housingplatform.shared.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -113,24 +114,43 @@ public class OrganizationServiceImpl implements OrganizationService {
     
     @Override
     @Transactional(readOnly = true)
-    public List<OrganizationResponse> getAllOrganizations(String type, String status) {
+    public List<OrganizationResponse> getAllOrganizations(String type, String status, String search) {
         List<Organization> organizations;
         
-        if (type != null && status != null) {
-            organizations = organizationRepository.findByTypeAndStatus(
-                    Organization.OrganizationType.valueOf(type.toUpperCase()),
-                    Organization.OrganizationStatus.valueOf(status.toUpperCase())
-            );
-        } else if (type != null) {
-            organizations = organizationRepository.findByType(
-                    Organization.OrganizationType.valueOf(type.toUpperCase())
-            );
-        } else if (status != null) {
-            organizations = organizationRepository.findByStatus(
-                    Organization.OrganizationStatus.valueOf(status.toUpperCase())
-            );
+        // Start with all organizations or search results
+        if (search != null && !search.trim().isEmpty()) {
+            organizations = organizationRepository.searchOrganizations(search.trim());
         } else {
             organizations = organizationRepository.findAll();
+        }
+        
+        // Apply type filter if provided
+        if (type != null && !type.trim().isEmpty()) {
+            try {
+                Organization.OrganizationType orgType = Organization.OrganizationType.valueOf(type.toUpperCase());
+                organizations = organizations.stream()
+                        .filter(org -> org.getType() == orgType)
+                        .collect(Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                // Invalid type, ignore filter
+            }
+        }
+        
+        // Apply status filter if provided
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                // Map frontend status values to backend enum values
+                String statusUpper = status.toUpperCase();
+                if ("PENDING".equals(statusUpper)) {
+                    statusUpper = "PENDING_APPROVAL";
+                }
+                Organization.OrganizationStatus orgStatus = Organization.OrganizationStatus.valueOf(statusUpper);
+                organizations = organizations.stream()
+                        .filter(org -> org.getStatus() == orgStatus)
+                        .collect(Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                // Invalid status, ignore filter
+            }
         }
         
         return organizations.stream()
@@ -143,17 +163,20 @@ public class OrganizationServiceImpl implements OrganizationService {
         Organization organization = organizationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
         
-        // Check if current user is super agent of this organization
-        try {
-            UUID currentUserId = UserContext.getCurrentUserId();
-            RealEstateAgent agent = realEstateAgentRepository.findByUserId(currentUserId)
-                    .orElseThrow(() -> new BusinessException("User is not a real estate agent"));
-            
-            if (!agent.getIsSuperAgent() || !agent.getOrganizationId().equals(id)) {
-                throw new BusinessException("Only super agents can update their own organization");
+        // Check if current user is super agent of this organization (skip if admin)
+        if (!UserContext.isAdmin()) {
+            try {
+                UUID currentUserId = UserContext.getCurrentUserId();
+                RealEstateAgent agent = realEstateAgentRepository.findByUserId(currentUserId)
+                        .orElseThrow(() -> new BusinessException("User is not a real estate agent"));
+                
+                if (!agent.getIsSuperAgent() || !agent.getOrganizationId().equals(id)) {
+                    throw new BusinessException("Only super agents can update their own organization");
+                }
+            } catch (IllegalStateException e) {
+                // User context not available - should not happen in authenticated endpoint
+                throw new BusinessException("User context not available");
             }
-        } catch (IllegalStateException e) {
-            // User context not available - allow if admin (will be checked by security)
         }
         
         organizationMapper.updateEntity(organization, request);
@@ -177,6 +200,16 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
         
         organization.setStatus(Organization.OrganizationStatus.REJECTED);
+        Organization updated = organizationRepository.save(organization);
+        return organizationMapper.toResponse(updated);
+    }
+    
+    @Override
+    public OrganizationResponse suspendOrganization(UUID id, String reason) {
+        Organization organization = organizationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
+        
+        organization.setStatus(Organization.OrganizationStatus.SUSPENDED);
         Organization updated = organizationRepository.save(organization);
         return organizationMapper.toResponse(updated);
     }

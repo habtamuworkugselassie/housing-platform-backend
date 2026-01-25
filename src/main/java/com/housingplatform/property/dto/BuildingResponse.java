@@ -40,6 +40,8 @@ public class BuildingResponse {
     private Boolean isFullyFurnished;
     private Integer availableUnits;
     private Integer occupiedUnits;
+    private Boolean isSponsored;
+    private String sponsorshipType;
     private List<PropertyResponse> units;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

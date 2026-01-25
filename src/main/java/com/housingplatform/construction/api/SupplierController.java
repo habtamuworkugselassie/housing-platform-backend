@@ -33,7 +33,7 @@ public class SupplierController {
     public ResponseEntity<List<OrganizationResponse>> getAllSuppliers(
             @RequestParam(required = false) String status) {
         String filterStatus = status != null ? status : "APPROVED";
-        List<OrganizationResponse> suppliers = organizationService.getAllOrganizations("SUPPLIER", filterStatus);
+        List<OrganizationResponse> suppliers = organizationService.getAllOrganizations("SUPPLIER", filterStatus, null);
         return ResponseEntity.ok(suppliers);
     }
     
@@ -84,7 +84,7 @@ public class SupplierController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String country) {
-        List<OrganizationResponse> allSuppliers = organizationService.getAllOrganizations("SUPPLIER", "APPROVED");
+        List<OrganizationResponse> allSuppliers = organizationService.getAllOrganizations("SUPPLIER", "APPROVED", null);
         
         // Filter by criteria
         List<OrganizationResponse> filtered = allSuppliers.stream()

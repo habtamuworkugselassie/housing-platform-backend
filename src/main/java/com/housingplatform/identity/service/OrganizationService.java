@@ -12,9 +12,10 @@ public interface OrganizationService {
     OrganizationResponse getOrganizationById(UUID id);
     OrganizationResponse getMyOrganization();
     OrganizationResponse getMyBank();
-    List<OrganizationResponse> getAllOrganizations(String type, String status);
+    List<OrganizationResponse> getAllOrganizations(String type, String status, String search);
     OrganizationResponse updateOrganization(UUID id, OrganizationRequest request);
     OrganizationResponse approveOrganization(UUID id);
     OrganizationResponse rejectOrganization(UUID id, String reason);
+    OrganizationResponse suspendOrganization(UUID id, String reason);
     OrganizationResponse getMySupplier();
 }

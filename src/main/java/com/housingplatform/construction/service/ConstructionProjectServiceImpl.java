@@ -100,7 +100,9 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
         ConstructionProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
         
-        if (!project.getRealEstateCompanyId().equals(companyId)) {
+        // Skip ownership check if admin
+        if (!com.housingplatform.shared.security.UserContext.isAdmin() && 
+            !project.getRealEstateCompanyId().equals(companyId)) {
             throw new BusinessException("Project does not belong to the specified company");
         }
         
@@ -129,7 +131,9 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
         ConstructionProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
         
-        if (!project.getRealEstateCompanyId().equals(companyId)) {
+        // Skip ownership check if admin
+        if (!com.housingplatform.shared.security.UserContext.isAdmin() && 
+            !project.getRealEstateCompanyId().equals(companyId)) {
             throw new BusinessException("Project does not belong to the specified company");
         }
         

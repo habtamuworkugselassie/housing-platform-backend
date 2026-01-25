@@ -15,6 +15,7 @@ import com.housingplatform.property.repository.PropertyImageRepository;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import com.housingplatform.shared.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -63,8 +64,8 @@ public class PropertyServiceImpl implements PropertyService {
             throw new BusinessException("Construction status is required");
         }
         
-        // Validate agent can manage properties for this company
-        if (agentId != null) {
+        // Validate agent can manage properties for this company (skip if admin)
+        if (agentId != null && !UserContext.isAdmin()) {
             agentService.validateAgentCanManageProperty(agentId, request.getRealEstateCompanyId());
         }
         
@@ -97,7 +98,41 @@ public class PropertyServiceImpl implements PropertyService {
     public PropertyResponse getPropertyById(UUID id) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
-        return propertyMapper.toResponseWithImages(property);
+        
+        PropertyResponse response = propertyMapper.toResponseWithImages(property);
+        
+        // Enrich with sponsorship info
+        if (property.getRealEstateCompanyId() != null) {
+            // Fetch organization
+            Organization org = organizationRepository.findById(property.getRealEstateCompanyId()).orElse(null);
+            Map<UUID, Organization> organizationsMap = org != null 
+                ? java.util.Map.of(org.getId(), org)
+                : java.util.Collections.emptyMap();
+            
+            // Fetch active sponsorship application for this organization
+            List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository
+                .findAllActiveApplications(java.time.LocalDateTime.now())
+                .stream()
+                .filter(app -> app.getOrganization().getId().equals(property.getRealEstateCompanyId()))
+                .collect(Collectors.toList());
+            
+            Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        // If multiple active applications exist, prefer PREMIER over BASIC
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+            
+            enrichWithSponsorshipInfo(response, property, organizationsMap, applicationMap);
+        }
+        
+        return response;
     }
     
     @Override
@@ -217,8 +252,8 @@ public class PropertyServiceImpl implements PropertyService {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
         
-        // Validate agent can manage this property
-        if (agentId != null) {
+        // Validate agent can manage this property (skip if admin)
+        if (agentId != null && !UserContext.isAdmin()) {
             com.housingplatform.identity.dto.AgentResponse agent = agentService.getAgentById(agentId);
             
             // Check if agent is super agent of the organization that owns the property
@@ -252,8 +287,8 @@ public class PropertyServiceImpl implements PropertyService {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
         
-        // Validate agent can manage this property
-        if (agentId != null) {
+        // Validate agent can manage this property (skip if admin)
+        if (agentId != null && !UserContext.isAdmin()) {
             com.housingplatform.identity.dto.AgentResponse agent = agentService.getAgentById(agentId);
             
             // Check if agent is super agent of the organization that owns the property
@@ -402,8 +437,8 @@ public class PropertyServiceImpl implements PropertyService {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property", id));
         
-        // Validate agent can manage this property
-        if (agentId != null) {
+        // Validate agent can manage this property (skip if admin)
+        if (agentId != null && !UserContext.isAdmin()) {
             com.housingplatform.identity.dto.AgentResponse agent = agentService.getAgentById(agentId);
             boolean isSuperAgent = Boolean.TRUE.equals(agent.getIsSuperAgent()) && 
                     agent.getOrganizationId().equals(property.getRealEstateCompanyId());
@@ -487,8 +522,8 @@ public class PropertyServiceImpl implements PropertyService {
             throw new BusinessException("Image does not belong to this property");
         }
         
-        // Validate agent can manage this property
-        if (agentId != null) {
+        // Validate agent can manage this property (skip if admin)
+        if (agentId != null && !UserContext.isAdmin()) {
             com.housingplatform.identity.dto.AgentResponse agent = agentService.getAgentById(agentId);
             boolean isSuperAgent = Boolean.TRUE.equals(agent.getIsSuperAgent()) && 
                     agent.getOrganizationId().equals(property.getRealEstateCompanyId());

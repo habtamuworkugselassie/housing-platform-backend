@@ -44,6 +44,14 @@ public class UserContext {
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
     
+    /**
+     * Check if the current user has admin scope
+     * @return true if user has admin scope, false otherwise
+     */
+    public static boolean isAdmin() {
+        return hasScope(PortalScope.ADMIN);
+    }
+    
     public static java.util.Optional<UUID> getCurrentUserOrganizationId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof Jwt jwt) {

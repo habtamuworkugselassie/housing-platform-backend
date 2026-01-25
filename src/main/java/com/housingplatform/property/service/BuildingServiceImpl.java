@@ -1,6 +1,8 @@
 package com.housingplatform.property.service;
 
+import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.repository.OrganizationRepository;
+import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.property.domain.Building;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.BuildingRequest;
@@ -16,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +31,7 @@ public class BuildingServiceImpl implements BuildingService {
     private final BuildingRepository buildingRepository;
     private final PropertyRepository propertyRepository;
     private final OrganizationRepository organizationRepository;
+    private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
     private final BuildingMapper buildingMapper;
     private final PropertyMapper propertyMapper;
     
@@ -44,7 +49,22 @@ public class BuildingServiceImpl implements BuildingService {
         }
         
         Building saved = buildingRepository.save(building);
-        return enrichBuildingResponse(saved);
+        
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
+        return enrichBuildingResponse(saved, applicationMap);
     }
     
     @Override
@@ -52,24 +72,67 @@ public class BuildingServiceImpl implements BuildingService {
     public BuildingResponse getBuildingById(UUID id) {
         Building building = buildingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Building", id));
-        return enrichBuildingResponse(building);
+        
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
+        return enrichBuildingResponse(building, applicationMap);
     }
     
     @Override
     @Transactional(readOnly = true)
     public List<BuildingResponse> getBuildingsByCompanyId(UUID companyId) {
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
         return buildingRepository.findByRealEstateCompanyId(companyId)
                 .stream()
-                .map(this::enrichBuildingResponse)
+                .map(building -> enrichBuildingResponse(building, applicationMap))
                 .collect(Collectors.toList());
     }
     
     @Override
     @Transactional(readOnly = true)
     public List<BuildingResponse> getBuildingsByAgentId(UUID agentId) {
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
         return buildingRepository.findByAgentId(agentId)
                 .stream()
-                .map(this::enrichBuildingResponse)
+                .map(building -> enrichBuildingResponse(building, applicationMap))
                 .collect(Collectors.toList());
     }
     
@@ -78,13 +141,30 @@ public class BuildingServiceImpl implements BuildingService {
         Building building = buildingRepository.findById(buildingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Building", buildingId));
         
-        if (!building.getRealEstateCompanyId().equals(companyId)) {
+        // Skip ownership check if admin
+        if (!com.housingplatform.shared.security.UserContext.isAdmin() && 
+            !building.getRealEstateCompanyId().equals(companyId)) {
             throw new BusinessException("Building does not belong to the specified company");
         }
         
         buildingMapper.updateEntity(building, request);
         Building updated = buildingRepository.save(building);
-        return enrichBuildingResponse(updated);
+        
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
+        return enrichBuildingResponse(updated, applicationMap);
     }
     
     @Override
@@ -92,7 +172,9 @@ public class BuildingServiceImpl implements BuildingService {
         Building building = buildingRepository.findById(buildingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Building", buildingId));
         
-        if (!building.getRealEstateCompanyId().equals(companyId)) {
+        // Skip ownership check if admin
+        if (!com.housingplatform.shared.security.UserContext.isAdmin() && 
+            !building.getRealEstateCompanyId().equals(companyId)) {
             throw new BusinessException("Building does not belong to the specified company");
         }
         
@@ -126,8 +208,23 @@ public class BuildingServiceImpl implements BuildingService {
             buildings = buildingRepository.findAll();
         }
         
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        // If multiple active applications exist, prefer PREMIER over BASIC
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
         return buildings.stream()
-                .map(this::enrichBuildingResponse)
+                .map(building -> enrichBuildingResponse(building, applicationMap))
                 .collect(Collectors.toList());
     }
     
@@ -188,17 +285,49 @@ public class BuildingServiceImpl implements BuildingService {
                     .collect(Collectors.toList());
         }
         
+        // Fetch active sponsorship applications for enrichment
+        List<SponsorshipApplication> activeApplications = sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+        Map<UUID, SponsorshipApplication> applicationMap = activeApplications.stream()
+                .collect(Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                        // If multiple active applications exist, prefer PREMIER over BASIC
+                        if (replacement.getSponsorship().getType() == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.PREMIER) {
+                            return replacement;
+                        }
+                        return existing;
+                    }
+                ));
+        
         return buildings.stream()
-                .map(this::enrichBuildingResponse)
+                .map(building -> enrichBuildingResponse(building, applicationMap))
                 .collect(Collectors.toList());
     }
     
     private BuildingResponse enrichBuildingResponse(Building building) {
+        return enrichBuildingResponse(building, java.util.Collections.emptyMap());
+    }
+    
+    private BuildingResponse enrichBuildingResponse(Building building, Map<UUID, SponsorshipApplication> applicationMap) {
         BuildingResponse response = buildingMapper.toResponse(building);
         
         // Get organization name
         organizationRepository.findById(building.getRealEstateCompanyId())
                 .ifPresent(org -> response.setRealEstateCompanyName(org.getName()));
+        
+        // Enrich with sponsorship info
+        if (building.getRealEstateCompanyId() != null && !applicationMap.isEmpty()) {
+            SponsorshipApplication application = applicationMap.get(building.getRealEstateCompanyId());
+            if (application != null && application.isActive()) {
+                response.setIsSponsored(true);
+                response.setSponsorshipType(application.getSponsorship().getType().name());
+            } else {
+                response.setIsSponsored(false);
+            }
+        } else {
+            response.setIsSponsored(false);
+        }
         
         // Get all units for this building
         List<Property> units = propertyRepository.findAll().stream()
