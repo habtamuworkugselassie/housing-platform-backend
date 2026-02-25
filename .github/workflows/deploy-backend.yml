@@ -31,7 +31,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: your-dockerhub-username/housing-platform-backend:latest
+          tags: habtamuwgs/housing-platform-backend:latest
 
       - name: Deploy on DigitalOcean droplet
         uses: appleboy/ssh-action@v1.2.0
@@ -41,6 +41,6 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             cd ~/housing-platform
-            docker pull your-dockerhub-username/housing-platform-backend:latest
+            docker pull habtamuwgs/housing-platform-backend:latest
             docker compose up -d backend
             docker image prune -f
