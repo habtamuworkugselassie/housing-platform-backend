@@ -8,34 +8,36 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface ConstructionPhaseMapper {
-    
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "project", ignore = true)
-    @Mapping(target = "status", ignore = true)
-    @Mapping(target = "completionPercentage", ignore = true)
-    @Mapping(target = "actualCost", ignore = true)
-    @Mapping(target = "actualEndDate", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "version", ignore = true)
-    @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "updatedBy", ignore = true)
-    ConstructionPhase toEntity(ConstructionPhaseRequest request);
-    
-    @Mapping(target = "projectId", source = "project.id")
-    @Mapping(target = "projectName", source = "project.name")
-    ConstructionPhaseResponse toResponse(ConstructionPhase phase);
-    
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "project", ignore = true)
-    @Mapping(target = "status", ignore = true)
-    @Mapping(target = "completionPercentage", ignore = true)
-    @Mapping(target = "actualCost", ignore = true)
-    @Mapping(target = "actualEndDate", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "version", ignore = true)
-    void updateEntity(@MappingTarget ConstructionPhase phase, ConstructionPhaseRequest request);
+
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "project", ignore = true)
+  @Mapping(target = "status", ignore = true)
+  @Mapping(target = "completionPercentage", ignore = true)
+  @Mapping(target = "actualCost", ignore = true)
+  @Mapping(target = "actualEndDate", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "createdBy", ignore = true)
+  @Mapping(target = "updatedBy", ignore = true)
+  ConstructionPhase toEntity(ConstructionPhaseRequest request);
+
+  @Mapping(target = "projectId", source = "project.id")
+  @Mapping(target = "projectName", source = "project.name")
+  ConstructionPhaseResponse toResponse(ConstructionPhase phase);
+
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "project", ignore = true)
+  @Mapping(target = "status", ignore = true)
+  @Mapping(target = "completionPercentage", ignore = true)
+  @Mapping(target = "actualCost", ignore = true)
+  @Mapping(target = "actualEndDate", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  void updateEntity(@MappingTarget ConstructionPhase phase, ConstructionPhaseRequest request);
 }

@@ -17,13 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
 public class AdminController {
-    
-    private final AdminService adminService;
-    
-    @GetMapping("/stats")
-    @Operation(summary = "Get admin dashboard statistics", description = "Retrieve statistics for the admin dashboard (admin only)")
-    public ResponseEntity<AdminStatsResponse> getStats() {
-        AdminStatsResponse stats = adminService.getStats();
-        return ResponseEntity.ok(stats);
-    }
+
+  private final AdminService adminService;
+
+  @GetMapping("/stats")
+  @Operation(
+      summary = "Get admin dashboard statistics",
+      description = "Retrieve statistics for the admin dashboard (admin only)")
+  public ResponseEntity<AdminStatsResponse> getStats() {
+    AdminStatsResponse stats = adminService.getStats();
+    return ResponseEntity.ok(stats);
+  }
 }

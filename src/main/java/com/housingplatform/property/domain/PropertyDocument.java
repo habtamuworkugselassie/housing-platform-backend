@@ -5,8 +5,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
-import java.util.UUID;
-
 @Entity
 @Table(name = "property_documents")
 @Getter
@@ -14,27 +12,29 @@ import java.util.UUID;
 @NoArgsConstructor
 @SuperBuilder
 public class PropertyDocument extends BaseEntity {
-    
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "property_id", nullable = false)
-    private Property property;
-    
-    @Column(nullable = false)
-    private String documentType;
-    
-    @Column(nullable = false)
-    private String fileName;
-    
-    @Column(nullable = false)
-    private String fileUrl;
-    
-    private String description;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private DocumentStatus status;
-    
-    public enum DocumentStatus {
-        PENDING, VERIFIED, REJECTED
-    }
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "property_id", nullable = false)
+  private Property property;
+
+  @Column(nullable = false)
+  private String documentType;
+
+  @Column(nullable = false)
+  private String fileName;
+
+  @Column(nullable = false)
+  private String fileUrl;
+
+  private String description;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private DocumentStatus status;
+
+  public enum DocumentStatus {
+    PENDING,
+    VERIFIED,
+    REJECTED
+  }
 }

@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class LoanRejectionRequest {
-    
-    @NotBlank(message = "Rejection reason is required")
-    private String rejectionReason;
+
+  @NotBlank(message = "Rejection reason is required")
+  private String rejectionReason;
 }

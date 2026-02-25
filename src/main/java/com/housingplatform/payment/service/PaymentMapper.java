@@ -6,8 +6,11 @@ import com.housingplatform.payment.dto.PaymentResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface PaymentMapper {
-    Payment toEntity(PaymentRequest request);
-    PaymentResponse toResponse(Payment payment);
+  Payment toEntity(PaymentRequest request);
+
+  PaymentResponse toResponse(Payment payment);
 }

@@ -7,16 +7,15 @@ import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoCo
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 
-@SpringBootApplication(exclude = {
-    RedisAutoConfiguration.class,
-    RedisRepositoriesAutoConfiguration.class
-    // Redis is conditionally enabled via RedisConfig only when rate limiting is enabled
-})
+@SpringBootApplication(
+    exclude = {RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class
+      // Redis is conditionally enabled via RedisConfig only when rate limiting is enabled
+    })
 @EnableJpaAuditing
 @EnableAsync
 public class HousingPlatformApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(HousingPlatformApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(HousingPlatformApplication.class, args);
+  }
 }

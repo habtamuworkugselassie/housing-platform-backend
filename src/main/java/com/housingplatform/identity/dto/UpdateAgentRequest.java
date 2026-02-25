@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateAgentRequest {
-    private String licenseNumber;
-    private String notes;
-    private RealEstateAgent.AgentStatus status;
+  private String licenseNumber;
+  private String notes;
+  private RealEstateAgent.AgentStatus status;
 }

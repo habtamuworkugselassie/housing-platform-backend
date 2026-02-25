@@ -7,9 +7,13 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface MaterialMapper {
-    Material toEntity(MaterialRequest request);
-    MaterialResponse toResponse(Material material);
-    void updateEntity(@MappingTarget Material material, MaterialRequest request);
+  Material toEntity(MaterialRequest request);
+
+  MaterialResponse toResponse(Material material);
+
+  void updateEntity(@MappingTarget Material material, MaterialRequest request);
 }

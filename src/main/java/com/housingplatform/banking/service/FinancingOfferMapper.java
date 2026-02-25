@@ -7,9 +7,13 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface FinancingOfferMapper {
-    FinancingOffer toEntity(FinancingOfferRequest request);
-    FinancingOfferResponse toResponse(FinancingOffer offer);
-    void updateEntity(@MappingTarget FinancingOffer offer, FinancingOfferRequest request);
+  FinancingOffer toEntity(FinancingOfferRequest request);
+
+  FinancingOfferResponse toResponse(FinancingOffer offer);
+
+  void updateEntity(@MappingTarget FinancingOffer offer, FinancingOfferRequest request);
 }

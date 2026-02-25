@@ -7,10 +7,13 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring",
-        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface CreditProductMapper {
-    CreditProduct toEntity(CreditProductRequest request);
-    CreditProductResponse toResponse(CreditProduct product);
-    void updateEntity(@MappingTarget CreditProduct product, CreditProductRequest request);
+  CreditProduct toEntity(CreditProductRequest request);
+
+  CreditProductResponse toResponse(CreditProduct product);
+
+  void updateEntity(@MappingTarget CreditProduct product, CreditProductRequest request);
 }

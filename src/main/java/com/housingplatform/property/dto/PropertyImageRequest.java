@@ -10,8 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PropertyImageRequest {
-    private String imageUrl;
-    private String caption;
-    private Integer displayOrder;
-    private Boolean isPrimary;
+  private String imageUrl;
+  private String caption;
+  private Integer displayOrder;
+  private Boolean isPrimary;
 }
