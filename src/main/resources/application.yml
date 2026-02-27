@@ -143,7 +143,7 @@ logging:
     org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter: WARN
 
 jwt:
-  secret: ${JWT_SECRET:your-256-bit-secret-key-change-this-in-production-minimum-32-characters-long}
+  secret: ${JWT_SECRET:}
   expiration: ${JWT_EXPIRATION:3600}
   issuer: ${JWT_ISSUER:housing-platform}
 

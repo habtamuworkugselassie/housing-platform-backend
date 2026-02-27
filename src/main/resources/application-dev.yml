@@ -21,3 +21,8 @@ logging:
     com.housingplatform: DEBUG
     org.springframework.web: DEBUG
     org.springframework.security: DEBUG
+
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-change-this-in-production-minimum-32-characters-long}
+  expiration: ${JWT_EXPIRATION:3600}
+  issuer: ${JWT_ISSUER:housing-platform}

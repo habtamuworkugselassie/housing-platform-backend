@@ -146,10 +146,9 @@ public class ScopeAuthorizationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
         return;
       }
-      log.warn("Missing scope annotations for endpoint: {}", path);
-      // For now, allow if no annotations (can be made stricter)
-      filterChain.doFilter(request, response);
-      return;
+      log.error("Missing required scope annotations for endpoint: {}", path);
+      throw new AccessDeniedException(
+          "Endpoint is missing required authorization annotations: " + path);
     }
 
     // Check if it's UNSECURED

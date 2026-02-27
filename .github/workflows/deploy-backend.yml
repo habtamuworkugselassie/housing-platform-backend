@@ -43,4 +43,4 @@ jobs:
             cd ~/housing-platform
             docker pull habtamuwgs/housing-platform-backend:latest
             docker compose up -d backend
-            docker image prune -f
+            docker image prune -fx

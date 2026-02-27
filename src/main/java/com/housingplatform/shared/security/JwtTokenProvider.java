@@ -11,12 +11,13 @@ import java.util.List;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.Assert;
 import org.springframework.stereotype.Component;
 
 @Component
 public class JwtTokenProvider {
 
-  @Value("${jwt.secret:your-256-bit-secret-key-change-this-in-production-minimum-32-characters}")
+  @Value("${jwt.secret:}")
   private String jwtSecret;
 
   @Value("${jwt.expiration:3600}") // 1 hour default
@@ -26,6 +27,9 @@ public class JwtTokenProvider {
   private String jwtIssuer;
 
   private SecretKey getSigningKey() {
+    Assert.hasText(jwtSecret, "jwt.secret must be configured");
+    Assert.isTrue(
+        jwtSecret.length() >= 32, "jwt.secret must be at least 32 characters for HS256 signing");
     return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
   }
 

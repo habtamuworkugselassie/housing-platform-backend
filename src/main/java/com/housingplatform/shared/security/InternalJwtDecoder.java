@@ -9,6 +9,7 @@ import javax.crypto.SecretKey;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.util.Assert;
 
 public class InternalJwtDecoder implements JwtDecoder {
 
@@ -16,22 +17,23 @@ public class InternalJwtDecoder implements JwtDecoder {
   private final String jwtIssuer;
 
   public InternalJwtDecoder() {
-    // Default values - will be overridden by Spring
-    this.jwtSecret =
-        System.getProperty(
-            "jwt.secret",
-            System.getenv()
-                .getOrDefault(
-                    "JWT_SECRET",
-                    "your-256-bit-secret-key-change-this-in-production-minimum-32-characters"));
+    this.jwtSecret = System.getProperty("jwt.secret", System.getenv().getOrDefault("JWT_SECRET", ""));
     this.jwtIssuer =
         System.getProperty(
             "jwt.issuer", System.getenv().getOrDefault("JWT_ISSUER", "housing-platform"));
+    validateJwtSecret(this.jwtSecret);
   }
 
   public InternalJwtDecoder(String jwtSecret, String jwtIssuer) {
     this.jwtSecret = jwtSecret;
     this.jwtIssuer = jwtIssuer;
+    validateJwtSecret(this.jwtSecret);
+  }
+
+  private void validateJwtSecret(String secret) {
+    Assert.hasText(secret, "jwt.secret must be configured");
+    Assert.isTrue(
+        secret.length() >= 32, "jwt.secret must be at least 32 characters for HS256 signing");
   }
 
   private SecretKey getSigningKey() {

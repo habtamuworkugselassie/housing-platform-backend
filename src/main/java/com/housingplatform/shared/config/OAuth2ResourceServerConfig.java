@@ -7,6 +7,7 @@ import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -46,11 +47,15 @@ public class OAuth2ResourceServerConfig {
   @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
   private String jwkSetUri;
 
-  @Value("${jwt.secret:your-256-bit-secret-key-change-this-in-production-minimum-32-characters}")
+  @Value("${jwt.secret:}")
   private String jwtSecret;
 
   @Value("${jwt.issuer:housing-platform}")
   private String jwtIssuer;
+
+  @Value(
+      "${app.cors.allowed-origin-patterns:http://localhost:5173,http://127.0.0.1:5173,https://housing-platform-frontend.onrender.com}")
+  private String allowedOriginPatterns;
 
   private final ScopeAuthorizationFilter scopeAuthorizationFilter;
   private RateLimitingFilter rateLimitingFilter;
@@ -370,12 +375,14 @@ public class OAuth2ResourceServerConfig {
     CorsConfiguration configuration = new CorsConfiguration();
     // Use allowedOriginPatterns instead of allowedOrigins when allowCredentials is true
     // This allows pattern matching while still supporting credentials
-    configuration.setAllowedOriginPatterns(
-        List.of(
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "https://housing-platform-frontend.onrender.com",
-            "https://*.onrender.com"));
+    List<String> parsedOriginPatterns = new ArrayList<>();
+    for (String originPattern : allowedOriginPatterns.split(",")) {
+      String trimmed = originPattern.trim();
+      if (!trimmed.isEmpty()) {
+        parsedOriginPatterns.add(trimmed);
+      }
+    }
+    configuration.setAllowedOriginPatterns(parsedOriginPatterns);
     configuration.setAllowedMethods(
         Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("*"));
