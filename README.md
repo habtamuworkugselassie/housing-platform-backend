@@ -176,6 +176,7 @@ Key environment variables:
 - `DATABASE_URL`: PostgreSQL connection URL
 - `DATABASE_USERNAME`: Database username
 - `DATABASE_PASSWORD`: Database password
+- `FRONTEND_BASE_URL`: Public URL of the frontend (e.g. `https://your-app.com`). Used for password-reset email links. Set as GitHub secret `FRONTEND_BASE_URL` for deploy workflow.
 - `REDIS_HOST`: Redis host
 - `REDIS_PORT`: Redis port
 - `KAFKA_BOOTSTRAP_SERVERS`: Kafka bootstrap servers
