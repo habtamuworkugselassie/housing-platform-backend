@@ -54,10 +54,11 @@ public class OAuth2ResourceServerConfig {
   private String jwtIssuer;
 
   @Value(
-      "${app.cors.allowed-origin-patterns:http://localhost:5173,http://127.0.0.1:5173,https://housing-platform-frontend.onrender.com}")
+      "${app.cors.allowed-origin-patterns:http://localhost:5173,http://127.0.0.1:5173,http://209.38.204.219*}")
   private String allowedOriginPatterns;
 
   private final ScopeAuthorizationFilter scopeAuthorizationFilter;
+
   private RateLimitingFilter rateLimitingFilter;
 
   public OAuth2ResourceServerConfig(ScopeAuthorizationFilter scopeAuthorizationFilter) {
