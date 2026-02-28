@@ -48,7 +48,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     String path = request.getRequestURI();
 
     // Apply rate limiting only to authentication endpoints
-    if (path.equals("/api/v1/auth/login") || path.equals("/api/v1/auth/register")) {
+    if (path.equals("/api/v1/auth/login")
+        || path.equals("/api/v1/auth/register")
+        || path.equals("/api/v1/auth/forgot-password")) {
       String clientIdentifier = getClientIdentifier(request);
       String rateLimitKey = "rate_limit:auth:" + clientIdentifier;
 

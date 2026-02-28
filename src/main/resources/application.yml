@@ -142,6 +142,11 @@ logging:
     org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider: WARN
     org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter: WARN
 
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  password-reset:
+    expiry-hours: ${PASSWORD_RESET_EXPIRY_HOURS:1}
+
 jwt:
   secret: ${JWT_SECRET:}
   expiration: ${JWT_EXPIRATION:3600}

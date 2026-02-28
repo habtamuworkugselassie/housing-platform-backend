@@ -1,15 +1,22 @@
 package com.housingplatform.identity.service;
 
+import com.housingplatform.identity.domain.PasswordResetToken;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AuthResponse;
+import com.housingplatform.identity.dto.ForgotPasswordRequest;
 import com.housingplatform.identity.dto.LoginRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
+import com.housingplatform.identity.dto.ResetPasswordRequest;
+import com.housingplatform.identity.repository.PasswordResetTokenRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,10 +34,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AuthenticationService {
 
+  private static final int RESET_TOKEN_EXPIRY_HOURS = 1;
+  private static final int RESET_TOKEN_BYTES = 32;
+
   private final UserRepository userRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
+  private final PasswordResetTokenRepository passwordResetTokenRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
+  private final PasswordResetEmailService passwordResetEmailService;
+
+  @Value("${app.password-reset.expiry-hours:" + RESET_TOKEN_EXPIRY_HOURS + "}")
+  private int resetTokenExpiryHours;
 
   public AuthResponse login(LoginRequest request) {
     // Find user by email, username, or phone number
@@ -278,5 +294,62 @@ public class AuthenticationService {
     // 2. Log logout events for audit purposes
     // 3. Invalidate refresh tokens
     // For now, it's a no-op as tokens are stateless
+  }
+
+  /**
+   * Initiates password reset: creates a token, stores it, and sends an email with the reset link.
+   * Does not reveal whether the email exists (always returns success for valid email format).
+   */
+  public void requestPasswordReset(ForgotPasswordRequest request) {
+    Optional<User> userOpt = userRepository.findByEmail(request.getEmail().trim().toLowerCase());
+    if (userOpt.isEmpty()) {
+      return;
+    }
+    User user = userOpt.get();
+    passwordResetTokenRepository.deleteByUserId(user.getId());
+
+    String token = generateSecureToken();
+    Instant expiresAt = Instant.now().plusSeconds(resetTokenExpiryHours * 3600L);
+    PasswordResetToken resetToken =
+        PasswordResetToken.builder()
+            .token(token)
+            .userId(user.getId())
+            .expiresAt(expiresAt)
+            .build();
+    passwordResetTokenRepository.save(resetToken);
+
+    passwordResetEmailService.sendPasswordResetEmail(user.getEmail(), token);
+  }
+
+  /**
+   * Resets password using the token from the email link. Invalidates the token after use.
+   */
+  public void resetPassword(ResetPasswordRequest request) {
+    Instant now = Instant.now();
+    PasswordResetToken resetToken =
+        passwordResetTokenRepository
+            .findByTokenAndUsedAtIsNullAndExpiresAtAfter(request.getToken().trim(), now)
+            .orElseThrow(
+                () ->
+                    new BusinessException(
+                        "Invalid or expired reset link. Please request a new password reset."));
+
+    User user =
+        userRepository
+            .findById(resetToken.getUserId())
+            .orElseThrow(() -> new BusinessException("User not found"));
+
+    user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+    userRepository.save(user);
+
+    resetToken.setUsedAt(now);
+    passwordResetTokenRepository.save(resetToken);
+  }
+
+  private static String generateSecureToken() {
+    SecureRandom random = new SecureRandom();
+    byte[] bytes = new byte[RESET_TOKEN_BYTES];
+    random.nextBytes(bytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 }

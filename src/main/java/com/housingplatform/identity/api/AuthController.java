@@ -1,8 +1,10 @@
 package com.housingplatform.identity.api;
 
 import com.housingplatform.identity.dto.AuthResponse;
+import com.housingplatform.identity.dto.ForgotPasswordRequest;
 import com.housingplatform.identity.dto.LoginRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
+import com.housingplatform.identity.dto.ResetPasswordRequest;
 import com.housingplatform.identity.service.AuthenticationService;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import io.swagger.v3.oas.annotations.Operation;
@@ -82,6 +84,25 @@ public class AuthController {
     // The backend endpoint provides a way to explicitly log out and can be extended
     // to support token blacklisting (e.g., using Redis) if needed
     authenticationService.logout();
+    return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/forgot-password")
+  @Operation(
+      summary = "Request password reset",
+      description =
+          "Sends a password reset link to the given email if the account exists. Always returns 200 to avoid email enumeration.")
+  public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    authenticationService.requestPasswordReset(request);
+    return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/reset-password")
+  @Operation(
+      summary = "Reset password",
+      description = "Sets a new password using the token from the reset email link.")
+  public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    authenticationService.resetPassword(request);
     return ResponseEntity.ok().build();
   }
 }
