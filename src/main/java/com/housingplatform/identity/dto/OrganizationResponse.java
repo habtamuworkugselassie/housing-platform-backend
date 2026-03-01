@@ -2,6 +2,7 @@ package com.housingplatform.identity.dto;
 
 import com.housingplatform.identity.domain.Organization;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,4 +29,10 @@ public class OrganizationResponse {
   private UUID primaryContactUserId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+
+  /** Logo URL (from media attachment with kind LOGO or primary). */
+  private String logoUrl;
+
+  /** All media attachments (logo, images, videos). */
+  private List<OrganizationMediaItem> media;
 }

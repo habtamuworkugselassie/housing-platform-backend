@@ -5,13 +5,13 @@ import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.service.RealEstateAgentService;
+import com.housingplatform.media.domain.MediaAttachment;
+import com.housingplatform.media.repository.MediaAttachmentRepository;
 import com.housingplatform.property.domain.Building;
 import com.housingplatform.property.domain.Property;
-import com.housingplatform.property.domain.PropertyImage;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
 import com.housingplatform.property.repository.BuildingRepository;
-import com.housingplatform.property.repository.PropertyImageRepository;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
@@ -46,7 +46,7 @@ public class PropertyServiceImpl implements PropertyService {
   private final RealEstateAgentService agentService;
   private final OrganizationRepository organizationRepository;
   private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
-  private final PropertyImageRepository propertyImageRepository;
+  private final MediaAttachmentRepository mediaAttachmentRepository;
 
   private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -351,6 +351,52 @@ public class PropertyServiceImpl implements PropertyService {
 
   @Override
   @Transactional(readOnly = true)
+  public List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId) {
+    List<Property> properties =
+        propertyRepository.findByRealEstateCompanyId(companyId).stream()
+            .filter(p -> p.getStatus() == Property.PropertyStatus.AVAILABLE)
+            .collect(Collectors.toList());
+    if (properties.isEmpty()) {
+      return List.of();
+    }
+    Set<UUID> organizationIds =
+        properties.stream()
+            .map(Property::getRealEstateCompanyId)
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toSet());
+    Map<UUID, Organization> organizationsMap =
+        organizationIds.isEmpty()
+            ? java.util.Collections.emptyMap()
+            : organizationRepository.findAllById(organizationIds).stream()
+                .collect(Collectors.toMap(Organization::getId, Function.identity()));
+    List<SponsorshipApplication> activeApplications =
+        sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+    Map<UUID, SponsorshipApplication> applicationMap =
+        activeApplications.stream()
+            .collect(
+                Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIER) {
+                        return replacement;
+                      }
+                      return existing;
+                    }));
+    return properties.stream()
+        .map(
+            p -> {
+              PropertyResponse response = propertyMapper.toResponseWithImages(p);
+              enrichWithSponsorshipInfo(response, p, organizationsMap, applicationMap);
+              return response;
+            })
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public List<PropertyResponse> getPropertiesByAgentId(UUID agentId) {
     return propertyRepository.findByAgentId(agentId).stream()
         .map(propertyMapper::toResponseWithImages)
@@ -511,14 +557,15 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     // Get current max display order
-    List<PropertyImage> existingImages =
-        propertyImageRepository.findByPropertyIdOrderByDisplayOrderAsc(id);
+    List<MediaAttachment> existingImages =
+        mediaAttachmentRepository.findByPropertyIdOrderByDisplayOrderAsc(id);
     int nextDisplayOrder =
         existingImages.isEmpty()
             ? 0
-            : existingImages.stream().mapToInt(PropertyImage::getDisplayOrder).max().orElse(0) + 1;
+            : existingImages.stream().mapToInt(MediaAttachment::getDisplayOrder).max().orElse(0)
+                + 1;
 
-    List<PropertyImage> newImages = new ArrayList<>();
+    List<MediaAttachment> newImages = new ArrayList<>();
 
     for (int i = 0; i < files.size(); i++) {
       MultipartFile file = files.get(i);
@@ -545,11 +592,12 @@ public class PropertyServiceImpl implements PropertyService {
         // Read file bytes
         byte[] fileData = file.getBytes();
 
-        // Create image entity with file data stored in database
+        // Create media attachment (image or video) with file data stored in database
         String caption = (captions != null && i < captions.size()) ? captions.get(i) : null;
+        boolean isVideo = contentType != null && contentType.startsWith("video/");
 
-        PropertyImage propertyImage =
-            PropertyImage.builder()
+        MediaAttachment attachment =
+            MediaAttachment.builder()
                 .property(property)
                 .fileData(fileData)
                 .contentType(contentType)
@@ -559,18 +607,20 @@ public class PropertyServiceImpl implements PropertyService {
                 .isPrimary(
                     existingImages.isEmpty()
                         && i == 0) // First image is primary if no existing images
+                .mediaKind(
+                    isVideo ? MediaAttachment.MediaKind.VIDEO : MediaAttachment.MediaKind.IMAGE)
                 .build();
 
-        newImages.add(propertyImage);
+        newImages.add(attachment);
       } catch (IOException e) {
         throw new BusinessException(
             "Failed to read file " + file.getOriginalFilename() + ": " + e.getMessage());
       }
     }
 
-    // Save all new images
+    // Save all new attachments
     if (!newImages.isEmpty()) {
-      propertyImageRepository.saveAll(newImages);
+      mediaAttachmentRepository.saveAll(newImages);
     }
 
     Property updated = propertyRepository.findById(id).orElse(property);
@@ -585,14 +635,10 @@ public class PropertyServiceImpl implements PropertyService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Property", id));
 
-    PropertyImage image =
-        propertyImageRepository
-            .findById(imageId)
-            .orElseThrow(() -> new ResourceNotFoundException("PropertyImage", imageId));
-
-    if (!image.getProperty().getId().equals(id)) {
-      throw new BusinessException("Image does not belong to this property");
-    }
+    MediaAttachment image =
+        mediaAttachmentRepository
+            .findByIdAndPropertyId(imageId, id)
+            .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", imageId));
 
     // Validate agent can manage this property (skip if admin)
     if (agentId != null && !UserContext.isAdmin()) {
@@ -607,17 +653,17 @@ public class PropertyServiceImpl implements PropertyService {
       }
     }
 
-    // Delete from database (file data is stored in DB, so deletion is automatic)
-    propertyImageRepository.delete(image);
+    boolean wasPrimary = image.getIsPrimary();
+    mediaAttachmentRepository.delete(image);
 
     // If this was the primary image, set the first remaining image as primary
-    if (image.getIsPrimary()) {
-      List<PropertyImage> remainingImages =
-          propertyImageRepository.findByPropertyIdOrderByDisplayOrderAsc(id);
+    if (wasPrimary) {
+      List<MediaAttachment> remainingImages =
+          mediaAttachmentRepository.findByPropertyIdOrderByDisplayOrderAsc(id);
       if (!remainingImages.isEmpty()) {
-        PropertyImage newPrimary = remainingImages.get(0);
+        MediaAttachment newPrimary = remainingImages.get(0);
         newPrimary.setIsPrimary(true);
-        propertyImageRepository.save(newPrimary);
+        mediaAttachmentRepository.save(newPrimary);
       }
     }
 
@@ -629,19 +675,10 @@ public class PropertyServiceImpl implements PropertyService {
   @Transactional(readOnly = true)
   public org.springframework.http.ResponseEntity<byte[]> getPropertyImageFile(
       UUID id, UUID imageId) {
-    // Verify property exists
-    if (!propertyRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Property", id);
-    }
-
-    PropertyImage image =
-        propertyImageRepository
-            .findById(imageId)
-            .orElseThrow(() -> new ResourceNotFoundException("PropertyImage", imageId));
-
-    if (!image.getProperty().getId().equals(id)) {
-      throw new BusinessException("Image does not belong to this property");
-    }
+    MediaAttachment image =
+        mediaAttachmentRepository
+            .findByIdAndPropertyId(imageId, id)
+            .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", imageId));
 
     if (!image.hasFileData()) {
       throw new ResourceNotFoundException("Image file data not found");
@@ -664,5 +701,43 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     return org.springframework.http.ResponseEntity.ok().headers(headers).body(image.getFileData());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public com.housingplatform.property.dto.FirstPropertyMediaResponse
+      getFirstPropertyMediaForOrganization(UUID organizationId) {
+    String imageUrl = null;
+    String videoUrl = null;
+    List<Property> properties = propertyRepository.findByRealEstateCompanyId(organizationId);
+    for (Property property : properties) {
+      if (imageUrl != null && videoUrl != null) {
+        break;
+      }
+      List<MediaAttachment> attachments =
+          mediaAttachmentRepository.findByPropertyIdOrderByDisplayOrderAsc(property.getId());
+      for (MediaAttachment att : attachments) {
+        String url =
+            att.hasFileData()
+                ? "/api/v1/properties/" + property.getId() + "/images/" + att.getId() + "/file"
+                : att.getImageUrl();
+        if (url == null || url.isBlank()) {
+          continue;
+        }
+        if (imageUrl == null && att.getMediaKind() == MediaAttachment.MediaKind.IMAGE) {
+          imageUrl = url;
+        }
+        if (videoUrl == null && att.getMediaKind() == MediaAttachment.MediaKind.VIDEO) {
+          videoUrl = url;
+        }
+        if (imageUrl != null && videoUrl != null) {
+          break;
+        }
+      }
+    }
+    return com.housingplatform.property.dto.FirstPropertyMediaResponse.builder()
+        .imageUrl(imageUrl)
+        .videoUrl(videoUrl)
+        .build();
   }
 }

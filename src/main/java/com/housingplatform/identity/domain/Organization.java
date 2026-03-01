@@ -44,7 +44,13 @@ public class Organization extends BaseAuditEntity {
   public enum OrganizationType {
     BANK,
     REAL_ESTATE_COMPANY,
-    SUPPLIER
+    SUPPLIER,
+    CONTRACTOR,
+    DEVELOPER,
+    INSURANCE,
+    CONSULTANT,
+    ARCHITECT,
+    FINISHING_CONTRACTOR
   }
 
   public enum OrganizationStatus {

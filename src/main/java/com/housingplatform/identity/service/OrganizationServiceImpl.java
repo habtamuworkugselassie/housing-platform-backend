@@ -3,30 +3,44 @@ package com.housingplatform.identity.service;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
+import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
+import com.housingplatform.identity.dto.OrganizationMediaItem;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.media.domain.MediaAttachment;
+import com.housingplatform.media.repository.MediaAttachmentRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class OrganizationServiceImpl implements OrganizationService {
 
+  private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   private final OrganizationRepository organizationRepository;
   private final OrganizationMapper organizationMapper;
   private final UserRepository userRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
+  private final MediaAttachmentRepository mediaAttachmentRepository;
 
   @Override
   public OrganizationResponse createOrganization(OrganizationRequest request) {
@@ -77,7 +91,42 @@ public class OrganizationServiceImpl implements OrganizationService {
       }
     }
 
-    return organizationMapper.toResponse(saved);
+    OrganizationResponse response = organizationMapper.toResponse(saved);
+    enrichWithMedia(response, saved.getId());
+    return response;
+  }
+
+  @Override
+  public OrganizationResponse createOrganizationAsAdmin(AdminOrganizationCreateRequest request) {
+    if (request.getRegistrationNumber() != null
+        && organizationRepository
+            .findByRegistrationNumber(request.getRegistrationNumber())
+            .isPresent()) {
+      throw new BusinessException("Organization with registration number already exists");
+    }
+
+    OrganizationRequest req = new OrganizationRequest();
+    req.setName(request.getName());
+    req.setRegistrationNumber(request.getRegistrationNumber());
+    req.setType(request.getType());
+    req.setAddress(request.getAddress());
+    req.setCity(request.getCity());
+    req.setCountry(request.getCountry());
+    req.setPhoneNumber(request.getPhoneNumber());
+    req.setEmail(request.getEmail());
+    req.setWebsite(request.getWebsite());
+    req.setDescription(request.getDescription());
+    req.setPrimaryContactUserId(request.getPrimaryContactUserId());
+
+    Organization organization = organizationMapper.toEntity(req);
+    organization.setStatus(
+        request.getInitialStatus() != null
+            ? request.getInitialStatus()
+            : Organization.OrganizationStatus.PENDING_APPROVAL);
+    Organization saved = organizationRepository.save(organization);
+    OrganizationResponse response = organizationMapper.toResponse(saved);
+    enrichWithMedia(response, saved.getId());
+    return response;
   }
 
   @Override
@@ -87,7 +136,9 @@ public class OrganizationServiceImpl implements OrganizationService {
         organizationRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
-    return organizationMapper.toResponse(organization);
+    OrganizationResponse response = organizationMapper.toResponse(organization);
+    enrichWithMedia(response, id);
+    return response;
   }
 
   @Override
@@ -104,7 +155,9 @@ public class OrganizationServiceImpl implements OrganizationService {
       throw new BusinessException("Only super agents can access their organization details");
     }
 
-    return organizationMapper.toResponse(agent.getOrganization());
+    OrganizationResponse response = organizationMapper.toResponse(agent.getOrganization());
+    enrichWithMedia(response, agent.getOrganization().getId());
+    return response;
   }
 
   @Override
@@ -127,7 +180,9 @@ public class OrganizationServiceImpl implements OrganizationService {
                     new ResourceNotFoundException(
                         "Bank not found for current user. User must be primary contact of a bank organization."));
 
-    return organizationMapper.toResponse(bank);
+    OrganizationResponse response = organizationMapper.toResponse(bank);
+    enrichWithMedia(response, bank.getId());
+    return response;
   }
 
   @Override
@@ -179,6 +234,39 @@ public class OrganizationServiceImpl implements OrganizationService {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types) {
+    if (types == null || types.trim().isEmpty()) {
+      return List.of();
+    }
+    Set<Organization.OrganizationType> typeSet = new java.util.HashSet<>();
+    for (String t : types.split(",")) {
+      String trimmed = t.trim();
+      if (!trimmed.isEmpty()) {
+        try {
+          typeSet.add(Organization.OrganizationType.valueOf(trimmed.toUpperCase()));
+        } catch (IllegalArgumentException ignored) {
+          // skip invalid type
+        }
+      }
+    }
+    if (typeSet.isEmpty()) {
+      return List.of();
+    }
+    List<Organization> all =
+        organizationRepository.findByStatus(Organization.OrganizationStatus.APPROVED);
+    List<Organization> filtered =
+        all.stream().filter(org -> typeSet.contains(org.getType())).collect(Collectors.toList());
+    List<OrganizationResponse> responses = new ArrayList<>();
+    for (Organization org : filtered) {
+      OrganizationResponse resp = organizationMapper.toResponse(org);
+      enrichWithMedia(resp, org.getId());
+      responses.add(resp);
+    }
+    return responses;
+  }
+
+  @Override
   public OrganizationResponse updateOrganization(UUID id, OrganizationRequest request) {
     Organization organization =
         organizationRepository
@@ -205,7 +293,9 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     organizationMapper.updateEntity(organization, request);
     Organization updated = organizationRepository.save(organization);
-    return organizationMapper.toResponse(updated);
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, id);
+    return response;
   }
 
   @Override
@@ -217,7 +307,9 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     organization.setStatus(Organization.OrganizationStatus.APPROVED);
     Organization updated = organizationRepository.save(organization);
-    return organizationMapper.toResponse(updated);
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, id);
+    return response;
   }
 
   @Override
@@ -229,7 +321,9 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     organization.setStatus(Organization.OrganizationStatus.REJECTED);
     Organization updated = organizationRepository.save(organization);
-    return organizationMapper.toResponse(updated);
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, id);
+    return response;
   }
 
   @Override
@@ -241,7 +335,9 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     organization.setStatus(Organization.OrganizationStatus.SUSPENDED);
     Organization updated = organizationRepository.save(organization);
-    return organizationMapper.toResponse(updated);
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, id);
+    return response;
   }
 
   @Override
@@ -264,6 +360,182 @@ public class OrganizationServiceImpl implements OrganizationService {
                     new ResourceNotFoundException(
                         "Supplier not found for current user. User must be primary contact of a supplier organization."));
 
-    return organizationMapper.toResponse(supplier);
+    OrganizationResponse response = organizationMapper.toResponse(supplier);
+    enrichWithMedia(response, supplier.getId());
+    return response;
+  }
+
+  @Transactional(readOnly = true)
+  protected void enrichWithMedia(OrganizationResponse response, UUID organizationId) {
+    if (response == null || organizationId == null) return;
+    List<MediaAttachment> attachments =
+        mediaAttachmentRepository.findByOrganizationIdOrderByDisplayOrderAsc(organizationId);
+    if (attachments.isEmpty()) return;
+
+    String basePath = "/api/v1/organizations/" + organizationId + "/media/";
+    List<OrganizationMediaItem> items = new ArrayList<>();
+    String logoUrl = null;
+    for (MediaAttachment att : attachments) {
+      String url = att.hasFileData() ? basePath + att.getId() + "/file" : att.getImageUrl();
+      items.add(
+          OrganizationMediaItem.builder()
+              .id(att.getId())
+              .url(url)
+              .caption(att.getCaption())
+              .displayOrder(att.getDisplayOrder())
+              .isPrimary(att.getIsPrimary())
+              .mediaKind(att.getMediaKind() != null ? att.getMediaKind().name() : "IMAGE")
+              .build());
+      if (logoUrl == null
+          && (att.getMediaKind() == MediaAttachment.MediaKind.LOGO || att.getIsPrimary())) {
+        logoUrl = url;
+      }
+    }
+    if (logoUrl == null && !items.isEmpty()) {
+      logoUrl = items.get(0).getUrl();
+    }
+    response.setLogoUrl(logoUrl);
+    response.setMedia(items);
+  }
+
+  @Override
+  public OrganizationResponse uploadOrganizationMedia(
+      UUID organizationId, List<MultipartFile> files, String mediaKindStr) {
+    Organization organization =
+        organizationRepository
+            .findById(organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
+
+    if (!UserContext.isAdmin()) {
+      UUID currentUserId = UserContext.getCurrentUserId();
+      boolean isPrimaryContact =
+          organization.getPrimaryContact() != null
+              && organization.getPrimaryContact().getId().equals(currentUserId);
+      if (!isPrimaryContact) {
+        RealEstateAgent agent = realEstateAgentRepository.findByUserId(currentUserId).orElse(null);
+        boolean isSuperAgent =
+            agent != null
+                && Boolean.TRUE.equals(agent.getIsSuperAgent())
+                && organization.getId().equals(agent.getOrganizationId());
+        if (!isSuperAgent) {
+          throw new BusinessException(
+              "Only admin or organization primary contact can upload media");
+        }
+      }
+    }
+
+    if (files == null || files.isEmpty()) {
+      throw new BusinessException("At least one file must be provided");
+    }
+
+    MediaAttachment.MediaKind kind = MediaAttachment.MediaKind.IMAGE;
+    if (mediaKindStr != null && !mediaKindStr.isBlank()) {
+      try {
+        kind = MediaAttachment.MediaKind.valueOf(mediaKindStr.toUpperCase());
+      } catch (IllegalArgumentException ignored) {
+      }
+    }
+
+    List<MediaAttachment> existing =
+        mediaAttachmentRepository.findByOrganizationIdOrderByDisplayOrderAsc(organizationId);
+    int nextOrder =
+        existing.isEmpty()
+            ? 0
+            : existing.stream().mapToInt(MediaAttachment::getDisplayOrder).max().orElse(0) + 1;
+
+    for (int i = 0; i < files.size(); i++) {
+      MultipartFile file = files.get(i);
+      if (file.isEmpty()) continue;
+      if (file.getSize() > MAX_FILE_SIZE) {
+        throw new BusinessException(
+            "File " + file.getOriginalFilename() + " exceeds maximum size of 10MB");
+      }
+      String contentType = file.getContentType();
+      if (contentType == null
+          || (!contentType.startsWith("image/") && !contentType.startsWith("video/"))) {
+        throw new BusinessException(
+            "File " + file.getOriginalFilename() + " must be an image or video");
+      }
+      try {
+        boolean isVideo = contentType.startsWith("video/");
+        MediaAttachment.MediaKind fileKind =
+            isVideo
+                ? MediaAttachment.MediaKind.VIDEO
+                : (kind == MediaAttachment.MediaKind.LOGO
+                    ? MediaAttachment.MediaKind.LOGO
+                    : MediaAttachment.MediaKind.IMAGE);
+        MediaAttachment att =
+            MediaAttachment.builder()
+                .organization(organization)
+                .fileData(file.getBytes())
+                .contentType(contentType)
+                .fileName(file.getOriginalFilename())
+                .displayOrder(nextOrder + i)
+                .isPrimary(existing.isEmpty() && i == 0)
+                .mediaKind(fileKind)
+                .build();
+        mediaAttachmentRepository.save(att);
+      } catch (IOException e) {
+        throw new BusinessException("Failed to read file: " + e.getMessage());
+      }
+    }
+
+    OrganizationResponse response = organizationMapper.toResponse(organization);
+    enrichWithMedia(response, organizationId);
+    return response;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public ResponseEntity<byte[]> getOrganizationMediaFile(UUID organizationId, UUID attachmentId) {
+    MediaAttachment att =
+        mediaAttachmentRepository
+            .findByIdAndOrganizationId(attachmentId, organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", attachmentId));
+    if (!att.hasFileData()) {
+      throw new ResourceNotFoundException("Media file not found");
+    }
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(
+        att.getContentType() != null
+            ? MediaType.parseMediaType(att.getContentType())
+            : MediaType.APPLICATION_OCTET_STREAM);
+    return ResponseEntity.ok().headers(headers).body(att.getFileData());
+  }
+
+  @Override
+  public OrganizationResponse deleteOrganizationMedia(UUID organizationId, UUID attachmentId) {
+    Organization organization =
+        organizationRepository
+            .findById(organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
+
+    if (!UserContext.isAdmin()) {
+      UUID currentUserId = UserContext.getCurrentUserId();
+      boolean isPrimaryContact =
+          organization.getPrimaryContact() != null
+              && organization.getPrimaryContact().getId().equals(currentUserId);
+      if (!isPrimaryContact) {
+        RealEstateAgent agent = realEstateAgentRepository.findByUserId(currentUserId).orElse(null);
+        boolean isSuperAgent =
+            agent != null
+                && Boolean.TRUE.equals(agent.getIsSuperAgent())
+                && organization.getId().equals(agent.getOrganizationId());
+        if (!isSuperAgent) {
+          throw new BusinessException(
+              "Only admin or organization primary contact can delete media");
+        }
+      }
+    }
+
+    MediaAttachment att =
+        mediaAttachmentRepository
+            .findByIdAndOrganizationId(attachmentId, organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", attachmentId));
+    mediaAttachmentRepository.delete(att);
+
+    OrganizationResponse response = organizationMapper.toResponse(organization);
+    enrichWithMedia(response, organizationId);
+    return response;
   }
 }

@@ -1,5 +1,6 @@
 package com.housingplatform.property.domain;
 
+import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -92,7 +93,7 @@ public class Property extends BaseAuditEntity {
 
   @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default
-  private List<PropertyImage> images = new ArrayList<>();
+  private List<MediaAttachment> images = new ArrayList<>();
 
   public enum PropertyType {
     APARTMENT,

@@ -57,6 +57,17 @@ public class SponsorshipController {
     return ResponseEntity.ok(sponsorships);
   }
 
+  @GetMapping("/sponsored-organizations")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Get sponsored organizations for landing",
+      description =
+          "Organizations with currently active (approved, within date range) sponsorship. Public.")
+  public ResponseEntity<List<SponsoredOrganizationResponse>> getSponsoredOrganizations() {
+    List<SponsoredOrganizationResponse> list = sponsorshipService.getActiveSponsoredOrganizations();
+    return ResponseEntity.ok(list);
+  }
+
   @GetMapping("/{id}")
   @Operation(
       summary = "Get sponsorship package by ID",
@@ -111,10 +122,41 @@ public class SponsorshipController {
   @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
   @Operation(
       summary = "List all applications",
-      description = "Get all sponsorship applications (admin only)")
-  public ResponseEntity<List<SponsorshipApplicationResponse>> getAllApplications() {
-    List<SponsorshipApplicationResponse> applications = sponsorshipService.getAllApplications();
+      description =
+          "Get all sponsorship applications (admin only). Optional organizationId filter.")
+  public ResponseEntity<List<SponsorshipApplicationResponse>> getAllApplications(
+      @RequestParam(required = false) UUID organizationId) {
+    List<SponsorshipApplicationResponse> applications =
+        organizationId != null
+            ? sponsorshipService.getApplicationsByOrganization(organizationId)
+            : sponsorshipService.getAllApplications();
     return ResponseEntity.ok(applications);
+  }
+
+  @GetMapping("/applications/organization/{organizationId}")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(
+      summary = "List applications by organization",
+      description = "Get all sponsorship applications for an organization (admin only)")
+  public ResponseEntity<List<SponsorshipApplicationResponse>> getApplicationsByOrganization(
+      @PathVariable UUID organizationId) {
+    List<SponsorshipApplicationResponse> applications =
+        sponsorshipService.getApplicationsByOrganization(organizationId);
+    return ResponseEntity.ok(applications);
+  }
+
+  @PostMapping("/applications/admin")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @AuthActionScope("sponsorships.update")
+  @Operation(
+      summary = "Assign organization to sponsorship (admin)",
+      description =
+          "Create a sponsorship application for an organization; optionally auto-approve.")
+  public ResponseEntity<SponsorshipApplicationResponse> assignOrganizationToSponsorship(
+      @Valid @RequestBody com.housingplatform.identity.dto.AdminAssignSponsorshipRequest request) {
+    SponsorshipApplicationResponse application =
+        sponsorshipService.assignOrganizationToSponsorship(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(application);
   }
 
   @GetMapping("/applications/pending")

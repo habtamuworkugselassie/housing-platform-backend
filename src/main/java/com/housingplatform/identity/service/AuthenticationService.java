@@ -311,19 +311,13 @@ public class AuthenticationService {
     String token = generateSecureToken();
     Instant expiresAt = Instant.now().plusSeconds(resetTokenExpiryHours * 3600L);
     PasswordResetToken resetToken =
-        PasswordResetToken.builder()
-            .token(token)
-            .userId(user.getId())
-            .expiresAt(expiresAt)
-            .build();
+        PasswordResetToken.builder().token(token).userId(user.getId()).expiresAt(expiresAt).build();
     passwordResetTokenRepository.save(resetToken);
 
     passwordResetEmailService.sendPasswordResetEmail(user.getEmail(), token);
   }
 
-  /**
-   * Resets password using the token from the email link. Invalidates the token after use.
-   */
+  /** Resets password using the token from the email link. Invalidates the token after use. */
   public void resetPassword(ResetPasswordRequest request) {
     Instant now = Instant.now();
     PasswordResetToken resetToken =

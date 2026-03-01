@@ -35,4 +35,16 @@ public interface SponsorshipService {
   SponsorshipApplicationResponse rejectApplication(UUID id, String reason);
 
   void cancelApplication(UUID id);
+
+  /**
+   * Admin: assign an organization to a sponsorship (create application, optionally auto-approve).
+   */
+  SponsorshipApplicationResponse assignOrganizationToSponsorship(
+      com.housingplatform.identity.dto.AdminAssignSponsorshipRequest request);
+
+  /**
+   * Get organizations with currently active (approved, within date range) sponsorship. Public, for
+   * landing page carousel.
+   */
+  List<SponsoredOrganizationResponse> getActiveSponsoredOrganizations();
 }

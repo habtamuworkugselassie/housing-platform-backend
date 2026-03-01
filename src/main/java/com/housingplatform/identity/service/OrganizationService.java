@@ -1,12 +1,18 @@
 package com.housingplatform.identity.service;
 
+import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface OrganizationService {
   OrganizationResponse createOrganization(OrganizationRequest request);
+
+  /** Create organization as admin; allows setting initial status (e.g. APPROVED). */
+  OrganizationResponse createOrganizationAsAdmin(AdminOrganizationCreateRequest request);
 
   OrganizationResponse getOrganizationById(UUID id);
 
@@ -15,6 +21,13 @@ public interface OrganizationService {
   OrganizationResponse getMyBank();
 
   List<OrganizationResponse> getAllOrganizations(String type, String status, String search);
+
+  /**
+   * List approved organizations by one or more types. Public, for marketplace listing.
+   *
+   * @param types comma-separated organization types (e.g. "BANK" or "CONSULTANT,ARCHITECT")
+   */
+  List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types);
 
   OrganizationResponse updateOrganization(UUID id, OrganizationRequest request);
 
@@ -25,4 +38,11 @@ public interface OrganizationService {
   OrganizationResponse suspendOrganization(UUID id, String reason);
 
   OrganizationResponse getMySupplier();
+
+  OrganizationResponse uploadOrganizationMedia(
+      UUID organizationId, List<MultipartFile> files, String mediaKind);
+
+  ResponseEntity<byte[]> getOrganizationMediaFile(UUID organizationId, UUID attachmentId);
+
+  OrganizationResponse deleteOrganizationMedia(UUID organizationId, UUID attachmentId);
 }

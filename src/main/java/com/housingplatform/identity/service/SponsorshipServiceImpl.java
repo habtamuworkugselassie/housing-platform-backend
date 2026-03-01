@@ -25,6 +25,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   private final SponsorshipRepository sponsorshipRepository;
   private final SponsorshipApplicationRepository applicationRepository;
   private final OrganizationRepository organizationRepository;
+  private final OrganizationService organizationService;
 
   // ========== Sponsorship Package Management (Admin Only) ==========
 
@@ -301,6 +302,28 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     }
   }
 
+  @Override
+  public SponsorshipApplicationResponse assignOrganizationToSponsorship(
+      AdminAssignSponsorshipRequest request) {
+    java.time.LocalDateTime startDateTime = request.getStartDate().atStartOfDay();
+    java.time.LocalDateTime endDateTime = request.getEndDate().atTime(23, 59, 59);
+    SponsorshipApplicationRequest appRequest =
+        SponsorshipApplicationRequest.builder()
+            .sponsorshipId(request.getSponsorshipId())
+            .startDate(startDateTime)
+            .endDate(endDateTime)
+            .notes(request.getNotes())
+            .amount(request.getAmount())
+            .paymentReference(request.getPaymentReference())
+            .build();
+    SponsorshipApplicationResponse application =
+        applyForSponsorship(request.getOrganizationId(), appRequest);
+    if (Boolean.TRUE.equals(request.getAutoApprove())) {
+      application = approveApplication(application.getId(), request.getNotes());
+    }
+    return application;
+  }
+
   // ========== Helper Methods ==========
 
   private SponsorshipResponse toSponsorshipResponse(Sponsorship sponsorship) {
@@ -337,5 +360,48 @@ public class SponsorshipServiceImpl implements SponsorshipService {
         .createdAt(application.getCreatedAt())
         .updatedAt(application.getUpdatedAt())
         .build();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<SponsoredOrganizationResponse> getActiveSponsoredOrganizations() {
+    LocalDateTime now = LocalDateTime.now();
+    List<SponsorshipApplication> applications =
+        applicationRepository.findAllActiveApplications(now);
+    return applications.stream()
+        .map(
+            app -> {
+              OrganizationResponse org =
+                  organizationService.getOrganizationById(app.getOrganization().getId());
+              String videoUrl = null;
+              if (org.getMedia() != null) {
+                videoUrl =
+                    org.getMedia().stream()
+                        .filter(m -> "VIDEO".equals(m.getMediaKind()))
+                        .map(OrganizationMediaItem::getUrl)
+                        .findFirst()
+                        .orElse(null);
+              }
+              return SponsoredOrganizationResponse.builder()
+                  .id(org.getId())
+                  .name(org.getName())
+                  .logoUrl(org.getLogoUrl())
+                  .videoUrl(videoUrl)
+                  .address(org.getAddress())
+                  .city(org.getCity())
+                  .country(org.getCountry())
+                  .sponsorshipType(app.getSponsorship().getType().name())
+                  .basePrice(app.getSponsorship().getBasePrice())
+                  .build();
+            })
+        .sorted(
+            (a, b) -> {
+              java.math.BigDecimal pa =
+                  a.getBasePrice() != null ? a.getBasePrice() : java.math.BigDecimal.ZERO;
+              java.math.BigDecimal pb =
+                  b.getBasePrice() != null ? b.getBasePrice() : java.math.BigDecimal.ZERO;
+              return pb.compareTo(pa);
+            })
+        .collect(Collectors.toList());
   }
 }

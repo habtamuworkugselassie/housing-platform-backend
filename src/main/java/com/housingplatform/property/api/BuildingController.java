@@ -58,6 +58,19 @@ public class BuildingController {
     return ResponseEntity.ok(buildings);
   }
 
+  @GetMapping("/organization/{organizationId}/list")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "List buildings by organization (marketplace)",
+      description =
+          "Public. Returns all buildings for the given real estate company. Used for home/marketplace"
+              + " organization-grouped listing.")
+  public ResponseEntity<List<BuildingResponse>> getBuildingsByOrganizationForMarketplace(
+      @PathVariable UUID organizationId) {
+    List<BuildingResponse> buildings = buildingService.getBuildingsByCompanyId(organizationId);
+    return ResponseEntity.ok(buildings);
+  }
+
   @PostMapping("/companies/{companyId}")
   @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
   @AuthActionScope("buildings.create")

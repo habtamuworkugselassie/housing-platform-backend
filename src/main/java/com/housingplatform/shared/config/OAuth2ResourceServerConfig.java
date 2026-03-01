@@ -54,7 +54,7 @@ public class OAuth2ResourceServerConfig {
   private String jwtIssuer;
 
   @Value(
-      "${app.cors.allowed-origin-patterns:http://localhost:5173,http://127.0.0.1:5173,http://209.38.204.219*}")
+      "${app.cors.allowed-origin-patterns:http://localhost:3000,http://127.0.0.1:3000,http://209.38.204.219*}")
   private String allowedOriginPatterns;
 
   private final ScopeAuthorizationFilter scopeAuthorizationFilter;
@@ -101,8 +101,23 @@ public class OAuth2ResourceServerConfig {
                 return true;
               }
               // Property image file endpoints (public access for viewing)
-              // Pattern: /api/v1/properties/{propertyId}/images/{imageId}/file
               if (path.matches("/api/v1/properties/[^/]+/images/[^/]+/file")) {
+                return true;
+              }
+              // Organization media file endpoints (public access for viewing)
+              if (path.matches("/api/v1/organizations/[^/]+/media/[^/]+/file")) {
+                return true;
+              }
+              // Sponsored organizations for landing page carousel
+              if (path.equals("/api/v1/sponsorships/sponsored-organizations")) {
+                return true;
+              }
+              // First property media for organization (sponsor carousel fallback)
+              if (path.matches("/api/v1/properties/organization/[^/]+/first-media")) {
+                return true;
+              }
+              // Marketplace organizations list (public by type)
+              if (path.startsWith("/api/v1/organizations/marketplace")) {
                 return true;
               }
               return false;
@@ -142,6 +157,10 @@ public class OAuth2ResourceServerConfig {
               }
               // Exclude property image file endpoints (public access for viewing)
               if (path.matches("/api/v1/properties/[^/]+/images/[^/]+/file")) {
+                return false;
+              }
+              // Exclude organization media file endpoints (public access for viewing)
+              if (path.matches("/api/v1/organizations/[^/]+/media/[^/]+/file")) {
                 return false;
               }
               // All other /api/** paths go through this chain

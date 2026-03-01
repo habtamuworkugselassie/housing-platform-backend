@@ -121,6 +121,34 @@ public class PropertyController {
     return ResponseEntity.ok(properties);
   }
 
+  @GetMapping("/organization/{organizationId}/list")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "List available properties by organization (marketplace)",
+      description =
+          "Public. Returns AVAILABLE properties for the given real estate company, with sponsorship"
+              + " enrichment. Used for home/marketplace organization-grouped listing.")
+  public ResponseEntity<List<PropertyResponse>> getAvailablePropertiesByOrganization(
+      @PathVariable UUID organizationId) {
+    List<PropertyResponse> properties =
+        propertyService.getAvailablePropertiesByCompanyIdForMarketplace(organizationId);
+    return ResponseEntity.ok(properties);
+  }
+
+  @GetMapping("/organization/{organizationId}/first-media")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Get first property media for organization",
+      description =
+          "First image and video from any of the organization's properties. Public, for sponsor"
+              + " carousel fallback when the organization has no logo/video.")
+  public ResponseEntity<com.housingplatform.property.dto.FirstPropertyMediaResponse>
+      getFirstPropertyMediaForOrganization(@PathVariable UUID organizationId) {
+    com.housingplatform.property.dto.FirstPropertyMediaResponse response =
+        propertyService.getFirstPropertyMediaForOrganization(organizationId);
+    return ResponseEntity.ok(response);
+  }
+
   @GetMapping("/{id}/financing-offers")
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(

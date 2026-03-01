@@ -4,19 +4,13 @@ import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.PropertyImageResponse;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
-import org.mapstruct.Mapper;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(
-    componentModel = "spring",
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+/**
+ * Property entity mapper. Implementation is in PropertyMapperImpl (no MapStruct so IDE runs work).
+ */
 public interface PropertyMapper {
   Property toEntity(PropertyRequest request);
 
-  @org.mapstruct.Mapping(target = "images", ignore = true)
-  @org.mapstruct.Mapping(target = "buildingId", source = "building.id")
-  @org.mapstruct.Mapping(target = "buildingName", source = "building.name")
   PropertyResponse toResponse(Property property);
 
   default PropertyResponse toResponseWithImages(Property property) {
@@ -55,5 +49,5 @@ public interface PropertyMapper {
     return response;
   }
 
-  void updateEntity(@MappingTarget Property property, PropertyRequest request);
+  void updateEntity(Property property, PropertyRequest request);
 }

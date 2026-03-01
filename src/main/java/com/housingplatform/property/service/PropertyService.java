@@ -22,6 +22,9 @@ public interface PropertyService {
 
   List<PropertyResponse> getPropertiesByCompanyId(UUID companyId);
 
+  /** Public marketplace: available properties for an organization with sponsorship enrichment. */
+  List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId);
+
   List<PropertyResponse> getPropertiesByAgentId(UUID agentId);
 
   List<PropertyResponse> searchProperties(
@@ -33,4 +36,11 @@ public interface PropertyService {
   PropertyResponse deletePropertyImage(UUID id, UUID imageId, UUID agentId);
 
   org.springframework.http.ResponseEntity<byte[]> getPropertyImageFile(UUID id, UUID imageId);
+
+  /**
+   * First image and video URLs from any of the organization's properties. Public, for sponsor
+   * carousel fallback when the organization has no logo/video.
+   */
+  com.housingplatform.property.dto.FirstPropertyMediaResponse getFirstPropertyMediaForOrganization(
+      UUID organizationId);
 }

@@ -2,6 +2,7 @@ package com.housingplatform.identity.api;
 
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
+import com.housingplatform.identity.dto.RejectOrganizationRequest;
 import com.housingplatform.identity.service.OrganizationService;
 import com.housingplatform.shared.security.annotation.AuthActionScope;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
@@ -12,8 +13,10 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/organizations")
@@ -64,6 +67,20 @@ public class OrganizationController {
     return ResponseEntity.ok(bank);
   }
 
+  @GetMapping("/marketplace")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "List approved organizations for marketplace",
+      description =
+          "Public. Returns approved organizations by type(s). Query param: type (e.g. BANK or"
+              + " CONSULTANT,ARCHITECT).")
+  public ResponseEntity<List<OrganizationResponse>> getMarketplaceOrganizations(
+      @RequestParam String type) {
+    List<OrganizationResponse> list =
+        organizationService.getApprovedOrganizationsForMarketplace(type);
+    return ResponseEntity.ok(list);
+  }
+
   @GetMapping("/{id}")
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(
@@ -108,7 +125,8 @@ public class OrganizationController {
   @AuthActionScope("organizations.reject")
   @Operation(summary = "Reject organization", description = "Reject an organization (admin only)")
   public ResponseEntity<OrganizationResponse> rejectOrganization(
-      @PathVariable UUID id, @RequestBody(required = false) String reason) {
+      @PathVariable UUID id, @RequestBody(required = false) RejectOrganizationRequest body) {
+    String reason = body != null ? body.getReason() : null;
     OrganizationResponse rejected = organizationService.rejectOrganization(id, reason);
     return ResponseEntity.ok(rejected);
   }
@@ -118,8 +136,47 @@ public class OrganizationController {
   @AuthActionScope("organizations.suspend")
   @Operation(summary = "Suspend organization", description = "Suspend an organization (admin only)")
   public ResponseEntity<OrganizationResponse> suspendOrganization(
-      @PathVariable UUID id, @RequestBody(required = false) String reason) {
+      @PathVariable UUID id, @RequestBody(required = false) RejectOrganizationRequest body) {
+    String reason = body != null ? body.getReason() : null;
     OrganizationResponse suspended = organizationService.suspendOrganization(id, reason);
     return ResponseEntity.ok(suspended);
+  }
+
+  @PostMapping(value = "/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @AuthActionScope("organizations.update")
+  @Operation(
+      summary = "Upload organization media (logo, images, videos)",
+      description =
+          "Upload logo (mediaKind=LOGO), images, or videos for an organization. Admin or organization primary contact.")
+  public ResponseEntity<OrganizationResponse> uploadOrganizationMedia(
+      @PathVariable UUID id,
+      @RequestParam("files") List<MultipartFile> files,
+      @RequestParam(required = false, defaultValue = "IMAGE") String mediaKind) {
+    OrganizationResponse updated =
+        organizationService.uploadOrganizationMedia(id, files, mediaKind);
+    return ResponseEntity.ok(updated);
+  }
+
+  @GetMapping("/{id}/media/{attachmentId}/file")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Get organization media file",
+      description = "Retrieve logo, image or video file for an organization. Public access.")
+  public ResponseEntity<byte[]> getOrganizationMediaFile(
+      @PathVariable UUID id, @PathVariable UUID attachmentId) {
+    return organizationService.getOrganizationMediaFile(id, attachmentId);
+  }
+
+  @DeleteMapping("/{id}/media/{attachmentId}")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @AuthActionScope("organizations.update")
+  @Operation(
+      summary = "Delete organization media",
+      description = "Delete a media attachment from an organization. Admin or primary contact.")
+  public ResponseEntity<OrganizationResponse> deleteOrganizationMedia(
+      @PathVariable UUID id, @PathVariable UUID attachmentId) {
+    OrganizationResponse updated = organizationService.deleteOrganizationMedia(id, attachmentId);
+    return ResponseEntity.ok(updated);
   }
 }

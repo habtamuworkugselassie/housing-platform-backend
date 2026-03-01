@@ -17,7 +17,8 @@ public class InternalJwtDecoder implements JwtDecoder {
   private final String jwtIssuer;
 
   public InternalJwtDecoder() {
-    this.jwtSecret = System.getProperty("jwt.secret", System.getenv().getOrDefault("JWT_SECRET", ""));
+    this.jwtSecret =
+        System.getProperty("jwt.secret", System.getenv().getOrDefault("JWT_SECRET", ""));
     this.jwtIssuer =
         System.getProperty(
             "jwt.issuer", System.getenv().getOrDefault("JWT_ISSUER", "housing-platform"));

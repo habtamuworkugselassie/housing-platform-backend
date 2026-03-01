@@ -232,10 +232,16 @@
                     <release>21</release>
                     <generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
                     <annotationProcessorPaths>
+                        <!-- Order matters: Lombok first, then binding so MapStruct sees Lombok-generated accessors -->
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
                         </path>
                         <path>
                             <groupId>org.mapstruct</groupId>
