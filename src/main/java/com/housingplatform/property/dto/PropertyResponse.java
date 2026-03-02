@@ -37,6 +37,8 @@ public class PropertyResponse {
   private Integer totalFloors;
   private UUID realEstateCompanyId;
   private String realEstateCompanyName;
+  /** Primary contact phone for the real estate (e.g. +251 91 123 4567). */
+  private String realEstateCompanyPhone;
   private UUID agentId;
   private UUID buildingId;
   private String buildingName;

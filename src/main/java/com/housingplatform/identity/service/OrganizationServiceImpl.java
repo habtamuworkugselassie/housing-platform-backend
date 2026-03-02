@@ -1,10 +1,12 @@
 package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationMediaItem;
+import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.repository.OrganizationRepository;
@@ -56,6 +58,7 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     Organization organization = organizationMapper.toEntity(request);
     organization.setStatus(Organization.OrganizationStatus.PENDING_APPROVAL);
+    syncPhonesFromRequest(organization, request.getPhoneNumbers());
     Organization saved = organizationRepository.save(organization);
 
     // If a REALTOR is creating a REAL_ESTATE_COMPANY, automatically create a RealEstateAgent
@@ -114,13 +117,23 @@ public class OrganizationServiceImpl implements OrganizationService {
     req.setAddress(request.getAddress());
     req.setCity(request.getCity());
     req.setCountry(request.getCountry());
-    req.setPhoneNumber(request.getPhoneNumber());
+    if (request.getPhoneNumbers() != null && !request.getPhoneNumbers().isEmpty()) {
+      req.setPhoneNumbers(request.getPhoneNumbers());
+    } else if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+      req.setPhoneNumbers(
+          List.of(
+              OrganizationPhoneDto.builder()
+                  .countryCode("+251")
+                  .number(request.getPhoneNumber().trim())
+                  .build()));
+    }
     req.setEmail(request.getEmail());
     req.setWebsite(request.getWebsite());
     req.setDescription(request.getDescription());
     req.setPrimaryContactUserId(request.getPrimaryContactUserId());
 
     Organization organization = organizationMapper.toEntity(req);
+    syncPhonesFromRequest(organization, req.getPhoneNumbers());
     organization.setStatus(
         request.getInitialStatus() != null
             ? request.getInitialStatus()
@@ -301,6 +314,9 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
     organizationMapper.updateEntity(organization, request);
+    if (request.getPhoneNumbers() != null) {
+      syncPhonesFromRequest(organization, request.getPhoneNumbers());
+    }
     Organization updated = organizationRepository.save(organization);
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
@@ -372,6 +388,38 @@ public class OrganizationServiceImpl implements OrganizationService {
     OrganizationResponse response = organizationMapper.toResponse(supplier);
     enrichWithMedia(response, supplier.getId());
     return response;
+  }
+
+  private void syncPhonesFromRequest(
+      Organization organization, List<OrganizationPhoneDto> phoneNumbers) {
+    organization.getPhones().clear();
+    if (phoneNumbers != null && !phoneNumbers.isEmpty()) {
+      int order = 0;
+      for (OrganizationPhoneDto dto : phoneNumbers) {
+        String num = dto.getNumber() != null ? dto.getNumber().trim() : "";
+        if (!num.isEmpty()) {
+          OrganizationPhone phone =
+              OrganizationPhone.builder()
+                  .organization(organization)
+                  .countryCode(dto.getCountryCode() != null ? dto.getCountryCode().trim() : "+251")
+                  .number(num)
+                  .displayOrder(order++)
+                  .build();
+          organization.getPhones().add(phone);
+        }
+      }
+    }
+    if (organization.getPhones().isEmpty()) {
+      organization
+          .getPhones()
+          .add(
+              OrganizationPhone.builder()
+                  .organization(organization)
+                  .countryCode("+251")
+                  .number("")
+                  .displayOrder(0)
+                  .build());
+    }
   }
 
   @Transactional(readOnly = true)

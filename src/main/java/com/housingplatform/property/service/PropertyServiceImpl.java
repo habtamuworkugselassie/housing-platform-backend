@@ -259,6 +259,17 @@ public class PropertyServiceImpl implements PropertyService {
       Organization org = organizationsMap.get(property.getRealEstateCompanyId());
       if (org != null) {
         response.setRealEstateCompanyName(org.getName());
+        if (org.getPhones() != null && !org.getPhones().isEmpty()) {
+          org.getPhones().stream()
+              .min(
+                  Comparator.comparing(
+                      com.housingplatform.identity.domain.OrganizationPhone::getDisplayOrder))
+              .ifPresent(
+                  p ->
+                      response.setRealEstateCompanyPhone(
+                          (p.getCountryCode() != null ? p.getCountryCode() : "").trim()
+                              + (p.getNumber() != null ? " " + p.getNumber().trim() : "")));
+        }
       }
 
       SponsorshipApplication application = applicationMap.get(property.getRealEstateCompanyId());
@@ -410,6 +421,12 @@ public class PropertyServiceImpl implements PropertyService {
   public List<PropertyResponse> searchProperties(
       String companyName, String city, String state, String country, String title, Integer limit) {
     Specification<Property> spec = Specification.where(null);
+
+    // Only return AVAILABLE properties for public search
+    spec =
+        spec.and(
+            (root, query, cb) ->
+                cb.equal(root.get("status"), Property.PropertyStatus.AVAILABLE));
 
     // Search by title (partial match)
     if (title != null && !title.trim().isEmpty()) {

@@ -373,6 +373,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             app -> {
               OrganizationResponse org =
                   organizationService.getOrganizationById(app.getOrganization().getId());
+              if (org.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
+                return null;
+              }
               String videoUrl = null;
               if (org.getMedia() != null) {
                 videoUrl =
@@ -394,6 +397,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                   .basePrice(app.getSponsorship().getBasePrice())
                   .build();
             })
+        .filter(r -> r != null)
         .sorted(
             (a, b) -> {
               java.math.BigDecimal pa =

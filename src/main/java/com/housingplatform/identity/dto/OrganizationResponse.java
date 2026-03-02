@@ -22,7 +22,23 @@ public class OrganizationResponse {
   private String address;
   private String city;
   private String country;
-  private String phoneNumber;
+
+  /**
+   * Phone numbers with country code. For backward compatibility, first phone formatted as single
+   * string.
+   */
+  private List<OrganizationPhoneDto> phoneNumbers;
+
+  /** First phone formatted as "countryCode number" for backward compatibility. */
+  public String getPhoneNumber() {
+    if (phoneNumbers == null || phoneNumbers.isEmpty()) return null;
+    OrganizationPhoneDto first = phoneNumbers.get(0);
+    if (first == null || first.getNumber() == null || first.getNumber().isBlank()) return null;
+    String cc = first.getCountryCode() != null ? first.getCountryCode().trim() : "";
+    String num = first.getNumber().trim();
+    return (cc + " " + num).trim();
+  }
+
   private String email;
   private String website;
   private String description;

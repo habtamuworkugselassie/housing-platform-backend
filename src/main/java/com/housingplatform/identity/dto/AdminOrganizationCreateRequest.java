@@ -3,6 +3,7 @@ package com.housingplatform.identity.dto;
 import com.housingplatform.identity.domain.Organization;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import java.util.UUID;
 import lombok.Data;
 
@@ -20,7 +21,14 @@ public class AdminOrganizationCreateRequest {
   private String address;
   private String city;
   private String country;
-  private String phoneNumber;
+
+  /** Phone numbers with country code. If null/empty and legacy phoneNumber is set, that is used. */
+  private List<OrganizationPhoneDto> phoneNumbers;
+
+  /**
+   * @deprecated Use phoneNumbers. If set and phoneNumbers is empty, converted to one phone.
+   */
+  @Deprecated private String phoneNumber;
 
   @jakarta.validation.constraints.Email(message = "Email should be valid")
   private String email;

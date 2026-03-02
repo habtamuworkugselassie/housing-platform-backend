@@ -2,6 +2,8 @@ package com.housingplatform.identity.domain;
 
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -30,7 +32,15 @@ public class Organization extends BaseAuditEntity {
   private String address;
   private String city;
   private String country;
-  private String phoneNumber;
+
+  @OneToMany(
+      mappedBy = "organization",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @OrderBy("displayOrder ASC")
+  private List<OrganizationPhone> phones = new ArrayList<>();
+
   private String email;
   private String website;
 

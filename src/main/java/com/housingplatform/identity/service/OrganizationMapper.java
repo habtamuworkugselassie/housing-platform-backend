@@ -1,9 +1,14 @@
 package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationPhone;
+import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
+import java.util.ArrayList;
+import java.util.List;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
@@ -11,11 +16,22 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface OrganizationMapper {
+  @Mapping(target = "phones", ignore = true)
   Organization toEntity(OrganizationRequest request);
 
   default OrganizationResponse toResponse(Organization organization) {
     if (organization == null) {
       return null;
+    }
+    List<OrganizationPhoneDto> phoneDtos = new ArrayList<>();
+    if (organization.getPhones() != null) {
+      for (OrganizationPhone p : organization.getPhones()) {
+        phoneDtos.add(
+            OrganizationPhoneDto.builder()
+                .countryCode(p.getCountryCode() != null ? p.getCountryCode() : "+251")
+                .number(p.getNumber() != null ? p.getNumber() : "")
+                .build());
+      }
     }
     OrganizationResponse response =
         OrganizationResponse.builder()
@@ -27,7 +43,7 @@ public interface OrganizationMapper {
             .address(organization.getAddress())
             .city(organization.getCity())
             .country(organization.getCountry())
-            .phoneNumber(organization.getPhoneNumber())
+            .phoneNumbers(phoneDtos)
             .email(organization.getEmail())
             .website(organization.getWebsite())
             .description(organization.getDescription())
@@ -41,5 +57,6 @@ public interface OrganizationMapper {
     return response;
   }
 
+  @Mapping(target = "phones", ignore = true)
   void updateEntity(@MappingTarget Organization organization, OrganizationRequest request);
 }
