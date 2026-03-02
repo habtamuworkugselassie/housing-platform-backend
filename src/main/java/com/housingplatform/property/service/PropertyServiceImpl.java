@@ -17,6 +17,7 @@ import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -676,22 +677,38 @@ public class PropertyServiceImpl implements PropertyService {
             .findByIdAndPropertyId(imageId, id)
             .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", imageId));
 
+    String imageUrl = image.getImageUrl();
+    if (mediaStorageService.isUploadsUrl(imageUrl)) {
+      try (var in = mediaStorageService.getInputStream(imageUrl)) {
+        byte[] body = in.readAllBytes();
+        String contentType = image.getContentType();
+        if (contentType == null || contentType.isEmpty()) {
+          contentType = "application/octet-stream";
+        }
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType(contentType));
+        headers.setContentLength(body.length);
+        if (image.getFileName() != null) {
+          headers.setContentDispositionFormData("inline", image.getFileName());
+        }
+        return org.springframework.http.ResponseEntity.ok().headers(headers).body(body);
+      } catch (IOException e) {
+        throw new ResourceNotFoundException("Image file not found on disk");
+      }
+    }
+
     if (!image.hasFileData()) {
       throw new ResourceNotFoundException("Image file data not found");
     }
 
-    // Determine content type
     String contentType = image.getContentType();
     if (contentType == null || contentType.isEmpty()) {
       contentType = "application/octet-stream";
     }
 
-    // Set headers for proper file serving
     org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
     headers.setContentType(org.springframework.http.MediaType.parseMediaType(contentType));
     headers.setContentLength(image.getFileData().length);
-
-    // Add content disposition for download (optional, can be inline for display)
     if (image.getFileName() != null) {
       headers.setContentDispositionFormData("inline", image.getFileName());
     }

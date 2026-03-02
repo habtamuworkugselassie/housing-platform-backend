@@ -16,6 +16,12 @@ import com.housingplatform.media.service.MediaStorageService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -23,12 +29,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -232,12 +232,14 @@ public class OrganizationServiceImpl implements OrganizationService {
       }
     }
 
-    return organizations.stream().map(organization -> {
-      OrganizationResponse response = organizationMapper.toResponse(organization);
-      enrichWithMedia(response, organization.getId());
-      return response;
-    }).toList();
-
+    return organizations.stream()
+        .map(
+            organization -> {
+              OrganizationResponse response = organizationMapper.toResponse(organization);
+              enrichWithMedia(response, organization.getId());
+              return response;
+            })
+        .toList();
   }
 
   @Override
@@ -465,22 +467,22 @@ public class OrganizationServiceImpl implements OrganizationService {
       }
       boolean isVideo = contentType.startsWith("video/");
       MediaAttachment.MediaKind fileKind =
-              isVideo
-                      ? MediaAttachment.MediaKind.VIDEO
-                      : (kind == MediaAttachment.MediaKind.LOGO
-                      ? MediaAttachment.MediaKind.LOGO
-                      : MediaAttachment.MediaKind.IMAGE);
+          isVideo
+              ? MediaAttachment.MediaKind.VIDEO
+              : (kind == MediaAttachment.MediaKind.LOGO
+                  ? MediaAttachment.MediaKind.LOGO
+                  : MediaAttachment.MediaKind.IMAGE);
       String imageUrl = mediaStorageService.save(file, "organizations/" + organizationId);
       MediaAttachment att =
-              MediaAttachment.builder()
-                      .organization(organization)
-                      .imageUrl(imageUrl)
-                      .contentType(contentType)
-                      .fileName(file.getOriginalFilename())
-                      .displayOrder(nextOrder + i)
-                      .isPrimary(existing.isEmpty() && i == 0)
-                      .mediaKind(fileKind)
-                      .build();
+          MediaAttachment.builder()
+              .organization(organization)
+              .imageUrl(imageUrl)
+              .contentType(contentType)
+              .fileName(file.getOriginalFilename())
+              .displayOrder(nextOrder + i)
+              .isPrimary(existing.isEmpty() && i == 0)
+              .mediaKind(fileKind)
+              .build();
       mediaAttachmentRepository.save(att);
     }
     mediaAttachmentRepository.flush();
@@ -496,6 +498,21 @@ public class OrganizationServiceImpl implements OrganizationService {
         mediaAttachmentRepository
             .findByIdAndOrganizationId(attachmentId, organizationId)
             .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", attachmentId));
+    String imageUrl = att.getImageUrl();
+    if (mediaStorageService.isUploadsUrl(imageUrl)) {
+      try (var in = mediaStorageService.getInputStream(imageUrl)) {
+        byte[] body = in.readAllBytes();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(
+            att.getContentType() != null
+                ? MediaType.parseMediaType(att.getContentType())
+                : MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentLength(body.length);
+        return ResponseEntity.ok().headers(headers).body(body);
+      } catch (IOException e) {
+        throw new ResourceNotFoundException("Media file not found on disk");
+      }
+    }
     if (!att.hasFileData()) {
       throw new ResourceNotFoundException("Media file not found");
     }
