@@ -10,8 +10,6 @@ public class WebConfig implements WebMvcConfigurer {
   @Override
   public void addResourceHandlers(ResourceHandlerRegistry registry) {
     // Serve sample real estate logos and images from classpath:realestates/ (used by V22 migration)
-    registry
-        .addResourceHandler("/realestates/**")
-        .addResourceLocations("classpath:realestates/");
+    registry.addResourceHandler("/realestates/**").addResourceLocations("classpath:realestates/");
   }
 }

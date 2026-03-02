@@ -16,6 +16,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -133,6 +135,39 @@ public class GlobalExceptionHandler {
             .path(request.getDescription(false).replace("uri=", ""))
             .build();
     return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+  }
+
+  @ExceptionHandler(MissingServletRequestPartException.class)
+  public ResponseEntity<ErrorResponse> handleMissingServletRequestPart(
+      MissingServletRequestPartException ex, WebRequest request) {
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error("Bad Request")
+            .message(
+                "Missing or invalid form part: "
+                    + ex.getRequestPartName()
+                    + ". For file uploads, send multipart/form-data with part name 'files'.")
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+    return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(MultipartException.class)
+  public ResponseEntity<ErrorResponse> handleMultipartException(
+      MultipartException ex, WebRequest request) {
+    log.warn("Multipart request failed: {}", ex.getMessage());
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error("Bad Request")
+            .message(
+                "Invalid multipart request. Ensure Content-Type is multipart/form-data with a valid boundary and part name 'files'.")
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+    return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
   }
 
   @ExceptionHandler(NoHandlerFoundException.class)

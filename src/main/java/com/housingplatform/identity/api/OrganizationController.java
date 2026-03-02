@@ -151,7 +151,7 @@ public class OrganizationController {
           "Upload logo (mediaKind=LOGO), images, or videos for an organization. Admin or organization primary contact.")
   public ResponseEntity<OrganizationResponse> uploadOrganizationMedia(
       @PathVariable UUID id,
-      @RequestParam("files") List<MultipartFile> files,
+      @RequestParam(value = "files", required = false) List<MultipartFile> files,
       @RequestParam(required = false, defaultValue = "IMAGE") String mediaKind) {
     OrganizationResponse updated =
         organizationService.uploadOrganizationMedia(id, files, mediaKind);

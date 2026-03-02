@@ -7,6 +7,7 @@ import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.service.RealEstateAgentService;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
+import com.housingplatform.media.service.MediaStorageService;
 import com.housingplatform.property.domain.Building;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.PropertyRequest;
@@ -16,7 +17,6 @@ import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -47,6 +47,7 @@ public class PropertyServiceImpl implements PropertyService {
   private final OrganizationRepository organizationRepository;
   private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
   private final MediaAttachmentRepository mediaAttachmentRepository;
+  private final MediaStorageService mediaStorageService;
 
   private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -588,34 +589,28 @@ public class PropertyServiceImpl implements PropertyService {
             "File " + file.getOriginalFilename() + " must be an image or video");
       }
 
-      try {
-        // Read file bytes
-        byte[] fileData = file.getBytes();
+      String caption = (captions != null && i < captions.size()) ? captions.get(i) : null;
+      boolean isVideo = contentType != null && contentType.startsWith("video/");
 
-        // Create media attachment (image or video) with file data stored in database
-        String caption = (captions != null && i < captions.size()) ? captions.get(i) : null;
-        boolean isVideo = contentType != null && contentType.startsWith("video/");
+      // Save file on server and store only the URL in DB
+      String imageUrl = mediaStorageService.save(file, "properties/" + id);
 
-        MediaAttachment attachment =
-            MediaAttachment.builder()
-                .property(property)
-                .fileData(fileData)
-                .contentType(contentType)
-                .fileName(file.getOriginalFilename())
-                .caption(caption)
-                .displayOrder(nextDisplayOrder + i)
-                .isPrimary(
-                    existingImages.isEmpty()
-                        && i == 0) // First image is primary if no existing images
-                .mediaKind(
-                    isVideo ? MediaAttachment.MediaKind.VIDEO : MediaAttachment.MediaKind.IMAGE)
-                .build();
+      MediaAttachment attachment =
+          MediaAttachment.builder()
+              .property(property)
+              .imageUrl(imageUrl)
+              .contentType(contentType)
+              .fileName(file.getOriginalFilename())
+              .caption(caption)
+              .displayOrder(nextDisplayOrder + i)
+              .isPrimary(
+                  existingImages.isEmpty()
+                      && i == 0) // First image is primary if no existing images
+              .mediaKind(
+                  isVideo ? MediaAttachment.MediaKind.VIDEO : MediaAttachment.MediaKind.IMAGE)
+              .build();
 
-        newImages.add(attachment);
-      } catch (IOException e) {
-        throw new BusinessException(
-            "Failed to read file " + file.getOriginalFilename() + ": " + e.getMessage());
-      }
+      newImages.add(attachment);
     }
 
     // Save all new attachments
@@ -654,6 +649,7 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     boolean wasPrimary = image.getIsPrimary();
+    mediaStorageService.deleteByUrl(image.getImageUrl());
     mediaAttachmentRepository.delete(image);
 
     // If this was the primary image, set the first remaining image as primary

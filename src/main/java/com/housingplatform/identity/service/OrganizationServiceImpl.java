@@ -12,15 +12,10 @@ import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
+import com.housingplatform.media.service.MediaStorageService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -28,6 +23,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   private final UserRepository userRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
   private final MediaAttachmentRepository mediaAttachmentRepository;
+  private final MediaStorageService mediaStorageService;
 
   @Override
   public OrganizationResponse createOrganization(OrganizationRequest request) {
@@ -230,7 +232,12 @@ public class OrganizationServiceImpl implements OrganizationService {
       }
     }
 
-    return organizations.stream().map(organizationMapper::toResponse).collect(Collectors.toList());
+    return organizations.stream().map(organization -> {
+      OrganizationResponse response = organizationMapper.toResponse(organization);
+      enrichWithMedia(response, organization.getId());
+      return response;
+    }).toList();
+
   }
 
   @Override
@@ -456,30 +463,27 @@ public class OrganizationServiceImpl implements OrganizationService {
         throw new BusinessException(
             "File " + file.getOriginalFilename() + " must be an image or video");
       }
-      try {
-        boolean isVideo = contentType.startsWith("video/");
-        MediaAttachment.MediaKind fileKind =
-            isVideo
-                ? MediaAttachment.MediaKind.VIDEO
-                : (kind == MediaAttachment.MediaKind.LOGO
-                    ? MediaAttachment.MediaKind.LOGO
-                    : MediaAttachment.MediaKind.IMAGE);
-        MediaAttachment att =
-            MediaAttachment.builder()
-                .organization(organization)
-                .fileData(file.getBytes())
-                .contentType(contentType)
-                .fileName(file.getOriginalFilename())
-                .displayOrder(nextOrder + i)
-                .isPrimary(existing.isEmpty() && i == 0)
-                .mediaKind(fileKind)
-                .build();
-        mediaAttachmentRepository.save(att);
-      } catch (IOException e) {
-        throw new BusinessException("Failed to read file: " + e.getMessage());
-      }
+      boolean isVideo = contentType.startsWith("video/");
+      MediaAttachment.MediaKind fileKind =
+              isVideo
+                      ? MediaAttachment.MediaKind.VIDEO
+                      : (kind == MediaAttachment.MediaKind.LOGO
+                      ? MediaAttachment.MediaKind.LOGO
+                      : MediaAttachment.MediaKind.IMAGE);
+      String imageUrl = mediaStorageService.save(file, "organizations/" + organizationId);
+      MediaAttachment att =
+              MediaAttachment.builder()
+                      .organization(organization)
+                      .imageUrl(imageUrl)
+                      .contentType(contentType)
+                      .fileName(file.getOriginalFilename())
+                      .displayOrder(nextOrder + i)
+                      .isPrimary(existing.isEmpty() && i == 0)
+                      .mediaKind(fileKind)
+                      .build();
+      mediaAttachmentRepository.save(att);
     }
-
+    mediaAttachmentRepository.flush();
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, organizationId);
     return response;
@@ -532,6 +536,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         mediaAttachmentRepository
             .findByIdAndOrganizationId(attachmentId, organizationId)
             .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", attachmentId));
+    mediaStorageService.deleteByUrl(att.getImageUrl());
     mediaAttachmentRepository.delete(att);
 
     OrganizationResponse response = organizationMapper.toResponse(organization);

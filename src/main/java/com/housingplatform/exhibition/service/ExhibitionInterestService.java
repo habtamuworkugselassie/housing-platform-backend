@@ -22,10 +22,7 @@ public class ExhibitionInterestService {
     String email = request.getEmail().trim().toLowerCase();
     String company = request.getCompany() != null ? request.getCompany().trim() : null;
     String phoneNumber = request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null;
-    String orgName =
-        (company != null && !company.isEmpty())
-            ? company
-            : ("Exhibition: " + email);
+    String orgName = (company != null && !company.isEmpty()) ? company : ("Exhibition: " + email);
 
     Organization organization =
         Organization.builder()

@@ -146,6 +146,8 @@ app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   password-reset:
     expiry-hours: ${PASSWORD_RESET_EXPIRY_HOURS:1}
+  # Directory for storing uploaded media (property/org images). Only URLs are stored in DB.
+  upload-dir: ${UPLOAD_DIR:./uploads}
 
 jwt:
   secret: ${JWT_SECRET:}

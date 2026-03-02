@@ -108,6 +108,10 @@ public class OAuth2ResourceServerConfig {
               if (path.matches("/api/v1/organizations/[^/]+/media/[^/]+/file")) {
                 return true;
               }
+              // Uploaded media files (stored on disk, URL in DB)
+              if (path.startsWith("/api/v1/uploads/")) {
+                return true;
+              }
               // Sponsored organizations for landing page carousel
               if (path.equals("/api/v1/sponsorships/sponsored-organizations")) {
                 return true;
@@ -161,6 +165,10 @@ public class OAuth2ResourceServerConfig {
               }
               // Exclude organization media file endpoints (public access for viewing)
               if (path.matches("/api/v1/organizations/[^/]+/media/[^/]+/file")) {
+                return false;
+              }
+              // Exclude uploaded media (disk storage URLs)
+              if (path.startsWith("/api/v1/uploads/")) {
                 return false;
               }
               // All other /api/** paths go through this chain
