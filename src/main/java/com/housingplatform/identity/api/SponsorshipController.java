@@ -217,9 +217,13 @@ public class SponsorshipController {
   }
 
   @PutMapping("/applications/{id}/cancel")
-  @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
   @AuthActionScope("sponsorships.cancel")
-  @Operation(summary = "Cancel application", description = "Cancel a sponsorship application")
+  @Operation(
+      summary = "Cancel application",
+      description =
+          "Cancel an approved sponsorship application. Admin can cancel any; realtor can cancel"
+              + " only their organization's application.")
   public ResponseEntity<Void> cancelApplication(@PathVariable UUID id) {
     sponsorshipService.cancelApplication(id);
     return ResponseEntity.noContent().build();

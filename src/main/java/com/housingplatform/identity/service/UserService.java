@@ -1,9 +1,11 @@
 package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.domain.User;
+import com.housingplatform.identity.dto.UserCreateRequest;
 import com.housingplatform.identity.dto.UserResponse;
 import com.housingplatform.identity.dto.UserUpdateRequest;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
 import java.util.UUID;
@@ -13,6 +15,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;
+  private final PasswordEncoder passwordEncoder;
 
   @Transactional(readOnly = true)
   @Cacheable(value = "users", key = "#id")
@@ -41,6 +45,32 @@ public class UserService {
   public UserResponse getCurrentUserFromContext() {
     UUID userId = UserContext.getCurrentUserId();
     return getUserById(userId);
+  }
+
+  /** Create a new user (admin only). Allows any role including ADMIN. */
+  public UserResponse createUser(UserCreateRequest request) {
+    if (userRepository.findByEmail(request.getEmail().trim().toLowerCase()).isPresent()) {
+      throw new BusinessException("Email already registered");
+    }
+    if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+      if (userRepository.findByPhoneNumber(request.getPhoneNumber().trim()).isPresent()) {
+        throw new BusinessException("Phone number already registered");
+      }
+    }
+    User user =
+        User.builder()
+            .email(request.getEmail().toLowerCase().trim())
+            .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .firstName(request.getFirstName())
+            .lastName(request.getLastName())
+            .phoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null)
+            .status(User.UserStatus.ACTIVE)
+            .emailVerified(false)
+            .phoneVerified(false)
+            .roles(request.getRoles())
+            .build();
+    User saved = userRepository.save(user);
+    return userMapper.toResponse(saved);
   }
 
   @Transactional(readOnly = true)

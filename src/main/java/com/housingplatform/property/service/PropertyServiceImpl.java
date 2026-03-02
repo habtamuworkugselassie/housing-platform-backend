@@ -188,6 +188,19 @@ public class PropertyServiceImpl implements PropertyService {
             : organizationRepository.findAllById(organizationIds).stream()
                 .collect(Collectors.toMap(Organization::getId, Function.identity()));
 
+    // For public access, hide properties belonging to suspended organizations
+    if (publicOnly && !organizationsMap.isEmpty()) {
+      allProperties =
+          allProperties.stream()
+              .filter(
+                  p -> {
+                    Organization org = organizationsMap.get(p.getRealEstateCompanyId());
+                    return org == null
+                        || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                  })
+              .collect(Collectors.toList());
+    }
+
     // Fetch all active sponsorship applications
     List<SponsorshipApplication> activeApplications =
         sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
@@ -425,8 +438,7 @@ public class PropertyServiceImpl implements PropertyService {
     // Only return AVAILABLE properties for public search
     spec =
         spec.and(
-            (root, query, cb) ->
-                cb.equal(root.get("status"), Property.PropertyStatus.AVAILABLE));
+            (root, query, cb) -> cb.equal(root.get("status"), Property.PropertyStatus.AVAILABLE));
 
     // Search by title (partial match)
     if (title != null && !title.trim().isEmpty()) {
@@ -538,8 +550,19 @@ public class PropertyServiceImpl implements PropertyService {
                     .thenComparing(Property::getCreatedAt, Comparator.reverseOrder()))
             .collect(Collectors.toList());
 
+    // Exclude properties from suspended organizations (public search)
+    List<Property> visibleProperties =
+        sortedProperties.stream()
+            .filter(
+                p -> {
+                  Organization org = organizationsMap.get(p.getRealEstateCompanyId());
+                  return org == null
+                      || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                })
+            .collect(Collectors.toList());
+
     // Map to response and enrich with company names and sponsorship info
-    return sortedProperties.stream()
+    return visibleProperties.stream()
         .map(
             property -> {
               PropertyResponse response = propertyMapper.toResponseWithImages(property);

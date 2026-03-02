@@ -37,6 +37,11 @@ public interface OrganizationService {
 
   OrganizationResponse suspendOrganization(UUID id, String reason);
 
+  /**
+   * Re-activate a suspended organization and its cancelled sponsorship applications (admin only).
+   */
+  OrganizationResponse reactivateOrganization(UUID id);
+
   OrganizationResponse getMySupplier();
 
   OrganizationResponse uploadOrganizationMedia(

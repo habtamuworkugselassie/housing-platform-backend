@@ -1,5 +1,6 @@
 package com.housingplatform.identity.api;
 
+import com.housingplatform.identity.dto.UserCreateRequest;
 import com.housingplatform.identity.dto.UserResponse;
 import com.housingplatform.identity.dto.UserUpdateRequest;
 import com.housingplatform.identity.service.UserService;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,6 +55,18 @@ public class UserController {
     org.springframework.data.domain.Page<UserResponse> users =
         userService.getAllUsers(search, role, status, pageable);
     return ResponseEntity.ok(users);
+  }
+
+  @PostMapping
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @AuthActionScope("users.create")
+  @Operation(
+      summary = "Create user",
+      description =
+          "Create a new user with specified roles (admin only). Any role including ADMIN is allowed.")
+  public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
+    UserResponse created = userService.createUser(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(created);
   }
 
   @GetMapping("/{id}")

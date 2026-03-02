@@ -9,6 +9,7 @@ import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.repository.SponsorshipRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import com.housingplatform.shared.security.UserContext;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -294,6 +295,20 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("SponsorshipApplication", id));
 
+    // Admin can cancel any; realtor can cancel only their organization's application
+    if (!UserContext.isAdmin()) {
+      UUID userOrgId =
+          UserContext.getCurrentUserOrganizationId()
+              .orElseThrow(
+                  () ->
+                      new BusinessException("Organization context required to cancel sponsorship"));
+      if (application.getOrganization() == null
+          || !application.getOrganization().getId().equals(userOrgId)) {
+        throw new BusinessException(
+            "You can only cancel your organization's sponsorship application");
+      }
+    }
+
     if (application.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED) {
       application.setStatus(SponsorshipApplication.ApplicationStatus.CANCELLED);
       applicationRepository.save(application);
@@ -371,11 +386,13 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     return applications.stream()
         .map(
             app -> {
-              OrganizationResponse org =
-                  organizationService.getOrganizationById(app.getOrganization().getId());
-              if (org.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
+              // Exclude suspended organizations (check entity so they never appear on carousel)
+              Organization orgEntity = app.getOrganization();
+              if (orgEntity == null
+                  || orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
                 return null;
               }
+              OrganizationResponse org = organizationService.getOrganizationById(orgEntity.getId());
               String videoUrl = null;
               if (org.getMedia() != null) {
                 videoUrl =

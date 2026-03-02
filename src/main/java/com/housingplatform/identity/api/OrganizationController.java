@@ -142,6 +142,18 @@ public class OrganizationController {
     return ResponseEntity.ok(suspended);
   }
 
+  @PutMapping("/{id}/reactivate")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @AuthActionScope("organizations.reactivate")
+  @Operation(
+      summary = "Reactivate organization",
+      description =
+          "Re-activate a suspended organization and its cancelled sponsorship applications (admin only).")
+  public ResponseEntity<OrganizationResponse> reactivateOrganization(@PathVariable UUID id) {
+    OrganizationResponse reactivated = organizationService.reactivateOrganization(id);
+    return ResponseEntity.ok(reactivated);
+  }
+
   @PostMapping(value = "/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
   @AuthActionScope("organizations.update")

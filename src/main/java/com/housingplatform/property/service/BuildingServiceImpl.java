@@ -1,5 +1,6 @@
 package com.housingplatform.property.service;
 
+import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
@@ -238,6 +239,27 @@ public class BuildingServiceImpl implements BuildingService {
       buildings = buildingRepository.findAll();
     }
 
+    // Exclude buildings belonging to suspended organizations (public list)
+    if (!buildings.isEmpty()) {
+      java.util.Set<UUID> companyIds =
+          buildings.stream()
+              .map(Building::getRealEstateCompanyId)
+              .filter(java.util.Objects::nonNull)
+              .collect(Collectors.toSet());
+      Map<UUID, Organization> orgsMap =
+          organizationRepository.findAllById(companyIds).stream()
+              .collect(Collectors.toMap(Organization::getId, Function.identity()));
+      buildings =
+          buildings.stream()
+              .filter(
+                  b -> {
+                    Organization org = orgsMap.get(b.getRealEstateCompanyId());
+                    return org == null
+                        || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                  })
+              .collect(Collectors.toList());
+    }
+
     // Fetch active sponsorship applications for enrichment
     List<SponsorshipApplication> activeApplications =
         sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
@@ -324,6 +346,27 @@ public class BuildingServiceImpl implements BuildingService {
     // Limit results
     if (limit != null && limit > 0) {
       buildings = buildings.stream().limit(limit).collect(Collectors.toList());
+    }
+
+    // Exclude buildings belonging to suspended organizations (public search)
+    if (!buildings.isEmpty()) {
+      java.util.Set<UUID> companyIds =
+          buildings.stream()
+              .map(Building::getRealEstateCompanyId)
+              .filter(java.util.Objects::nonNull)
+              .collect(Collectors.toSet());
+      Map<UUID, Organization> orgsMap =
+          organizationRepository.findAllById(companyIds).stream()
+              .collect(Collectors.toMap(Organization::getId, Function.identity()));
+      buildings =
+          buildings.stream()
+              .filter(
+                  b -> {
+                    Organization org = orgsMap.get(b.getRealEstateCompanyId());
+                    return org == null
+                        || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                  })
+              .collect(Collectors.toList());
     }
 
     // Fetch active sponsorship applications for enrichment

@@ -3,6 +3,7 @@ package com.housingplatform.identity.service;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.RealEstateAgent;
+import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationMediaItem;
@@ -11,6 +12,7 @@ import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
+import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
@@ -43,6 +45,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   private final OrganizationMapper organizationMapper;
   private final UserRepository userRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
+  private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
   private final MediaAttachmentRepository mediaAttachmentRepository;
   private final MediaStorageService mediaStorageService;
 
@@ -360,6 +363,47 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     organization.setStatus(Organization.OrganizationStatus.SUSPENDED);
     Organization updated = organizationRepository.save(organization);
+
+    // Suspend (cancel) all approved sponsorship applications for this organization
+    List<SponsorshipApplication> applications =
+        sponsorshipApplicationRepository.findByOrganizationId(id);
+    for (SponsorshipApplication app : applications) {
+      if (app.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED) {
+        app.setStatus(SponsorshipApplication.ApplicationStatus.CANCELLED);
+        sponsorshipApplicationRepository.save(app);
+      }
+    }
+
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, id);
+    return response;
+  }
+
+  @Override
+  public OrganizationResponse reactivateOrganization(UUID id) {
+    Organization organization =
+        organizationRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
+
+    if (organization.getStatus() != Organization.OrganizationStatus.SUSPENDED) {
+      throw new BusinessException("Only suspended organizations can be reactivated");
+    }
+
+    organization.setStatus(Organization.OrganizationStatus.APPROVED);
+    Organization updated = organizationRepository.save(organization);
+
+    // Re-activate (set back to APPROVED) sponsorship applications that were cancelled when org was
+    // suspended
+    List<SponsorshipApplication> applications =
+        sponsorshipApplicationRepository.findByOrganizationId(id);
+    for (SponsorshipApplication app : applications) {
+      if (app.getStatus() == SponsorshipApplication.ApplicationStatus.CANCELLED) {
+        app.setStatus(SponsorshipApplication.ApplicationStatus.APPROVED);
+        sponsorshipApplicationRepository.save(app);
+      }
+    }
+
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
     return response;
