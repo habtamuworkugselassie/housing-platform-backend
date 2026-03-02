@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,17 +19,38 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class MediaStorageService {
 
+  private static final Logger log = LoggerFactory.getLogger(MediaStorageService.class);
   private static final String UPLOADS_PREFIX = "/api/v1/uploads/";
+  private static final String FALLBACK_SUBDIR = "housing-platform-uploads";
 
   private final Path uploadDir;
 
   public MediaStorageService(@Value("${app.upload-dir:./uploads}") String uploadDirPath) {
-    this.uploadDir = Path.of(uploadDirPath).toAbsolutePath().normalize();
+    Path preferred = Path.of(uploadDirPath).toAbsolutePath().normalize();
+    Path resolved = preferred;
     try {
-      Files.createDirectories(this.uploadDir);
+      Files.createDirectories(preferred);
     } catch (IOException e) {
-      throw new IllegalStateException("Could not create upload directory: " + this.uploadDir, e);
+      Path fallback =
+          Path.of(System.getProperty("java.io.tmpdir", "/tmp")).resolve(FALLBACK_SUBDIR);
+      try {
+        Files.createDirectories(fallback);
+        resolved = fallback;
+        log.warn(
+            "Upload directory not writable: {}. Using fallback: {} (uploads may not persist across restarts). Set UPLOAD_DIR to a writable path for persistence.",
+            preferred,
+            resolved);
+      } catch (IOException e2) {
+        throw new IllegalStateException(
+            "Could not create upload directory: "
+                + preferred
+                + " (nor fallback: "
+                + fallback
+                + "). Set app.upload-dir (or UPLOAD_DIR) to a writable path.",
+            e);
+      }
     }
+    this.uploadDir = resolved;
   }
 
   /**

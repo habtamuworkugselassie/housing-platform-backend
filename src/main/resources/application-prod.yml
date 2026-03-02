@@ -1,3 +1,6 @@
+app:
+  upload-dir: ${UPLOAD_DIR:/var/lib/housing-platform/uploads}
+
 spring:
   jpa:
     show-sql: false
