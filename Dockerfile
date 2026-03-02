@@ -18,9 +18,13 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
 
 COPY --from=build /app/target/*.jar app.jar
+
+# Prod default upload dir: writable by spring so app.upload-dir=/var/lib/housing-platform/uploads works
+RUN mkdir -p /var/lib/housing-platform/uploads && chown -R spring:spring /var/lib/housing-platform
+
+USER spring:spring
 
 EXPOSE 8080
 
