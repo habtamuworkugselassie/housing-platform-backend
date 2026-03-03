@@ -219,7 +219,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     if (type != null && !type.trim().isEmpty()) {
       try {
         Organization.OrganizationType orgType =
-            Organization.OrganizationType.valueOf(type.toUpperCase());
+            Organization.OrganizationType.fromValue(type);
         organizations =
             organizations.stream()
                 .filter(org -> org.getType() == orgType)
@@ -269,7 +269,7 @@ public class OrganizationServiceImpl implements OrganizationService {
       String trimmed = t.trim();
       if (!trimmed.isEmpty()) {
         try {
-          typeSet.add(Organization.OrganizationType.valueOf(trimmed.toUpperCase()));
+          typeSet.add(Organization.OrganizationType.fromValue(trimmed));
         } catch (IllegalArgumentException ignored) {
           // skip invalid type
         }

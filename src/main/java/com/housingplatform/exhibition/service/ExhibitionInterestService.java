@@ -28,7 +28,7 @@ public class ExhibitionInterestService {
     Organization organization =
         Organization.builder()
             .name(orgName)
-            .type(Organization.OrganizationType.valueOf(request.getOrganizationType()))
+            .type(Organization.OrganizationType.fromValue(request.getOrganizationType()))
             .status(Organization.OrganizationStatus.PENDING_APPROVAL)
             .email(email)
             .description(

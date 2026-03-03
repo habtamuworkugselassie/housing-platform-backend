@@ -41,7 +41,7 @@ public class AdminController {
   @Operation(
       summary = "Register organization (admin)",
       description =
-          "Create a new organization (REAL_ESTATE_COMPANY, BANK, SUPPLIER, CONTRACTOR, DEVELOPER, INSURANCE, CONSULTANT, ARCHITECT, FINISHING_CONTRACTOR) with full details. Optionally set initial status (e.g. APPROVED).")
+          "Create a new organization (REAL_ESTATE_COMPANY, BANK, SUPPLIER, CONTRACTOR, DEVELOPER, INSURANCE, CONSULTANT_ARCHITECT, FINISHING_CONTRACTOR) with full details. Optionally set initial status (e.g. APPROVED).")
   public ResponseEntity<OrganizationResponse> registerOrganization(
       @Valid @RequestBody AdminOrganizationCreateRequest request) {
     OrganizationResponse created = organizationService.createOrganizationAsAdmin(request);

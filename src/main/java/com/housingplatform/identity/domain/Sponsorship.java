@@ -38,8 +38,8 @@ public class Sponsorship extends BaseAuditEntity {
   private String notes;
 
   public enum SponsorshipType {
-    BASIC,
-    PREMIER
+    GOLD,
+    PREMIUM
   }
 
   public enum SponsorshipStatus {

@@ -1,5 +1,6 @@
 package com.housingplatform.identity.domain;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
 import java.util.ArrayList;
@@ -59,9 +60,20 @@ public class Organization extends BaseAuditEntity {
     CONTRACTOR,
     DEVELOPER,
     INSURANCE,
-    CONSULTANT,
-    ARCHITECT,
-    FINISHING_CONTRACTOR
+    CONSULTANT_ARCHITECT,
+    FINISHING_CONTRACTOR;
+
+    @JsonCreator
+    public static OrganizationType fromValue(String rawValue) {
+      if (rawValue == null) {
+        return null;
+      }
+      String normalized = rawValue.trim().toUpperCase();
+      if ("CONSULTANT".equals(normalized) || "ARCHITECT".equals(normalized)) {
+        return CONSULTANT_ARCHITECT;
+      }
+      return OrganizationType.valueOf(normalized);
+    }
   }
 
   public enum OrganizationStatus {
@@ -73,7 +85,7 @@ public class Organization extends BaseAuditEntity {
 
   public enum SponsorshipType {
     NONE,
-    BASIC,
-    PREMIER
+    GOLD,
+    PREMIUM
   }
 }

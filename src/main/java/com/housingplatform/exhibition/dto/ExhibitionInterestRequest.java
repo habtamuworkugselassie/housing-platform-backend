@@ -28,7 +28,7 @@ public class ExhibitionInterestRequest {
   @NotBlank(message = "Organization type is required")
   @Pattern(
       regexp =
-          "REAL_ESTATE_COMPANY|SUPPLIER|CONTRACTOR|DEVELOPER|CONSULTANT|ARCHITECT|FINISHING_CONTRACTOR",
+          "REAL_ESTATE_COMPANY|SUPPLIER|CONTRACTOR|DEVELOPER|CONSULTANT_ARCHITECT|FINISHING_CONTRACTOR",
       message = "Invalid organization type")
   private String organizationType;
 

@@ -126,10 +126,10 @@ public class PropertyServiceImpl implements PropertyService {
                       app -> app.getOrganization().getId(),
                       Function.identity(),
                       (existing, replacement) -> {
-                        // If multiple active applications exist, prefer PREMIER over BASIC
+                        // If multiple active applications exist, prefer PREMIUM over GOLD
                         if (replacement.getSponsorship().getType()
                             == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                .PREMIER) {
+                                .PREMIUM) {
                           return replacement;
                         }
                         return existing;
@@ -206,16 +206,16 @@ public class PropertyServiceImpl implements PropertyService {
                     app -> app.getOrganization().getId(),
                     Function.identity(),
                     (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIER over BASIC
+                      // If multiple active applications exist, prefer PREMIUM over GOLD
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
                     }));
 
-    // Sort by sponsorship priority: Premier (0) > Basic (1) > None (2)
+    // Sort by sponsorship priority: Premium (0) > Gold (1) > None (2)
     // Then by creation date (newest first)
     // This ensures sponsored properties always appear at the top of every page
     List<Property> sortedProperties =
@@ -226,10 +226,10 @@ public class PropertyServiceImpl implements PropertyService {
                           SponsorshipApplication application =
                               applicationMap.get(p.getRealEstateCompanyId());
                           if (application != null && application.isActive()) {
-                            // Premier gets highest priority (0), Basic gets second priority (1)
+                            // Premium gets highest priority (0), Gold gets second priority (1)
                             return application.getSponsorship().getType()
                                     == com.housingplatform.identity.domain.Sponsorship
-                                        .SponsorshipType.PREMIER
+                                        .SponsorshipType.PREMIUM
                                 ? 0
                                 : 1;
                           }
@@ -401,7 +401,7 @@ public class PropertyServiceImpl implements PropertyService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -516,16 +516,16 @@ public class PropertyServiceImpl implements PropertyService {
                     app -> app.getOrganization().getId(),
                     Function.identity(),
                     (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIER over BASIC
+                      // If multiple active applications exist, prefer PREMIUM over GOLD
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
                     }));
 
-    // Sort by sponsorship priority: Premier > Basic > None, then by creation date (newest first)
+    // Sort by sponsorship priority: Premium > Gold > None, then by creation date (newest first)
     List<Property> sortedProperties =
         properties.stream()
             .sorted(
@@ -536,7 +536,7 @@ public class PropertyServiceImpl implements PropertyService {
                           if (application != null && application.isActive()) {
                             return application.getSponsorship().getType()
                                     == com.housingplatform.identity.domain.Sponsorship
-                                        .SponsorshipType.PREMIER
+                                        .SponsorshipType.PREMIUM
                                 ? 0
                                 : 1;
                           }

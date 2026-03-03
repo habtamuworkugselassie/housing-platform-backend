@@ -73,7 +73,7 @@ public class OrganizationController {
       summary = "List approved organizations for marketplace",
       description =
           "Public. Returns approved organizations by type(s). Query param: type (e.g. BANK or"
-              + " CONSULTANT,ARCHITECT).")
+              + " CONSULTANT_ARCHITECT).")
   public ResponseEntity<List<OrganizationResponse>> getMarketplaceOrganizations(
       @RequestParam String type) {
     List<OrganizationResponse> list =

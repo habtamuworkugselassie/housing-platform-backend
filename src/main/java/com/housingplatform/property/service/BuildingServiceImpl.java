@@ -62,7 +62,7 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -91,7 +91,7 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -115,7 +115,7 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -141,7 +141,7 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -180,7 +180,7 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -270,10 +270,10 @@ public class BuildingServiceImpl implements BuildingService {
                     app -> app.getOrganization().getId(),
                     Function.identity(),
                     (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIER over BASIC
+                      // If multiple active applications exist, prefer PREMIUM over GOLD
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;
@@ -379,10 +379,10 @@ public class BuildingServiceImpl implements BuildingService {
                     app -> app.getOrganization().getId(),
                     Function.identity(),
                     (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIER over BASIC
+                      // If multiple active applications exist, prefer PREMIUM over GOLD
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIER) {
+                              .PREMIUM) {
                         return replacement;
                       }
                       return existing;

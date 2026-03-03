@@ -25,7 +25,7 @@ public interface OrganizationService {
   /**
    * List approved organizations by one or more types. Public, for marketplace listing.
    *
-   * @param types comma-separated organization types (e.g. "BANK" or "CONSULTANT,ARCHITECT")
+   * @param types comma-separated organization types (e.g. "BANK" or "CONSULTANT_ARCHITECT")
    */
   List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types);
 
