@@ -42,8 +42,6 @@ public class Property extends BaseAuditEntity {
   @Column(name = "price_usd", precision = 19, scale = 2)
   private BigDecimal priceUSD; // Price in US Dollars
 
-  // At least one price must be provided (enforced at service level)
-
   private String address;
   private String city;
   private String state;

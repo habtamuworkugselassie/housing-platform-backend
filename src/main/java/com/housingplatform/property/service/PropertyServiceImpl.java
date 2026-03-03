@@ -72,11 +72,6 @@ public class PropertyServiceImpl implements PropertyService {
 
     Property property = propertyMapper.toEntity(request);
 
-    // Validate that at least one price is provided
-    if (property.getPriceETB() == null && property.getPriceUSD() == null) {
-      throw new BusinessException("At least one price (ETB or USD) must be provided");
-    }
-
     property.setAgentId(agentId);
     property.setStatus(Property.PropertyStatus.AVAILABLE);
     property.setVerificationStatus(Property.VerificationStatus.PENDING);

@@ -5,6 +5,7 @@ import com.housingplatform.banking.service.FinancingOfferService;
 import com.housingplatform.identity.service.RealEstateAgentService;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
+import com.housingplatform.property.dto.PropertyCreditCoverageRequest;
 import com.housingplatform.property.service.PropertyService;
 import com.housingplatform.shared.security.UserContext;
 import com.housingplatform.shared.security.annotation.AuthActionScope;
@@ -157,6 +158,39 @@ public class PropertyController {
   public ResponseEntity<List<FinancingOfferResponse>> getFinancingOffers(@PathVariable UUID id) {
     List<FinancingOfferResponse> offers = financingOfferService.getFinancingOffersByPropertyId(id);
     return ResponseEntity.ok(offers);
+  }
+
+  @PostMapping("/{id}/financing-offers/link")
+  @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
+  @AuthActionScope("properties.update")
+  @Operation(
+      summary = "Link credit product to property",
+      description =
+          "Create an active financing offer by linking a bank credit product to the selected"
+              + " property")
+  public ResponseEntity<FinancingOfferResponse> linkCreditProductToProperty(
+      @PathVariable UUID id, @RequestParam UUID bankId, @RequestParam UUID creditProductId) {
+    FinancingOfferResponse created =
+        financingOfferService.linkCreditProductToProperty(bankId, creditProductId, id);
+    return ResponseEntity.status(HttpStatus.CREATED).body(created);
+  }
+
+  @PostMapping("/{id}/financing-offers")
+  @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
+  @AuthActionScope("properties.update")
+  @Operation(
+      summary = "Create property financing offer",
+      description =
+          "Create a simplified financing offer for a property using selected bank and coverage"
+              + " percentage. The system automatically chooses an active credit product for that"
+              + " bank.")
+  public ResponseEntity<FinancingOfferResponse> createPropertyFinancingOffer(
+      @PathVariable UUID id,
+      @RequestParam UUID bankId,
+      @Valid @RequestBody PropertyCreditCoverageRequest request) {
+    FinancingOfferResponse created =
+        financingOfferService.createPropertyCreditOffer(bankId, id, request.getCoveragePercentage());
+    return ResponseEntity.status(HttpStatus.CREATED).body(created);
   }
 
   @GetMapping("/search")

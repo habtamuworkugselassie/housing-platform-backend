@@ -2,6 +2,7 @@ package com.housingplatform.banking.service;
 
 import com.housingplatform.banking.dto.FinancingOfferRequest;
 import com.housingplatform.banking.dto.FinancingOfferResponse;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,6 +21,9 @@ public interface FinancingOfferService {
 
   FinancingOfferResponse linkCreditProductToProperty(
       UUID bankId, UUID creditProductId, UUID propertyId);
+
+  FinancingOfferResponse createPropertyCreditOffer(
+      UUID bankId, UUID propertyId, BigDecimal coveragePercentage);
 
   FinancingOfferResponse linkCreditProductToBuilding(
       UUID bankId, UUID creditProductId, UUID buildingId);

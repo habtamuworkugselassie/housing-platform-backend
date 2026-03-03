@@ -23,8 +23,6 @@ public class PropertyRequest {
   @DecimalMin(value = "0.0", inclusive = false, message = "Price USD must be greater than 0")
   private BigDecimal priceUSD; // Price in US Dollars
 
-  // At least one price must be provided (validated at service level)
-
   @NotBlank(message = "Address is required")
   private String address;
 

@@ -5,7 +5,11 @@ import com.housingplatform.banking.dto.FinancingOfferRequest;
 import com.housingplatform.banking.dto.FinancingOfferResponse;
 import com.housingplatform.banking.repository.CreditProductRepository;
 import com.housingplatform.banking.repository.FinancingOfferRepository;
+import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -118,6 +122,44 @@ public class FinancingOfferServiceImpl implements FinancingOfferService {
 
     FinancingOffer saved = financingOfferRepository.save(offer);
     return financingOfferMapper.toResponse(saved);
+  }
+
+  @Override
+  public FinancingOfferResponse createPropertyCreditOffer(
+      UUID bankId, UUID propertyId, BigDecimal coveragePercentage) {
+    List<com.housingplatform.banking.domain.CreditProduct> activeProducts =
+        creditProductRepository.findByBankIdAndStatus(
+            bankId, com.housingplatform.banking.domain.CreditProduct.CreditProductStatus.ACTIVE);
+
+    if (activeProducts.isEmpty()) {
+      throw new BusinessException(
+          "Selected bank has no active credit products. Please create/activate one first.");
+    }
+
+    // Use the active product with highest max amount as default for simplified flow.
+    com.housingplatform.banking.domain.CreditProduct selectedProduct =
+        activeProducts.stream()
+            .max(
+                Comparator.comparing(
+                    product ->
+                        product.getMaxLoanAmount() == null
+                            ? BigDecimal.ZERO
+                            : product.getMaxLoanAmount()))
+            .orElseThrow(
+                () ->
+                    new BusinessException(
+                        "Unable to select a default credit product for the selected bank."));
+
+    FinancingOfferResponse linked =
+        linkCreditProductToProperty(bankId, selectedProduct.getId(), propertyId);
+
+    FinancingOfferRequest updateRequest = new FinancingOfferRequest();
+    updateRequest.setCreditProductId(selectedProduct.getId());
+    updateRequest.setPropertyId(propertyId);
+    updateRequest.setSpecialLTVRatio(
+        coveragePercentage.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+
+    return updateFinancingOffer(bankId, linked.getId(), updateRequest);
   }
 
   @Override
