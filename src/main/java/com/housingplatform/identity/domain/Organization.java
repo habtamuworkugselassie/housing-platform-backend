@@ -39,6 +39,7 @@ public class Organization extends BaseAuditEntity {
       orphanRemoval = true,
       fetch = FetchType.LAZY)
   @OrderBy("displayOrder ASC")
+  @Builder.Default
   private List<OrganizationPhone> phones = new ArrayList<>();
 
   private String email;

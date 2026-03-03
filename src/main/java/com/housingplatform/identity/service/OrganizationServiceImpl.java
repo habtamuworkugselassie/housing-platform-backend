@@ -436,7 +436,12 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   private void syncPhonesFromRequest(
       Organization organization, List<OrganizationPhoneDto> phoneNumbers) {
-    organization.getPhones().clear();
+    List<OrganizationPhone> phones = organization.getPhones();
+    if (phones == null) {
+      phones = new ArrayList<>();
+      organization.setPhones(phones);
+    }
+    phones.clear();
     if (phoneNumbers != null && !phoneNumbers.isEmpty()) {
       int order = 0;
       for (OrganizationPhoneDto dto : phoneNumbers) {
@@ -449,20 +454,18 @@ public class OrganizationServiceImpl implements OrganizationService {
                   .number(num)
                   .displayOrder(order++)
                   .build();
-          organization.getPhones().add(phone);
+          phones.add(phone);
         }
       }
     }
-    if (organization.getPhones().isEmpty()) {
-      organization
-          .getPhones()
-          .add(
-              OrganizationPhone.builder()
-                  .organization(organization)
-                  .countryCode("+251")
-                  .number("")
-                  .displayOrder(0)
-                  .build());
+    if (phones.isEmpty()) {
+      phones.add(
+          OrganizationPhone.builder()
+              .organization(organization)
+              .countryCode("+251")
+              .number("")
+              .displayOrder(0)
+              .build());
     }
   }
 
