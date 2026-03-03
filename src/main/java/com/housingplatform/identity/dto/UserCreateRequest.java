@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.Set;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
@@ -34,4 +35,6 @@ public class UserCreateRequest {
 
   @NotEmpty(message = "At least one role is required")
   private Set<User.UserRole> roles;
+
+  private UUID organizationId;
 }

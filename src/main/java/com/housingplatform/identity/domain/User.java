@@ -41,6 +41,10 @@ public class User extends BaseAuditEntity {
   @Builder.Default
   private Boolean phoneVerified = false;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "organization_id")
+  private Organization organization;
+
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
   @Column(name = "role")

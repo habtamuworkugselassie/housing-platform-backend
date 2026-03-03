@@ -218,8 +218,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     // Apply type filter if provided
     if (type != null && !type.trim().isEmpty()) {
       try {
-        Organization.OrganizationType orgType =
-            Organization.OrganizationType.fromValue(type);
+        Organization.OrganizationType orgType = Organization.OrganizationType.fromValue(type);
         organizations =
             organizations.stream()
                 .filter(org -> org.getType() == orgType)

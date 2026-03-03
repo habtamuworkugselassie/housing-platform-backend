@@ -5,11 +5,9 @@ import com.housingplatform.banking.dto.FinancingOfferRequest;
 import com.housingplatform.banking.dto.FinancingOfferResponse;
 import com.housingplatform.banking.repository.CreditProductRepository;
 import com.housingplatform.banking.repository.FinancingOfferRepository;
-import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -131,24 +129,40 @@ public class FinancingOfferServiceImpl implements FinancingOfferService {
         creditProductRepository.findByBankIdAndStatus(
             bankId, com.housingplatform.banking.domain.CreditProduct.CreditProductStatus.ACTIVE);
 
-    if (activeProducts.isEmpty()) {
-      throw new BusinessException(
-          "Selected bank has no active credit products. Please create/activate one first.");
+    BigDecimal ltvRatio =
+        coveragePercentage.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    com.housingplatform.banking.domain.CreditProduct selectedProduct = null;
+
+    // Look for an existing product with matching max LTV
+    for (com.housingplatform.banking.domain.CreditProduct product : activeProducts) {
+      if (product.getMaxLoanToValueRatio() != null
+          && product.getMaxLoanToValueRatio().compareTo(ltvRatio) == 0) {
+        selectedProduct = product;
+        break;
+      }
     }
 
-    // Use the active product with highest max amount as default for simplified flow.
-    com.housingplatform.banking.domain.CreditProduct selectedProduct =
-        activeProducts.stream()
-            .max(
-                Comparator.comparing(
-                    product ->
-                        product.getMaxLoanAmount() == null
-                            ? BigDecimal.ZERO
-                            : product.getMaxLoanAmount()))
-            .orElseThrow(
-                () ->
-                    new BusinessException(
-                        "Unable to select a default credit product for the selected bank."));
+    // If no matching product is found, create a new simplified one
+    if (selectedProduct == null) {
+      com.housingplatform.banking.domain.CreditProduct newProduct =
+          new com.housingplatform.banking.domain.CreditProduct();
+      newProduct.setBankId(bankId);
+      newProduct.setName("Simplified Credit Product - " + coveragePercentage + "% Coverage");
+      newProduct.setDescription("Auto-generated credit product for property financing offers.");
+      newProduct.setProductType(
+          com.housingplatform.banking.domain.CreditProduct.CreditProductType.HOME_PURCHASE);
+      newProduct.setInterestRate(BigDecimal.ZERO);
+      newProduct.setMinTenureMonths(12);
+      newProduct.setMaxTenureMonths(360);
+      newProduct.setMaxLoanToValueRatio(ltvRatio);
+      newProduct.setMinLoanAmount(BigDecimal.ZERO);
+      newProduct.setMaxLoanAmount(new BigDecimal("100000000.00"));
+      newProduct.setCurrency(com.housingplatform.shared.domain.Currency.ETB);
+      newProduct.setStatus(
+          com.housingplatform.banking.domain.CreditProduct.CreditProductStatus.ACTIVE);
+
+      selectedProduct = creditProductRepository.save(newProduct);
+    }
 
     FinancingOfferResponse linked =
         linkCreditProductToProperty(bankId, selectedProduct.getId(), propertyId);
@@ -156,8 +170,7 @@ public class FinancingOfferServiceImpl implements FinancingOfferService {
     FinancingOfferRequest updateRequest = new FinancingOfferRequest();
     updateRequest.setCreditProductId(selectedProduct.getId());
     updateRequest.setPropertyId(propertyId);
-    updateRequest.setSpecialLTVRatio(
-        coveragePercentage.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+    updateRequest.setSpecialLTVRatio(ltvRatio);
 
     return updateFinancingOffer(bankId, linked.getId(), updateRequest);
   }

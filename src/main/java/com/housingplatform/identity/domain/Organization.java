@@ -86,6 +86,7 @@ public class Organization extends BaseAuditEntity {
   public enum SponsorshipType {
     NONE,
     GOLD,
-    PREMIUM
+    PREMIUM,
+    SILVER
   }
 }

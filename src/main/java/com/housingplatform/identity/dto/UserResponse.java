@@ -25,6 +25,7 @@ public class UserResponse {
   private Set<User.UserRole> roles;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+  private UUID organizationId;
 
   // Computed property for backward compatibility with frontend
   // This will be serialized as "enabled" in JSON

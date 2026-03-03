@@ -62,9 +62,13 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 
@@ -91,9 +95,13 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 
@@ -115,9 +123,13 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 
@@ -141,9 +153,13 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 
@@ -180,9 +196,13 @@ public class BuildingServiceImpl implements BuildingService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 

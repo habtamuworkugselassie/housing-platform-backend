@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.UserCreateRequest;
 import com.housingplatform.identity.dto.UserResponse;
 import com.housingplatform.identity.dto.UserUpdateRequest;
+import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
   private final UserRepository userRepository;
+  private final OrganizationRepository organizationRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
 
@@ -57,6 +59,15 @@ public class UserService {
         throw new BusinessException("Phone number already registered");
       }
     }
+    com.housingplatform.identity.domain.Organization organization = null;
+    if (request.getOrganizationId() != null) {
+      organization =
+          organizationRepository
+              .findById(request.getOrganizationId())
+              .orElseThrow(
+                  () -> new ResourceNotFoundException("Organization", request.getOrganizationId()));
+    }
+
     User user =
         User.builder()
             .email(request.getEmail().toLowerCase().trim())
@@ -68,6 +79,7 @@ public class UserService {
             .emailVerified(false)
             .phoneVerified(false)
             .roles(request.getRoles())
+            .organization(organization)
             .build();
     User saved = userRepository.save(user);
     return userMapper.toResponse(saved);

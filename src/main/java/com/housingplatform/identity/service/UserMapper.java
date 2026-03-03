@@ -11,7 +11,9 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface UserMapper {
+  @org.mapstruct.Mapping(source = "organization.id", target = "organizationId")
   UserResponse toResponse(User user);
 
+  @org.mapstruct.Mapping(target = "organization", ignore = true)
   void updateEntity(@MappingTarget User user, UserUpdateRequest request);
 }

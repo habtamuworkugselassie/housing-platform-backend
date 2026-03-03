@@ -132,6 +132,16 @@ public class PropertyServiceImpl implements PropertyService {
                                 .PREMIUM) {
                           return replacement;
                         }
+                        if (existing.getSponsorship().getType()
+                            == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                                .PREMIUM) {
+                          return existing;
+                        }
+                        if (replacement.getSponsorship().getType()
+                            == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                                .GOLD) {
+                          return replacement;
+                        }
                         return existing;
                       }));
 
@@ -147,7 +157,8 @@ public class PropertyServiceImpl implements PropertyService {
       String status, String city, Pageable pageable, boolean publicOnly) {
     Specification<Property> spec = Specification.where(null);
 
-    // For public access, only show AVAILABLE properties (ignore status parameter for security)
+    // For public access, only show AVAILABLE properties (ignore status parameter
+    // for security)
     // For authenticated users, respect the status parameter
     if (publicOnly) {
       spec =
@@ -170,7 +181,8 @@ public class PropertyServiceImpl implements PropertyService {
     // Get all properties matching the criteria
     List<Property> allProperties = propertyRepository.findAll(spec);
 
-    // Fetch all organizations for company name (optimized: single query instead of N+1)
+    // Fetch all organizations for company name (optimized: single query instead of
+    // N+1)
     Set<UUID> organizationIds =
         allProperties.stream()
             .map(Property::getRealEstateCompanyId)
@@ -206,12 +218,15 @@ public class PropertyServiceImpl implements PropertyService {
                     app -> app.getOrganization().getId(),
                     Function.identity(),
                     (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIUM over GOLD
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 
@@ -226,14 +241,15 @@ public class PropertyServiceImpl implements PropertyService {
                           SponsorshipApplication application =
                               applicationMap.get(p.getRealEstateCompanyId());
                           if (application != null && application.isActive()) {
-                            // Premium gets highest priority (0), Gold gets second priority (1)
-                            return application.getSponsorship().getType()
-                                    == com.housingplatform.identity.domain.Sponsorship
-                                        .SponsorshipType.PREMIUM
-                                ? 0
-                                : 1;
+                            if (application.getSponsorship().getType()
+                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                                    .PREMIUM) return 0;
+                            if (application.getSponsorship().getType()
+                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                                    .GOLD) return 1;
+                            return 2; // SILVER gets third priority
                           }
-                          return 2; // Non-sponsored properties get lowest priority
+                          return 3; // Non-sponsored properties get lowest priority
                         })
                     .thenComparing(Property::getCreatedAt, Comparator.reverseOrder()))
             .collect(Collectors.toList());
@@ -318,7 +334,8 @@ public class PropertyServiceImpl implements PropertyService {
         throw new BusinessException("Property does not belong to your organization");
       }
 
-      // Only validate agent can manage property if not super agent (super agents can manage all org
+      // Only validate agent can manage property if not super agent (super agents can
+      // manage all org
       // properties)
       if (!isSuperAgent && request.getRealEstateCompanyId() != null) {
         agentService.validateAgentCanManageProperty(agentId, request.getRealEstateCompanyId());
@@ -401,9 +418,13 @@ public class PropertyServiceImpl implements PropertyService {
                     (existing, replacement) -> {
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
     return properties.stream()
@@ -493,7 +514,8 @@ public class PropertyServiceImpl implements PropertyService {
       properties = properties.stream().limit(limit).collect(Collectors.toList());
     }
 
-    // Fetch organizations for company names (optimized: single query instead of N+1)
+    // Fetch organizations for company names (optimized: single query instead of
+    // N+1)
     Set<UUID> organizationIds =
         properties.stream()
             .map(Property::getRealEstateCompanyId)
@@ -516,16 +538,20 @@ public class PropertyServiceImpl implements PropertyService {
                     app -> app.getOrganization().getId(),
                     Function.identity(),
                     (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIUM over GOLD
                       if (replacement.getSponsorship().getType()
                           == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
                         return replacement;
-                      }
                       return existing;
                     }));
 
-    // Sort by sponsorship priority: Premium > Gold > None, then by creation date (newest first)
+    // Sort by sponsorship priority: Premium > Gold > None, then by creation date
+    // (newest first)
     List<Property> sortedProperties =
         properties.stream()
             .sorted(
@@ -534,13 +560,15 @@ public class PropertyServiceImpl implements PropertyService {
                           SponsorshipApplication application =
                               applicationMap.get(p.getRealEstateCompanyId());
                           if (application != null && application.isActive()) {
-                            return application.getSponsorship().getType()
-                                    == com.housingplatform.identity.domain.Sponsorship
-                                        .SponsorshipType.PREMIUM
-                                ? 0
-                                : 1;
+                            if (application.getSponsorship().getType()
+                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                                    .PREMIUM) return 0;
+                            if (application.getSponsorship().getType()
+                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                                    .GOLD) return 1;
+                            return 2; // SILVER gets third priority
                           }
-                          return 2; // Non-sponsored properties get lowest priority
+                          return 3; // Non-sponsored properties get lowest priority
                         })
                     .thenComparing(Property::getCreatedAt, Comparator.reverseOrder()))
             .collect(Collectors.toList());

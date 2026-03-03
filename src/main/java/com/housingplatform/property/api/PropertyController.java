@@ -3,9 +3,9 @@ package com.housingplatform.property.api;
 import com.housingplatform.banking.dto.FinancingOfferResponse;
 import com.housingplatform.banking.service.FinancingOfferService;
 import com.housingplatform.identity.service.RealEstateAgentService;
+import com.housingplatform.property.dto.PropertyCreditCoverageRequest;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
-import com.housingplatform.property.dto.PropertyCreditCoverageRequest;
 import com.housingplatform.property.service.PropertyService;
 import com.housingplatform.shared.security.UserContext;
 import com.housingplatform.shared.security.annotation.AuthActionScope;
@@ -189,7 +189,8 @@ public class PropertyController {
       @RequestParam UUID bankId,
       @Valid @RequestBody PropertyCreditCoverageRequest request) {
     FinancingOfferResponse created =
-        financingOfferService.createPropertyCreditOffer(bankId, id, request.getCoveragePercentage());
+        financingOfferService.createPropertyCreditOffer(
+            bankId, id, request.getCoveragePercentage());
     return ResponseEntity.status(HttpStatus.CREATED).body(created);
   }
 

@@ -39,7 +39,8 @@ public class Sponsorship extends BaseAuditEntity {
 
   public enum SponsorshipType {
     GOLD,
-    PREMIUM
+    PREMIUM,
+    SILVER
   }
 
   public enum SponsorshipStatus {
