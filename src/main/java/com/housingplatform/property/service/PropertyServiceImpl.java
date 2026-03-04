@@ -50,7 +50,7 @@ public class PropertyServiceImpl implements PropertyService {
   private final MediaAttachmentRepository mediaAttachmentRepository;
   private final MediaStorageService mediaStorageService;
 
-  private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
   @Override
   public PropertyResponse createProperty(PropertyRequest request, UUID agentId) {
@@ -642,7 +642,7 @@ public class PropertyServiceImpl implements PropertyService {
       // Validate file size
       if (file.getSize() > MAX_FILE_SIZE) {
         throw new BusinessException(
-            "File " + file.getOriginalFilename() + " exceeds maximum size of 10MB");
+            "File " + file.getOriginalFilename() + " exceeds maximum size of 100MB");
       }
 
       // Validate file type (images and videos)

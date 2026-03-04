@@ -39,7 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional
 public class OrganizationServiceImpl implements OrganizationService {
 
-  private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
   private final OrganizationRepository organizationRepository;
   private final OrganizationMapper organizationMapper;
@@ -64,7 +64,8 @@ public class OrganizationServiceImpl implements OrganizationService {
     syncPhonesFromRequest(organization, request.getPhoneNumbers());
     Organization saved = organizationRepository.save(organization);
 
-    // If a REALTOR is creating a REAL_ESTATE_COMPANY, automatically create a RealEstateAgent
+    // If a REALTOR is creating a REAL_ESTATE_COMPANY, automatically create a
+    // RealEstateAgent
     // and mark them as the super agent (owner)
     if (saved.getType() == Organization.OrganizationType.REAL_ESTATE_COMPANY) {
       try {
@@ -93,7 +94,8 @@ public class OrganizationServiceImpl implements OrganizationService {
           }
         }
       } catch (IllegalStateException e) {
-        // User context not available (shouldn't happen in authenticated endpoint, but handle
+        // User context not available (shouldn't happen in authenticated endpoint, but
+        // handle
         // gracefully)
         // This means the organization was created but no agent was linked
       }
@@ -392,7 +394,8 @@ public class OrganizationServiceImpl implements OrganizationService {
     organization.setStatus(Organization.OrganizationStatus.APPROVED);
     Organization updated = organizationRepository.save(organization);
 
-    // Re-activate (set back to APPROVED) sponsorship applications that were cancelled when org was
+    // Re-activate (set back to APPROVED) sponsorship applications that were
+    // cancelled when org was
     // suspended
     List<SponsorshipApplication> applications =
         sponsorshipApplicationRepository.findByOrganizationId(id);
@@ -551,7 +554,7 @@ public class OrganizationServiceImpl implements OrganizationService {
       if (file.isEmpty()) continue;
       if (file.getSize() > MAX_FILE_SIZE) {
         throw new BusinessException(
-            "File " + file.getOriginalFilename() + " exceeds maximum size of 10MB");
+            "File " + file.getOriginalFilename() + " exceeds maximum size of 100MB");
       }
       String contentType = file.getContentType();
       if (contentType == null
