@@ -30,8 +30,6 @@ public class OpenApiConfig {
             List.of(
                 new Server().url("/").description("Current Server (Droplet/Local)"),
                 new Server().url("http://localhost:8080").description("Local Development Server"),
-                new Server()
-                    .url("http://209.38.204.219:8080")
-                    .description("Production Server")));
+                new Server().url("http://209.38.204.219:8080").description("Production Server")));
   }
 }
