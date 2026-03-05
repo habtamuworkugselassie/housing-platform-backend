@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class PropertyServiceImpl implements PropertyService {
 
   private final PropertyRepository propertyRepository;
@@ -389,6 +391,7 @@ public class PropertyServiceImpl implements PropertyService {
 
   @Override
   @Transactional(readOnly = true)
+  @Cacheable(value = "availablePropertiesByOrg")
   public List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId) {
     List<Property> properties =
         propertyRepository.findByRealEstateCompanyId(companyId).stream()
@@ -447,6 +450,7 @@ public class PropertyServiceImpl implements PropertyService {
 
   @Override
   @Transactional(readOnly = true)
+  @Cacheable(value = "propertiesSearch")
   public List<PropertyResponse> searchProperties(
       String companyName, String city, String state, String country, String title, Integer limit) {
     Specification<Property> spec = Specification.where(null);

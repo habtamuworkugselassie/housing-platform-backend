@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,6 +73,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
 
   @Override
   @Transactional(readOnly = true)
+  @Cacheable(value = "activeSponsorships")
   public List<SponsorshipResponse> getActiveSponsorships() {
     return sponsorshipRepository.findByStatus(Sponsorship.SponsorshipStatus.ACTIVE).stream()
         .map(this::toSponsorshipResponse)
@@ -295,7 +297,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("SponsorshipApplication", id));
 
-    // Admin can cancel any; realtor can cancel only their organization's application
+    // Admin can cancel any; realtor can cancel only their organization's
+    // application
     if (!UserContext.isAdmin()) {
       UUID userOrgId =
           UserContext.getCurrentUserOrganizationId()
@@ -379,6 +382,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
 
   @Override
   @Transactional(readOnly = true)
+  @Cacheable(value = "sponsoredOrganizations")
   public List<SponsoredOrganizationResponse> getActiveSponsoredOrganizations() {
     LocalDateTime now = LocalDateTime.now();
     List<SponsorshipApplication> applications =
@@ -386,7 +390,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     return applications.stream()
         .map(
             app -> {
-              // Exclude suspended organizations (check entity so they never appear on carousel)
+              // Exclude suspended organizations (check entity so they never appear on
+              // carousel)
               Organization orgEntity = app.getOrganization();
               if (orgEntity == null
                   || orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
