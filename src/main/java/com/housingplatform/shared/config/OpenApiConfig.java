@@ -28,9 +28,10 @@ public class OpenApiConfig {
                 .license(new License().name("Proprietary").url("https://housingplatform.com")))
         .servers(
             List.of(
+                new Server().url("/").description("Current Server (Droplet/Local)"),
                 new Server().url("http://localhost:8080").description("Local Development Server"),
                 new Server()
-                    .url("https://api.housingplatform.com")
+                    .url("http://209.38.204.219:8080")
                     .description("Production Server")));
   }
 }
