@@ -46,13 +46,14 @@ public class PropertyController {
   public ResponseEntity<Page<PropertyResponse>> getAllProperties(
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String city,
+      @RequestParam(required = false) String type,
       @RequestParam(defaultValue = "0") Integer page,
       @RequestParam(defaultValue = "20") Integer size) {
     Pageable pageable = PageRequest.of(page, size);
     boolean isAuthenticated = isAuthenticated();
     boolean publicOnly = !isAuthenticated;
     Page<PropertyResponse> properties =
-        propertyService.getAllProperties(status, city, pageable, publicOnly);
+        propertyService.getAllProperties(status, city, type, pageable, publicOnly);
     return ResponseEntity.ok(properties);
   }
 

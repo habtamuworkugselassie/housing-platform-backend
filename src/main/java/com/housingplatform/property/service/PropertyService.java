@@ -15,7 +15,7 @@ public interface PropertyService {
   PropertyResponse getPropertyById(UUID id);
 
   Page<PropertyResponse> getAllProperties(
-      String status, String city, Pageable pageable, boolean publicOnly);
+      String status, String city, String type, Pageable pageable, boolean publicOnly);
 
   PropertyResponse updateProperty(UUID id, PropertyRequest request, UUID agentId);
 

@@ -158,7 +158,7 @@ public class PropertyServiceImpl implements PropertyService {
   @Override
   @Transactional(readOnly = true)
   public Page<PropertyResponse> getAllProperties(
-      String status, String city, Pageable pageable, boolean publicOnly) {
+      String status, String city, String type, Pageable pageable, boolean publicOnly) {
     Specification<Property> spec = Specification.where(null);
 
     // For public access, only show AVAILABLE properties (ignore status parameter
@@ -180,6 +180,15 @@ public class PropertyServiceImpl implements PropertyService {
     if (city != null) {
       spec =
           spec.and((root, query, cb) -> cb.equal(cb.lower(root.get("city")), city.toLowerCase()));
+    }
+
+    if (type != null && !type.trim().isEmpty()) {
+      try {
+        Property.PropertyType typeEnum = Property.PropertyType.valueOf(type.trim().toUpperCase());
+        spec = spec.and((root, query, cb) -> cb.equal(root.get("type"), typeEnum));
+      } catch (IllegalArgumentException e) {
+        // Invalid type value, ignore it
+      }
     }
 
     // Get all properties matching the criteria
