@@ -17,11 +17,26 @@ public class OrganizationResponse {
   private UUID id;
   private String name;
   private String registrationNumber;
+  private String businessRegistration;
+  private String license;
+  private String vatRegistration;
+  private String tinRegistration;
+
+  /** Number/code in parallel with document (businessRegistration). */
+  private String businessRegistrationNumber;
+
+  private String licenseNumber;
+  private String vatNumber;
+  private String tinNumber;
+
   private Organization.OrganizationType type;
   private Organization.OrganizationStatus status;
   private String address;
   private String city;
   private String country;
+
+  private Double latitude;
+  private Double longitude;
 
   /**
    * Phone numbers with country code. For backward compatibility, first phone formatted as single
@@ -51,4 +66,19 @@ public class OrganizationResponse {
 
   /** All media attachments (logo, images, videos). */
   private List<OrganizationMediaItem> media;
+
+  /** True when fully verified (all 8 fields). Kept for backward compatibility. */
+  private Boolean verified;
+
+  /**
+   * Verification level: NONE, HALF (e.g. documents submitted but numbers missing, or vice versa),
+   * FULL (all documents and numbers). Used for half vs fully verified badge on frontend and mobile.
+   */
+  private String verificationLevel;
+
+  /** Returns true if fully verified (all 8 verification fields non-blank). */
+  public boolean isVerified() {
+    if (Boolean.TRUE.equals(verified)) return true;
+    return "FULL".equals(verificationLevel);
+  }
 }

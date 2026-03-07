@@ -68,6 +68,17 @@ public class SponsorshipController {
     return ResponseEntity.ok(list);
   }
 
+  @GetMapping("/exclusive-organizations")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Get exclusive sponsor organizations for splash and hero",
+      description =
+          "Organizations with EXCLUSIVE sponsorship (active, approved, within date range). Public.")
+  public ResponseEntity<List<SponsoredOrganizationResponse>> getExclusiveOrganizations() {
+    List<SponsoredOrganizationResponse> list = sponsorshipService.getExclusiveOrganizations();
+    return ResponseEntity.ok(list);
+  }
+
   @GetMapping("/{id}")
   @Operation(
       summary = "Get sponsorship package by ID",

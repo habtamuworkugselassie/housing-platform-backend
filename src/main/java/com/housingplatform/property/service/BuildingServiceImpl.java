@@ -33,6 +33,7 @@ public class BuildingServiceImpl implements BuildingService {
   private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
   private final BuildingMapper buildingMapper;
   private final PropertyMapper propertyMapper;
+  private final PropertyService propertyService;
 
   @Override
   public BuildingResponse createBuilding(UUID companyId, BuildingRequest request) {
@@ -421,10 +422,16 @@ public class BuildingServiceImpl implements BuildingService {
       Building building, Map<UUID, SponsorshipApplication> applicationMap) {
     BuildingResponse response = buildingMapper.toResponse(building);
 
-    // Get organization name
+    // Get organization name and verified status
     organizationRepository
         .findById(building.getRealEstateCompanyId())
-        .ifPresent(org -> response.setRealEstateCompanyName(org.getName()));
+        .ifPresent(
+            org -> {
+              response.setRealEstateCompanyName(org.getName());
+              Organization.VerificationLevel level = org.getVerificationLevel();
+              response.setRealEstateCompanyVerified(level == Organization.VerificationLevel.FULL);
+              response.setRealEstateCompanyVerificationLevel(level != null ? level.name() : null);
+            });
 
     // Enrich with sponsorship info
     if (building.getRealEstateCompanyId() != null && !applicationMap.isEmpty()) {
@@ -460,9 +467,9 @@ public class BuildingServiceImpl implements BuildingService {
     response.setAvailableUnits((int) availableUnits);
     response.setOccupiedUnits((int) occupiedUnits);
 
-    // Map units to PropertyResponse
+    // Map units to PropertyResponse with org verification and sponsorship enrichment
     List<PropertyResponse> unitResponses =
-        units.stream().map(propertyMapper::toResponseWithImages).collect(Collectors.toList());
+        propertyService.toResponseWithImagesAndSponsorship(units);
     response.setUnits(unitResponses);
 
     return response;

@@ -50,4 +50,12 @@ public interface OrganizationService {
   ResponseEntity<byte[]> getOrganizationMediaFile(UUID organizationId, UUID attachmentId);
 
   OrganizationResponse deleteOrganizationMedia(UUID organizationId, UUID attachmentId);
+
+  /**
+   * Upload an organization document (e.g. business registration, license, VAT, TIN). Replaces
+   * existing document if present. Allowed types: BUSINESS_REGISTRATION, LICENSE, VAT_REGISTRATION,
+   * TIN_REGISTRATION.
+   */
+  OrganizationResponse uploadOrganizationDocument(
+      UUID organizationId, String documentType, MultipartFile file);
 }

@@ -47,4 +47,9 @@ public interface SponsorshipService {
    * landing page carousel.
    */
   List<SponsoredOrganizationResponse> getActiveSponsoredOrganizations();
+
+  /**
+   * Get organizations with EXCLUSIVE sponsorship only. Public, for splash screen and hero section.
+   */
+  List<SponsoredOrganizationResponse> getExclusiveOrganizations();
 }

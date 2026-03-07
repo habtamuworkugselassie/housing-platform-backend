@@ -90,7 +90,9 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     Property saved = propertyRepository.save(property);
-    return propertyMapper.toResponseWithImages(saved);
+    PropertyResponse response = propertyMapper.toResponseWithImages(saved);
+    enrichSingleResponse(response, saved);
+    return response;
   }
 
   @Override
@@ -285,6 +287,9 @@ public class PropertyServiceImpl implements PropertyService {
       Organization org = organizationsMap.get(property.getRealEstateCompanyId());
       if (org != null) {
         response.setRealEstateCompanyName(org.getName());
+        Organization.VerificationLevel level = org.getVerificationLevel();
+        response.setRealEstateCompanyVerified(level == Organization.VerificationLevel.FULL);
+        response.setRealEstateCompanyVerificationLevel(level != null ? level.name() : null);
         if (org.getPhones() != null && !org.getPhones().isEmpty()) {
           org.getPhones().stream()
               .min(
@@ -306,6 +311,32 @@ public class PropertyServiceImpl implements PropertyService {
         response.setIsSponsored(false);
       }
     }
+  }
+
+  /**
+   * Enriches a single property response with org verification and sponsorship (e.g. after
+   * create/update).
+   */
+  private void enrichSingleResponse(PropertyResponse response, Property property) {
+    if (property.getRealEstateCompanyId() == null) {
+      return;
+    }
+    Organization org =
+        organizationRepository.findById(property.getRealEstateCompanyId()).orElse(null);
+    Map<UUID, Organization> organizationsMap =
+        org != null ? java.util.Map.of(org.getId(), org) : java.util.Collections.emptyMap();
+    List<SponsorshipApplication> activeApplications =
+        sponsorshipApplicationRepository
+            .findAllActiveApplications(java.time.LocalDateTime.now())
+            .stream()
+            .filter(app -> app.getOrganization().getId().equals(property.getRealEstateCompanyId()))
+            .collect(Collectors.toList());
+    Map<UUID, SponsorshipApplication> applicationMap =
+        activeApplications.stream()
+            .collect(
+                Collectors.toMap(
+                    app -> app.getOrganization().getId(), Function.identity(), (a, b) -> a));
+    enrichWithSponsorshipInfo(response, property, organizationsMap, applicationMap);
   }
 
   @Override
@@ -346,7 +377,9 @@ public class PropertyServiceImpl implements PropertyService {
 
     propertyMapper.updateEntity(property, request);
     Property updated = propertyRepository.save(property);
-    return propertyMapper.toResponseWithImages(updated);
+    PropertyResponse response = propertyMapper.toResponseWithImages(updated);
+    enrichSingleResponse(response, updated);
+    return response;
   }
 
   @Override
@@ -384,9 +417,8 @@ public class PropertyServiceImpl implements PropertyService {
   @Override
   @Transactional(readOnly = true)
   public List<PropertyResponse> getPropertiesByCompanyId(UUID companyId) {
-    return propertyRepository.findByRealEstateCompanyId(companyId).stream()
-        .map(propertyMapper::toResponseWithImages)
-        .collect(Collectors.toList());
+    List<Property> properties = propertyRepository.findByRealEstateCompanyId(companyId);
+    return toResponseWithImagesAndSponsorship(properties);
   }
 
   @Override
@@ -443,8 +475,53 @@ public class PropertyServiceImpl implements PropertyService {
   @Override
   @Transactional(readOnly = true)
   public List<PropertyResponse> getPropertiesByAgentId(UUID agentId) {
-    return propertyRepository.findByAgentId(agentId).stream()
-        .map(propertyMapper::toResponseWithImages)
+    List<Property> properties = propertyRepository.findByAgentId(agentId);
+    return toResponseWithImagesAndSponsorship(properties);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<PropertyResponse> toResponseWithImagesAndSponsorship(List<Property> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return List.of();
+    }
+    Set<UUID> organizationIds =
+        properties.stream()
+            .map(Property::getRealEstateCompanyId)
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toSet());
+    Map<UUID, Organization> organizationsMap =
+        organizationIds.isEmpty()
+            ? java.util.Collections.emptyMap()
+            : organizationRepository.findAllById(organizationIds).stream()
+                .collect(Collectors.toMap(Organization::getId, Function.identity()));
+    List<SponsorshipApplication> activeApplications =
+        sponsorshipApplicationRepository.findAllActiveApplications(java.time.LocalDateTime.now());
+    Map<UUID, SponsorshipApplication> applicationMap =
+        activeApplications.stream()
+            .collect(
+                Collectors.toMap(
+                    app -> app.getOrganization().getId(),
+                    Function.identity(),
+                    (existing, replacement) -> {
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return replacement;
+                      if (existing.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
+                              .PREMIUM) return existing;
+                      if (replacement.getSponsorship().getType()
+                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
+                        return replacement;
+                      return existing;
+                    }));
+    return properties.stream()
+        .map(
+            p -> {
+              PropertyResponse response = propertyMapper.toResponseWithImages(p);
+              enrichWithSponsorshipInfo(response, p, organizationsMap, applicationMap);
+              return response;
+            })
         .collect(Collectors.toList());
   }
 
@@ -687,7 +764,9 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     Property updated = propertyRepository.findById(id).orElse(property);
-    return propertyMapper.toResponseWithImages(updated);
+    PropertyResponse response = propertyMapper.toResponseWithImages(updated);
+    enrichSingleResponse(response, updated);
+    return response;
   }
 
   @Override
@@ -732,7 +811,9 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     Property updated = propertyRepository.findById(id).orElse(property);
-    return propertyMapper.toResponseWithImages(updated);
+    PropertyResponse response = propertyMapper.toResponseWithImages(updated);
+    enrichSingleResponse(response, updated);
+    return response;
   }
 
   @Override

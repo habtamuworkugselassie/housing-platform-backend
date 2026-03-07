@@ -160,3 +160,8 @@ rate:
       enabled: ${RATE_LIMIT_AUTH_ENABLED:false}
       max-requests: ${RATE_LIMIT_AUTH_MAX_REQUESTS:5}
       window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
+
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  whatsapp-from-number: ${TWILIO_WHATSAPP_FROM_NUMBER:}

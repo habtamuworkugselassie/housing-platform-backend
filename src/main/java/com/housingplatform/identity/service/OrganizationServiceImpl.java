@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +49,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
   private final MediaAttachmentRepository mediaAttachmentRepository;
   private final MediaStorageService mediaStorageService;
+  private final CacheManager cacheManager;
 
   @Override
   public OrganizationResponse createOrganization(OrganizationRequest request) {
@@ -118,10 +120,20 @@ public class OrganizationServiceImpl implements OrganizationService {
     OrganizationRequest req = new OrganizationRequest();
     req.setName(request.getName());
     req.setRegistrationNumber(request.getRegistrationNumber());
+    req.setBusinessRegistration(request.getBusinessRegistration());
+    req.setLicense(request.getLicense());
+    req.setVatRegistration(request.getVatRegistration());
+    req.setTinRegistration(request.getTinRegistration());
+    req.setBusinessRegistrationNumber(request.getBusinessRegistrationNumber());
+    req.setLicenseNumber(request.getLicenseNumber());
+    req.setVatNumber(request.getVatNumber());
+    req.setTinNumber(request.getTinNumber());
     req.setType(request.getType());
     req.setAddress(request.getAddress());
     req.setCity(request.getCity());
     req.setCountry(request.getCountry());
+    req.setLatitude(request.getLatitude());
+    req.setLongitude(request.getLongitude());
     if (request.getPhoneNumbers() != null && !request.getPhoneNumbers().isEmpty()) {
       req.setPhoneNumbers(request.getPhoneNumbers());
     } else if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
@@ -322,6 +334,7 @@ public class OrganizationServiceImpl implements OrganizationService {
       syncPhonesFromRequest(organization, request.getPhoneNumbers());
     }
     Organization updated = organizationRepository.save(organization);
+    evictAvailablePropertiesByOrgCache(id);
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
     return response;
@@ -656,5 +669,121 @@ public class OrganizationServiceImpl implements OrganizationService {
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, organizationId);
     return response;
+  }
+
+  private static final Set<String> DOCUMENT_TYPES =
+      Set.of("BUSINESS_REGISTRATION", "LICENSE", "VAT_REGISTRATION", "TIN_REGISTRATION");
+  private static final long MAX_DOCUMENT_SIZE = 20 * 1024 * 1024; // 20MB
+
+  @Override
+  public OrganizationResponse uploadOrganizationDocument(
+      UUID organizationId, String documentType, MultipartFile file) {
+    if (documentType == null || !DOCUMENT_TYPES.contains(documentType.toUpperCase())) {
+      throw new BusinessException(
+          "Invalid documentType. Must be one of: BUSINESS_REGISTRATION, LICENSE, VAT_REGISTRATION,"
+              + " TIN_REGISTRATION");
+    }
+    String type = documentType.toUpperCase();
+
+    Organization organization =
+        organizationRepository
+            .findById(organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
+
+    if (!UserContext.isAdmin()) {
+      UUID currentUserId = UserContext.getCurrentUserId();
+      boolean isPrimaryContact =
+          organization.getPrimaryContact() != null
+              && organization.getPrimaryContact().getId().equals(currentUserId);
+      if (!isPrimaryContact) {
+        RealEstateAgent agent = realEstateAgentRepository.findByUserId(currentUserId).orElse(null);
+        boolean isSuperAgent =
+            agent != null
+                && Boolean.TRUE.equals(agent.getIsSuperAgent())
+                && organization.getId().equals(agent.getOrganizationId());
+        if (!isSuperAgent) {
+          throw new BusinessException(
+              "Only admin or organization primary contact can upload organization documents");
+        }
+      }
+    }
+
+    if (file == null || file.isEmpty()) {
+      throw new BusinessException("File is required");
+    }
+    if (file.getSize() > MAX_DOCUMENT_SIZE) {
+      throw new BusinessException(
+          "File " + file.getOriginalFilename() + " exceeds maximum size of 20MB");
+    }
+    String contentType = file.getContentType();
+    if (contentType == null) {
+      contentType = "application/octet-stream";
+    }
+    boolean allowed =
+        contentType.equals("application/pdf")
+            || contentType.startsWith("image/")
+            || contentType.equals("application/msword")
+            || contentType.equals(
+                "application/vnd.openxmlformats-officedocument.wordprocessorml.document");
+    if (!allowed) {
+      throw new BusinessException("File must be PDF, image, or Word document. Got: " + contentType);
+    }
+
+    String subPath = "organizations/" + organizationId + "/documents/" + type;
+    String oldUrl = getDocumentUrlForType(organization, type);
+    if (oldUrl != null && mediaStorageService.isUploadsUrl(oldUrl)) {
+      mediaStorageService.deleteByUrl(oldUrl);
+    }
+
+    String newUrl = mediaStorageService.save(file, subPath);
+    setDocumentUrlForType(organization, type, newUrl);
+    organizationRepository.save(organization);
+    evictAvailablePropertiesByOrgCache(organizationId);
+
+    OrganizationResponse response = organizationMapper.toResponse(organization);
+    enrichWithMedia(response, organizationId);
+    return response;
+  }
+
+  private String getDocumentUrlForType(Organization org, String documentType) {
+    switch (documentType) {
+      case "BUSINESS_REGISTRATION":
+        return org.getBusinessRegistration();
+      case "LICENSE":
+        return org.getLicense();
+      case "VAT_REGISTRATION":
+        return org.getVatRegistration();
+      case "TIN_REGISTRATION":
+        return org.getTinRegistration();
+      default:
+        return null;
+    }
+  }
+
+  private void setDocumentUrlForType(Organization org, String documentType, String url) {
+    switch (documentType) {
+      case "BUSINESS_REGISTRATION":
+        org.setBusinessRegistration(url);
+        break;
+      case "LICENSE":
+        org.setLicense(url);
+        break;
+      case "VAT_REGISTRATION":
+        org.setVatRegistration(url);
+        break;
+      case "TIN_REGISTRATION":
+        org.setTinRegistration(url);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** Evicts cached property list for this org so verified badge and company info stay fresh. */
+  private void evictAvailablePropertiesByOrgCache(UUID organizationId) {
+    var cache = cacheManager.getCache("availablePropertiesByOrg");
+    if (cache != null) {
+      cache.evict(organizationId);
+    }
   }
 }

@@ -5,7 +5,10 @@ import com.housingplatform.identity.dto.ForgotPasswordRequest;
 import com.housingplatform.identity.dto.LoginRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
 import com.housingplatform.identity.dto.ResetPasswordRequest;
+import com.housingplatform.identity.dto.SendOtpRequest;
+import com.housingplatform.identity.dto.VerifyOtpRequest;
 import com.housingplatform.identity.service.AuthenticationService;
+import com.housingplatform.identity.service.VerificationService;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
   private final AuthenticationService authenticationService;
+  private final VerificationService verificationService;
 
   @PostMapping("/register")
   @Operation(
@@ -80,7 +84,8 @@ public class AuthController {
       description = "Logout user (client should discard tokens). Requires authentication.")
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED) // Override class-level UNSECURED policy
   public ResponseEntity<Void> logout() {
-    // In a stateless JWT system, logout is primarily handled client-side by discarding tokens
+    // In a stateless JWT system, logout is primarily handled client-side by
+    // discarding tokens
     // The backend endpoint provides a way to explicitly log out and can be extended
     // to support token blacklisting (e.g., using Redis) if needed
     authenticationService.logout();
@@ -104,5 +109,51 @@ public class AuthController {
   public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
     authenticationService.resetPassword(request);
     return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/verify/send")
+  @Operation(
+      summary = "Send WhatsApp OTP",
+      description =
+          "Dispatches a 6-digit one-time password to the user's registered WhatsApp number.")
+  public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody SendOtpRequest request) {
+    verificationService.sendWhatsAppOtp(request.getPhoneNumber());
+    return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/verify/confirm")
+  @Operation(
+      summary = "Confirm WhatsApp OTP",
+      description = "Validates the 6-digit OTP and marks the user's phone as verified.")
+  public ResponseEntity<Void> confirmVerificationCode(
+      @Valid @RequestBody VerifyOtpRequest request) {
+    boolean isValid = verificationService.verifyOtp(request.getPhoneNumber(), request.getCode());
+    if (isValid) {
+      authenticationService.markPhoneAsVerified(request.getPhoneNumber());
+      return ResponseEntity.ok().build();
+    } else {
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    }
+  }
+
+  @PostMapping("/login/otp/send")
+  @Operation(
+      summary = "Request OTP for Login",
+      description =
+          "Sends a 6-digit one-time password to the user's registered WhatsApp number for login.")
+  public ResponseEntity<Void> requestOtpLogin(@Valid @RequestBody SendOtpRequest request) {
+    authenticationService.requestOtpLogin(request.getPhoneNumber());
+    return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/login/otp/confirm")
+  @Operation(
+      summary = "Confirm OTP for Login",
+      description = "Validates the 6-digit OTP and logs the user in, returning a JWT token.")
+  public ResponseEntity<AuthResponse> confirmOtpLogin(
+      @Valid @RequestBody VerifyOtpRequest request) {
+    AuthResponse response =
+        authenticationService.confirmOtpLogin(request.getPhoneNumber(), request.getCode());
+    return ResponseEntity.ok(response);
   }
 }

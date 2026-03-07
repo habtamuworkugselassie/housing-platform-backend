@@ -38,6 +38,7 @@ public class Sponsorship extends BaseAuditEntity {
   private String notes;
 
   public enum SponsorshipType {
+    EXCLUSIVE,
     GOLD,
     PREMIUM,
     SILVER

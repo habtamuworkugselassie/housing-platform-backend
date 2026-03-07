@@ -16,12 +16,7 @@ import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,6 +38,7 @@ public class AuthenticationService {
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final PasswordResetEmailService passwordResetEmailService;
+  private final VerificationService verificationService;
 
   @Value("${app.password-reset.expiry-hours:" + RESET_TOKEN_EXPIRY_HOURS + "}")
   private int resetTokenExpiryHours;
@@ -63,7 +59,8 @@ public class AuthenticationService {
       throw new BusinessException("Invalid credentials");
     }
 
-    // Check if user account is valid (allow PENDING_VERIFICATION for newly registered users)
+    // Check if user account is valid (allow PENDING_VERIFICATION for newly
+    // registered users)
     if (user.getStatus() == User.UserStatus.SUSPENDED
         || user.getStatus() == User.UserStatus.INACTIVE) {
       throw new BusinessException("User account is not active");
@@ -147,7 +144,8 @@ public class AuthenticationService {
               .findById(userId)
               .orElseThrow(() -> new BusinessException("User not found"));
 
-      // Check if user account is valid (allow PENDING_VERIFICATION for newly registered users)
+      // Check if user account is valid (allow PENDING_VERIFICATION for newly
+      // registered users)
       if (user.getStatus() == User.UserStatus.SUSPENDED
           || user.getStatus() == User.UserStatus.INACTIVE) {
         throw new BusinessException("User account is not active");
@@ -258,7 +256,8 @@ public class AuthenticationService {
     List<String> roleNames =
         savedUser.getRoles().stream().map(Enum::name).collect(Collectors.toList());
 
-    // Get organization_id if user is a real estate agent (unlikely for new registrations, but check
+    // Get organization_id if user is a real estate agent (unlikely for new
+    // registrations, but check
     // anyway)
     UUID organizationId = null;
     Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(savedUser.getId());
@@ -345,5 +344,84 @@ public class AuthenticationService {
     byte[] bytes = new byte[RESET_TOKEN_BYTES];
     random.nextBytes(bytes);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+  }
+
+  public void markPhoneAsVerified(String phoneNumber) {
+    if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+      return;
+    }
+    User user =
+        userRepository
+            .findByPhoneNumber(phoneNumber)
+            .orElseThrow(
+                () -> new BusinessException("User not found for phone number: " + phoneNumber));
+
+    user.setPhoneVerified(true);
+    // If we consider WhatsApp sufficient for activation, we can update status:
+    if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
+      user.setStatus(User.UserStatus.ACTIVE);
+    }
+    userRepository.save(user);
+  }
+
+  public void requestOtpLogin(String phoneNumber) {
+    verificationService.sendWhatsAppOtp(phoneNumber);
+  }
+
+  public AuthResponse confirmOtpLogin(String phoneNumber, String code) {
+    boolean isValid = verificationService.verifyOtp(phoneNumber, code);
+    if (!isValid) {
+      throw new BusinessException("Invalid or expired verification code");
+    }
+
+    User user =
+        userRepository
+            .findByPhoneNumber(phoneNumber)
+            .orElseThrow(
+                () ->
+                    new BusinessException(
+                        "User not found for this phone number. Please register."));
+
+    if (user.getStatus() == User.UserStatus.SUSPENDED
+        || user.getStatus() == User.UserStatus.INACTIVE) {
+      throw new BusinessException("User account is not active");
+    }
+
+    if (!user.getPhoneVerified()) {
+      user.setPhoneVerified(true);
+      if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
+        user.setStatus(User.UserStatus.ACTIVE);
+      }
+      user = userRepository.save(user);
+    }
+
+    List<String> scopes =
+        user.getRoles().stream().map(this::mapRoleToScope).filter(Objects::nonNull).toList();
+
+    List<String> roleNames = user.getRoles().stream().map(Enum::name).collect(Collectors.toList());
+
+    UUID organizationId = null;
+    Optional<RealEstateAgent> agent = realEstateAgentRepository.findByUserId(user.getId());
+    if (agent.isPresent()) {
+      organizationId = agent.get().getOrganizationId();
+    }
+
+    String accessToken =
+        jwtTokenProvider.generateToken(
+            user.getId(), user.getEmail(), scopes, roleNames, organizationId);
+    String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+
+    return AuthResponse.builder()
+        .accessToken(accessToken)
+        .tokenType("Bearer")
+        .expiresIn(3600L) // 1 hour
+        .refreshToken(refreshToken)
+        .userId(user.getId())
+        .email(user.getEmail())
+        .firstName(user.getFirstName())
+        .lastName(user.getLastName())
+        .scopes(scopes)
+        .roles(roleNames)
+        .build();
   }
 }

@@ -1,5 +1,6 @@
 package com.housingplatform.property.service;
 
+import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
 import java.util.List;
@@ -26,6 +27,12 @@ public interface PropertyService {
   List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId);
 
   List<PropertyResponse> getPropertiesByAgentId(UUID agentId);
+
+  /**
+   * Maps properties to responses with images and sponsorship/verification enrichment. Used by
+   * building units and any list that needs realEstateCompanyVerified and company info.
+   */
+  List<PropertyResponse> toResponseWithImagesAndSponsorship(List<Property> properties);
 
   List<PropertyResponse> searchProperties(
       String companyName, String city, String state, String country, String title, Integer limit);

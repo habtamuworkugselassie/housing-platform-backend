@@ -7,7 +7,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Public DTO for an organization with an active sponsorship, used on the landing page carousel. */
+/**
+ * Public DTO for an organization with an active sponsorship, used on the landing page carousel and
+ * splash.
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,6 +20,10 @@ public class SponsoredOrganizationResponse {
   private String name;
   private String logoUrl;
   private String videoUrl;
+
+  /** First image URL from organization media (for splash/hero when no video). */
+  private String splashImageUrl;
+
   private String address;
   private String city;
   private String country;

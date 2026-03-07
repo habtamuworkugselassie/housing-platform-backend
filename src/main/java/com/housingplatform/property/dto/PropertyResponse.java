@@ -41,6 +41,18 @@ public class PropertyResponse {
   /** Primary contact phone for the real estate (e.g. +251 91 123 4567). */
   private String realEstateCompanyPhone;
 
+  /**
+   * True when the real estate company is fully verified (all 8 fields). Kept for backward
+   * compatibility.
+   */
+  private Boolean realEstateCompanyVerified;
+
+  /**
+   * Verification level of the real estate company: NONE, HALF, FULL. Used for half vs fully
+   * verified badge (e.g. blue checkmark).
+   */
+  private String realEstateCompanyVerificationLevel;
+
   private UUID agentId;
   private UUID buildingId;
   private String buildingName;

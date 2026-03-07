@@ -128,6 +128,13 @@
             <version>2.3.0</version>
         </dependency>
         
+        <!-- Twilio API -->
+        <dependency>
+            <groupId>com.twilio.sdk</groupId>
+            <artifactId>twilio</artifactId>
+            <version>10.6.0</version>
+        </dependency>
+        
         <!-- Utilities -->
         <dependency>
             <groupId>org.projectlombok</groupId>

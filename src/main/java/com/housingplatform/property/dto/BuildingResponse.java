@@ -28,6 +28,13 @@ public class BuildingResponse {
   private Integer totalUnits;
   private UUID realEstateCompanyId;
   private String realEstateCompanyName;
+
+  /** True when the real estate company is fully verified. Kept for backward compatibility. */
+  private Boolean realEstateCompanyVerified;
+
+  /** Verification level: NONE, HALF, FULL. Used for half vs fully verified badge. */
+  private String realEstateCompanyVerificationLevel;
+
   private UUID agentId;
   private Building.BuildingType buildingType;
   private Building.BuildingStatus status;

@@ -22,6 +22,23 @@ public class Organization extends BaseAuditEntity {
   @Column(unique = true)
   private String registrationNumber;
 
+  private String businessRegistration;
+  private String license;
+  private String vatRegistration;
+  private String tinRegistration;
+
+  /** Number/code in parallel with document URL (businessRegistration). */
+  private String businessRegistrationNumber;
+
+  /** Number in parallel with document URL (license). */
+  private String licenseNumber;
+
+  /** Number in parallel with document URL (vatRegistration). */
+  private String vatNumber;
+
+  /** Number in parallel with document URL (tinRegistration). */
+  private String tinNumber;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private OrganizationType type;
@@ -33,6 +50,11 @@ public class Organization extends BaseAuditEntity {
   private String address;
   private String city;
   private String country;
+
+  /** HQ or branch location coordinates (from map picker). */
+  private Double latitude;
+
+  private Double longitude;
 
   @OneToMany(
       mappedBy = "organization",
@@ -52,6 +74,45 @@ public class Organization extends BaseAuditEntity {
   @OneToOne
   @JoinColumn(name = "primary_contact_user_id")
   private User primaryContact;
+
+  /**
+   * Verification level for badge display: FULL = all documents and numbers, HALF = one category
+   * complete (e.g. all documents but numbers missing, or vice versa), NONE = neither.
+   */
+  public VerificationLevel getVerificationLevel() {
+    boolean allDocs =
+        isNonBlank(businessRegistration)
+            && isNonBlank(license)
+            && isNonBlank(vatRegistration)
+            && isNonBlank(tinRegistration);
+    boolean allNumbers =
+        isNonBlank(businessRegistrationNumber)
+            && isNonBlank(licenseNumber)
+            && isNonBlank(vatNumber)
+            && isNonBlank(tinNumber);
+    if (allDocs && allNumbers) {
+      return VerificationLevel.FULL;
+    }
+    if (allDocs || allNumbers) {
+      return VerificationLevel.HALF;
+    }
+    return VerificationLevel.NONE;
+  }
+
+  /** True when fully verified (all 8 fields). Kept for backward compatibility. */
+  public boolean isVerified() {
+    return getVerificationLevel() == VerificationLevel.FULL;
+  }
+
+  private static boolean isNonBlank(String s) {
+    return s != null && !s.trim().isEmpty();
+  }
+
+  public enum VerificationLevel {
+    NONE,
+    HALF,
+    FULL
+  }
 
   public enum OrganizationType {
     BANK,
@@ -85,6 +146,7 @@ public class Organization extends BaseAuditEntity {
 
   public enum SponsorshipType {
     NONE,
+    EXCLUSIVE,
     GOLD,
     PREMIUM,
     SILVER

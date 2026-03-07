@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   // ========== Sponsorship Package Management (Admin Only) ==========
 
   @Override
+  @CacheEvict(value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
   public SponsorshipResponse createSponsorship(CreateSponsorshipRequest request) {
     // Check if name already exists
     if (sponsorshipRepository.findByName(request.getName()).isPresent()) {
@@ -75,12 +77,14 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   @Transactional(readOnly = true)
   @Cacheable(value = "activeSponsorships")
   public List<SponsorshipResponse> getActiveSponsorships() {
-    return sponsorshipRepository.findByStatus(Sponsorship.SponsorshipStatus.ACTIVE).stream()
+    List<Sponsorship> sponsorships = sponsorshipRepository.findByStatus(Sponsorship.SponsorshipStatus.ACTIVE);
+    return sponsorships.stream()
         .map(this::toSponsorshipResponse)
         .collect(Collectors.toList());
   }
 
   @Override
+  @CacheEvict(value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
   public SponsorshipResponse updateSponsorship(UUID id, UpdateSponsorshipRequest request) {
     Sponsorship sponsorship =
         sponsorshipRepository
@@ -123,6 +127,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
+  @CacheEvict(value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
   public void deleteSponsorship(UUID id) {
     if (!sponsorshipRepository.existsById(id)) {
       throw new ResourceNotFoundException("Sponsorship", id);
@@ -165,7 +170,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
 
     // Check for overlapping approved applications
     List<SponsorshipApplication> existingApplications =
-        applicationRepository.findByOrganizationId(organizationId);
+        applicationRepository.findBySponsorshipIdAndOrganizationIdAndStatus(request.getSponsorshipId(), organizationId, SponsorshipApplication.ApplicationStatus.APPROVED);
     for (SponsorshipApplication existing : existingApplications) {
       if (existing.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED) {
         boolean overlaps =
@@ -232,6 +237,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
+  @CacheEvict(value = {"sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
   public SponsorshipApplicationResponse approveApplication(UUID id, String notes) {
     SponsorshipApplication application =
         applicationRepository
@@ -291,6 +297,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
+  @CacheEvict(value = {"sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
   public void cancelApplication(UUID id) {
     SponsorshipApplication application =
         applicationRepository
@@ -321,6 +328,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
+  @CacheEvict(value = {"sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
   public SponsorshipApplicationResponse assignOrganizationToSponsorship(
       AdminAssignSponsorshipRequest request) {
     java.time.LocalDateTime startDateTime = request.getStartDate().atStartOfDay();
@@ -399,10 +407,17 @@ public class SponsorshipServiceImpl implements SponsorshipService {
               }
               OrganizationResponse org = organizationService.getOrganizationById(orgEntity.getId());
               String videoUrl = null;
+              String splashImageUrl = null;
               if (org.getMedia() != null) {
                 videoUrl =
                     org.getMedia().stream()
                         .filter(m -> "VIDEO".equals(m.getMediaKind()))
+                        .map(OrganizationMediaItem::getUrl)
+                        .findFirst()
+                        .orElse(null);
+                splashImageUrl =
+                    org.getMedia().stream()
+                        .filter(m -> "IMAGE".equals(m.getMediaKind()))
                         .map(OrganizationMediaItem::getUrl)
                         .findFirst()
                         .orElse(null);
@@ -412,6 +427,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                   .name(org.getName())
                   .logoUrl(org.getLogoUrl())
                   .videoUrl(videoUrl)
+                  .splashImageUrl(splashImageUrl)
                   .address(org.getAddress())
                   .city(org.getCity())
                   .country(org.getCountry())
@@ -428,6 +444,18 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                   b.getBasePrice() != null ? b.getBasePrice() : java.math.BigDecimal.ZERO;
               return pb.compareTo(pa);
             })
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  @Cacheable(value = "exclusiveOrganizations")
+  public List<SponsoredOrganizationResponse> getExclusiveOrganizations() {
+    return getActiveSponsoredOrganizations().stream()
+        .filter(
+            r ->
+                r.getSponsorshipType() != null
+                    && "EXCLUSIVE".equals(r.getSponsorshipType().toUpperCase()))
         .collect(Collectors.toList());
   }
 }

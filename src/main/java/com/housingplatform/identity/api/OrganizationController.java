@@ -170,6 +170,22 @@ public class OrganizationController {
     return ResponseEntity.ok(updated);
   }
 
+  @PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @AuthActionScope("organizations.update")
+  @Operation(
+      summary = "Upload organization document",
+      description =
+          "Upload a document for business registration, license, VAT registration, or TIN registration. documentType: BUSINESS_REGISTRATION, LICENSE, VAT_REGISTRATION, TIN_REGISTRATION. Admin or organization primary contact.")
+  public ResponseEntity<OrganizationResponse> uploadOrganizationDocument(
+      @PathVariable UUID id,
+      @RequestParam String documentType,
+      @RequestParam("file") MultipartFile file) {
+    OrganizationResponse updated =
+        organizationService.uploadOrganizationDocument(id, documentType, file);
+    return ResponseEntity.ok(updated);
+  }
+
   @GetMapping("/{id}/media/{attachmentId}/file")
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(

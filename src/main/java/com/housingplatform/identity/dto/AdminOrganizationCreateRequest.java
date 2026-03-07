@@ -15,12 +15,24 @@ public class AdminOrganizationCreateRequest {
 
   private String registrationNumber;
 
+  private String businessRegistration;
+  private String license;
+  private String vatRegistration;
+  private String tinRegistration;
+  private String businessRegistrationNumber;
+  private String licenseNumber;
+  private String vatNumber;
+  private String tinNumber;
+
   @NotNull(message = "Organization type is required")
   private Organization.OrganizationType type;
 
   private String address;
   private String city;
   private String country;
+
+  private Double latitude;
+  private Double longitude;
 
   /** Phone numbers with country code. If null/empty and legacy phoneNumber is set, that is used. */
   private List<OrganizationPhoneDto> phoneNumbers;

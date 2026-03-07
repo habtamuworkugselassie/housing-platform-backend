@@ -60,6 +60,10 @@ public class UploadsController {
     if (lower.endsWith(".mp4")) return "video/mp4";
     if (lower.endsWith(".webm")) return "video/webm";
     if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+    if (lower.endsWith(".pdf")) return "application/pdf";
+    if (lower.endsWith(".doc")) return "application/msword";
+    if (lower.endsWith(".docx"))
+      return "application/vnd.openxmlformats-officedocument.wordprocessorml.document";
     return "application/octet-stream";
   }
 }

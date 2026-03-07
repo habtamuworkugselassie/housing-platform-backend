@@ -38,11 +38,21 @@ public interface OrganizationMapper {
             .id(organization.getId())
             .name(organization.getName())
             .registrationNumber(organization.getRegistrationNumber())
+            .businessRegistration(organization.getBusinessRegistration())
+            .license(organization.getLicense())
+            .vatRegistration(organization.getVatRegistration())
+            .tinRegistration(organization.getTinRegistration())
+            .businessRegistrationNumber(organization.getBusinessRegistrationNumber())
+            .licenseNumber(organization.getLicenseNumber())
+            .vatNumber(organization.getVatNumber())
+            .tinNumber(organization.getTinNumber())
             .type(organization.getType())
             .status(organization.getStatus())
             .address(organization.getAddress())
             .city(organization.getCity())
             .country(organization.getCountry())
+            .latitude(organization.getLatitude())
+            .longitude(organization.getLongitude())
             .phoneNumbers(phoneDtos)
             .email(organization.getEmail())
             .website(organization.getWebsite())
@@ -53,6 +63,11 @@ public interface OrganizationMapper {
                     : null)
             .createdAt(organization.getCreatedAt())
             .updatedAt(organization.getUpdatedAt())
+            .verified(organization.isVerified())
+            .verificationLevel(
+                organization.getVerificationLevel() != null
+                    ? organization.getVerificationLevel().name()
+                    : null)
             .build();
     return response;
   }

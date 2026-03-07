@@ -15,12 +15,27 @@ public class OrganizationRequest {
 
   private String registrationNumber;
 
+  private String businessRegistration;
+  private String license;
+  private String vatRegistration;
+  private String tinRegistration;
+
+  /** Number/code in parallel with document (businessRegistration). */
+  private String businessRegistrationNumber;
+
+  private String licenseNumber;
+  private String vatNumber;
+  private String tinNumber;
+
   @NotNull(message = "Organization type is required")
   private Organization.OrganizationType type;
 
   private String address;
   private String city;
   private String country;
+
+  private Double latitude;
+  private Double longitude;
 
   /** One or more phone numbers with country code. Empty numbers are ignored. */
   private List<OrganizationPhoneDto> phoneNumbers;
