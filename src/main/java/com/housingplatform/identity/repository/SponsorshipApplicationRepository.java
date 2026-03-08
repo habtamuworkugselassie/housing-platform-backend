@@ -22,7 +22,8 @@ public interface SponsorshipApplicationRepository
 
   List<SponsorshipApplication> findByStatus(SponsorshipApplication.ApplicationStatus status);
 
-  List<SponsorshipApplication> findBySponsorshipIdAndOrganizationIdAndStatus(UUID sponsorship_id, UUID organization_id, SponsorshipApplication.ApplicationStatus status);
+  List<SponsorshipApplication> findBySponsorshipIdAndOrganizationIdAndStatus(
+      UUID sponsorship_id, UUID organization_id, SponsorshipApplication.ApplicationStatus status);
 
   @Query(
       "SELECT sa FROM SponsorshipApplication sa WHERE sa.organization.id = :organizationId "

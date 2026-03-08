@@ -1,6 +1,7 @@
 package com.housingplatform.media.domain;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.User;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.shared.domain.BaseEntity;
 import jakarta.persistence.*;
@@ -22,6 +23,10 @@ public class MediaAttachment extends BaseEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "organization_id")
   private Organization organization;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id")
+  private User user;
 
   @Column(name = "image_url")
   private String imageUrl;

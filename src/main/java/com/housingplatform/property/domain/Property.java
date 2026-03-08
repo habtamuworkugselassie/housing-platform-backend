@@ -93,6 +93,10 @@ public class Property extends BaseAuditEntity {
   @Builder.Default
   private List<MediaAttachment> images = new ArrayList<>();
 
+  @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private List<Review> reviews = new ArrayList<>();
+
   public enum PropertyType {
     APARTMENT,
     HOUSE,

@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MediaAttachmentRepository extends JpaRepository<MediaAttachment, UUID> {
 
+  List<MediaAttachment> findByUserIdOrderByDisplayOrderAsc(UUID userId);
+
   List<MediaAttachment> findByPropertyIdOrderByDisplayOrderAsc(UUID propertyId);
 
   List<MediaAttachment> findByOrganizationIdOrderByDisplayOrderAsc(UUID organizationId);

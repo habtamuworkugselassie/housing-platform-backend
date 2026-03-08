@@ -33,7 +33,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   // ========== Sponsorship Package Management (Admin Only) ==========
 
   @Override
-  @CacheEvict(value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
+  @CacheEvict(
+      value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public SponsorshipResponse createSponsorship(CreateSponsorshipRequest request) {
     // Check if name already exists
     if (sponsorshipRepository.findByName(request.getName()).isPresent()) {
@@ -77,14 +79,15 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   @Transactional(readOnly = true)
   @Cacheable(value = "activeSponsorships")
   public List<SponsorshipResponse> getActiveSponsorships() {
-    List<Sponsorship> sponsorships = sponsorshipRepository.findByStatus(Sponsorship.SponsorshipStatus.ACTIVE);
-    return sponsorships.stream()
-        .map(this::toSponsorshipResponse)
-        .collect(Collectors.toList());
+    List<Sponsorship> sponsorships =
+        sponsorshipRepository.findByStatus(Sponsorship.SponsorshipStatus.ACTIVE);
+    return sponsorships.stream().map(this::toSponsorshipResponse).collect(Collectors.toList());
   }
 
   @Override
-  @CacheEvict(value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
+  @CacheEvict(
+      value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public SponsorshipResponse updateSponsorship(UUID id, UpdateSponsorshipRequest request) {
     Sponsorship sponsorship =
         sponsorshipRepository
@@ -127,7 +130,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
-  @CacheEvict(value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
+  @CacheEvict(
+      value = {"activeSponsorships", "sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public void deleteSponsorship(UUID id) {
     if (!sponsorshipRepository.existsById(id)) {
       throw new ResourceNotFoundException("Sponsorship", id);
@@ -170,7 +175,10 @@ public class SponsorshipServiceImpl implements SponsorshipService {
 
     // Check for overlapping approved applications
     List<SponsorshipApplication> existingApplications =
-        applicationRepository.findBySponsorshipIdAndOrganizationIdAndStatus(request.getSponsorshipId(), organizationId, SponsorshipApplication.ApplicationStatus.APPROVED);
+        applicationRepository.findBySponsorshipIdAndOrganizationIdAndStatus(
+            request.getSponsorshipId(),
+            organizationId,
+            SponsorshipApplication.ApplicationStatus.APPROVED);
     for (SponsorshipApplication existing : existingApplications) {
       if (existing.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED) {
         boolean overlaps =
@@ -237,7 +245,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
-  @CacheEvict(value = {"sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public SponsorshipApplicationResponse approveApplication(UUID id, String notes) {
     SponsorshipApplication application =
         applicationRepository
@@ -297,7 +307,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
-  @CacheEvict(value = {"sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public void cancelApplication(UUID id) {
     SponsorshipApplication application =
         applicationRepository
@@ -328,7 +340,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   @Override
-  @CacheEvict(value = {"sponsoredOrganizations", "exclusiveOrganizations"}, allEntries = true)
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public SponsorshipApplicationResponse assignOrganizationToSponsorship(
       AdminAssignSponsorshipRequest request) {
     java.time.LocalDateTime startDateTime = request.getStartDate().atStartOfDay();
