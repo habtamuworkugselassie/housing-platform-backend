@@ -63,7 +63,7 @@ public class AuthenticationService {
     // registered users)
     if (user.getStatus() == User.UserStatus.SUSPENDED
         || user.getStatus() == User.UserStatus.INACTIVE) {
-      throw new BusinessException("User account is not active");
+      throw new BusinessException("User account is disabled");
     }
 
     // Extract scopes from user roles
@@ -148,7 +148,7 @@ public class AuthenticationService {
       // registered users)
       if (user.getStatus() == User.UserStatus.SUSPENDED
           || user.getStatus() == User.UserStatus.INACTIVE) {
-        throw new BusinessException("User account is not active");
+        throw new BusinessException("User account is disabled");
       }
 
       // Extract scopes and roles
@@ -384,7 +384,7 @@ public class AuthenticationService {
 
     if (user.getStatus() == User.UserStatus.SUSPENDED
         || user.getStatus() == User.UserStatus.INACTIVE) {
-      throw new BusinessException("User account is not active");
+      throw new BusinessException("User account is disabled");
     }
 
     if (!user.getPhoneVerified()) {

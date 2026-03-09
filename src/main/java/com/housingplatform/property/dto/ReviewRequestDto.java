@@ -13,10 +13,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReviewRequestDto {
-    @NotNull
-    @Min(1)
-    @Max(5)
-    private Integer rating;
+  @NotNull
+  @Min(1)
+  @Max(5)
+  private Integer rating;
 
-    private String comment;
+  private String comment;
 }

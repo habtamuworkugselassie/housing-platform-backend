@@ -35,7 +35,9 @@ public class ReviewService {
   @Transactional
   public ReviewDto createReview(UUID propertyId, ReviewDto reviewDto) {
 
-    User user = userRepository.findById(reviewDto.getUserId())
+    User user =
+        userRepository
+            .findById(reviewDto.getUserId())
             .orElseThrow(() -> new RuntimeException("User not found"));
 
     Property property =
@@ -43,7 +45,8 @@ public class ReviewService {
             .findById(propertyId)
             .orElseThrow(() -> new RuntimeException("Property not found"));
 
-    Review.ReviewBuilder<?, ?> builder = Review.builder()
+    Review.ReviewBuilder<?, ?> builder =
+        Review.builder()
             .property(property)
             .user(user)
             .rating(reviewDto.getRating())
@@ -64,15 +67,15 @@ public class ReviewService {
     User user = review.getUser();
     if (user != null) {
       List<MediaAttachment> attachments =
-              mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(user.getId());
+          mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(user.getId());
       String imageUrl = null;
 
       if (!attachments.isEmpty()) {
         for (MediaAttachment att : attachments) {
           String url =
-                  att.hasFileData()
-                          ? "/api/v1/properties/" + user.getId() + "/images/" + att.getId() + "/file"
-                        :att.getImageUrl();
+              att.hasFileData()
+                  ? "/api/v1/properties/" + user.getId() + "/images/" + att.getId() + "/file"
+                  : att.getImageUrl();
           if (url == null || url.isBlank()) {
             continue;
           }
@@ -86,15 +89,15 @@ public class ReviewService {
       }
 
       return ReviewDto.builder()
-              .id(review.getId())
-              .propertyId(review.getProperty().getId())
-              .userId(review.getUser().getId())
-              .userName(review.getUser().getFirstName() + " " + review.getUser().getLastName())
-              .userImageUrl(imageUrl)
-              .rating(review.getRating())
-              .comment(review.getComment())
-              .createdAt(review.getCreatedAt())
-              .build();
+          .id(review.getId())
+          .propertyId(review.getProperty().getId())
+          .userId(review.getUser().getId())
+          .userName(review.getUser().getFirstName() + " " + review.getUser().getLastName())
+          .userImageUrl(imageUrl)
+          .rating(review.getRating())
+          .comment(review.getComment())
+          .createdAt(review.getCreatedAt())
+          .build();
     } else {
       return null;
     }
