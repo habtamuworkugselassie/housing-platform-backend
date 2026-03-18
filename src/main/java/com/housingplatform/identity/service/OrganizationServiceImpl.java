@@ -388,6 +388,10 @@ public class OrganizationServiceImpl implements OrganizationService {
       }
     }
 
+    // Evict sponsorship caches so the suspended org is immediately removed from
+    // sponsored/exclusive lists
+    evictSponsorshipCaches();
+
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
     return response;
@@ -408,8 +412,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     Organization updated = organizationRepository.save(organization);
 
     // Re-activate (set back to APPROVED) sponsorship applications that were
-    // cancelled when org was
-    // suspended
+    // cancelled when org was suspended
     List<SponsorshipApplication> applications =
         sponsorshipApplicationRepository.findByOrganizationId(id);
     for (SponsorshipApplication app : applications) {
@@ -418,6 +421,9 @@ public class OrganizationServiceImpl implements OrganizationService {
         sponsorshipApplicationRepository.save(app);
       }
     }
+
+    // Evict sponsorship caches so the reactivated org is immediately visible again
+    evictSponsorshipCaches();
 
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
@@ -784,6 +790,21 @@ public class OrganizationServiceImpl implements OrganizationService {
     var cache = cacheManager.getCache("availablePropertiesByOrg");
     if (cache != null) {
       cache.evict(organizationId);
+    }
+  }
+
+  /**
+   * Evicts all sponsorship-related caches. Must be called whenever an organization's status changes
+   * in a way that affects sponsorship list visibility (suspend / reactivate).
+   */
+  private void evictSponsorshipCaches() {
+    var sponsored = cacheManager.getCache("sponsoredOrganizations");
+    if (sponsored != null) {
+      sponsored.clear();
+    }
+    var exclusive = cacheManager.getCache("exclusiveOrganizations");
+    if (exclusive != null) {
+      exclusive.clear();
     }
   }
 }

@@ -14,8 +14,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -93,6 +95,16 @@ public class UserController {
       @Valid @RequestBody UserUpdateRequest userRequest) {
     UUID userId = UserContext.getCurrentUserId();
     UserResponse updated = userService.updateUser(userId, userRequest);
+    return ResponseEntity.ok(updated);
+  }
+
+  @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @Operation(
+      summary = "Upload profile image",
+      description = "Uploads a new profile image for the current authenticated user")
+  public ResponseEntity<UserResponse> uploadProfileImage(@RequestParam("file") MultipartFile file) {
+    UUID userId = UserContext.getCurrentUserId();
+    UserResponse updated = userService.uploadProfileImage(userId, file);
     return ResponseEntity.ok(updated);
   }
 

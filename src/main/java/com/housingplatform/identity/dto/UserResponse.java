@@ -26,6 +26,7 @@ public class UserResponse {
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
   private UUID organizationId;
+  private String profileImageUrl;
 
   // Computed property for backward compatibility with frontend
   // This will be serialized as "enabled" in JSON

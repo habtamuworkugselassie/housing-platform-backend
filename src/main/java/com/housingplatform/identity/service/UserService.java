@@ -6,19 +6,23 @@ import com.housingplatform.identity.dto.UserResponse;
 import com.housingplatform.identity.dto.UserUpdateRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.media.domain.MediaAttachment;
+import com.housingplatform.media.repository.MediaAttachmentRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -27,15 +31,15 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final OrganizationRepository organizationRepository;
+  private final MediaAttachmentRepository mediaAttachmentRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
 
   @Transactional(readOnly = true)
-  @Cacheable(value = "users", key = "#id")
   public UserResponse getUserById(UUID id) {
     User user =
         userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
-    return userMapper.toResponse(user);
+    return populateProfileImage(userMapper.toResponse(user), user);
   }
 
   @Transactional(readOnly = true)
@@ -47,6 +51,24 @@ public class UserService {
   public UserResponse getCurrentUserFromContext() {
     UUID userId = UserContext.getCurrentUserId();
     return getUserById(userId);
+  }
+
+  private UserResponse populateProfileImage(UserResponse response, User user) {
+    List<MediaAttachment> attachments =
+        mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(user.getId());
+    if (!attachments.isEmpty()) {
+      for (MediaAttachment att : attachments) {
+        String url =
+            att.hasFileData()
+                ? "/api/v1/properties/" + user.getId() + "/images/" + att.getId() + "/file"
+                : att.getImageUrl();
+        if (url != null && !url.isBlank()) {
+          response.setProfileImageUrl(url);
+          break;
+        }
+      }
+    }
+    return response;
   }
 
   /** Create a new user (admin only). Allows any role including ADMIN. */
@@ -140,7 +162,7 @@ public class UserService {
     }
 
     Page<User> users = userRepository.findAll(spec, pageable);
-    return users.map(userMapper::toResponse);
+    return users.map(user -> populateProfileImage(userMapper.toResponse(user), user));
   }
 
   @CacheEvict(value = "users", key = "#id")
@@ -171,6 +193,38 @@ public class UserService {
 
     userMapper.updateEntity(user, request);
     User updated = userRepository.save(user);
-    return userMapper.toResponse(updated);
+    return populateProfileImage(userMapper.toResponse(updated), updated);
+  }
+
+  @Transactional
+  public UserResponse uploadProfileImage(UUID userId, MultipartFile file) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+    // Remove existing profile images
+    List<MediaAttachment> existing =
+        mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(userId);
+    mediaAttachmentRepository.deleteAll(existing);
+
+    try {
+      MediaAttachment attachment =
+          MediaAttachment.builder()
+              .user(user)
+              .fileName(file.getOriginalFilename())
+              .contentType(file.getContentType())
+              .fileData(file.getBytes())
+              .displayOrder(0)
+              .isPrimary(true)
+              .mediaKind(MediaAttachment.MediaKind.IMAGE)
+              .build();
+
+      mediaAttachmentRepository.save(attachment);
+    } catch (IOException e) {
+      throw new BusinessException("Failed to read file data", e);
+    }
+
+    return getUserById(userId);
   }
 }
