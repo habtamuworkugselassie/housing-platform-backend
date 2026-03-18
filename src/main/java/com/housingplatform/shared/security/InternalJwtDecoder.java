@@ -15,6 +15,7 @@ public class InternalJwtDecoder implements JwtDecoder {
 
   private final String jwtSecret;
   private final String jwtIssuer;
+  private final TokenBlacklistService blacklistService;
 
   public InternalJwtDecoder() {
     this.jwtSecret =
@@ -22,12 +23,22 @@ public class InternalJwtDecoder implements JwtDecoder {
     this.jwtIssuer =
         System.getProperty(
             "jwt.issuer", System.getenv().getOrDefault("JWT_ISSUER", "housing-platform"));
+    this.blacklistService = null;
     validateJwtSecret(this.jwtSecret);
   }
 
   public InternalJwtDecoder(String jwtSecret, String jwtIssuer) {
     this.jwtSecret = jwtSecret;
     this.jwtIssuer = jwtIssuer;
+    this.blacklistService = null;
+    validateJwtSecret(this.jwtSecret);
+  }
+
+  public InternalJwtDecoder(
+      String jwtSecret, String jwtIssuer, TokenBlacklistService blacklistService) {
+    this.jwtSecret = jwtSecret;
+    this.jwtIssuer = jwtIssuer;
+    this.blacklistService = blacklistService;
     validateJwtSecret(this.jwtSecret);
   }
 
@@ -44,6 +55,12 @@ public class InternalJwtDecoder implements JwtDecoder {
   @Override
   public Jwt decode(String token) throws JwtException {
     try {
+      // Check blacklist before doing any further validation.
+      // A blacklisted token was explicitly invalidated on logout.
+      if (blacklistService != null && blacklistService.isBlacklisted(token)) {
+        throw new JwtException("JWT token has been invalidated (user logged out).");
+      }
+
       Claims claims =
           Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
 
@@ -75,6 +92,9 @@ public class InternalJwtDecoder implements JwtDecoder {
       }
 
       return jwtBuilder.build();
+    } catch (JwtException e) {
+      // Re-throw as-is so the caller gets the exact reason
+      throw e;
     } catch (Exception e) {
       throw new JwtException("Failed to decode JWT token", e);
     }

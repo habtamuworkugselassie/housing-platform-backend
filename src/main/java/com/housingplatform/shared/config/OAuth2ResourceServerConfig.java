@@ -3,6 +3,7 @@ package com.housingplatform.shared.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.housingplatform.shared.security.RateLimitingFilter;
 import com.housingplatform.shared.security.ScopeAuthorizationFilter;
+import com.housingplatform.shared.security.TokenBlacklistService;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -58,11 +59,15 @@ public class OAuth2ResourceServerConfig {
   private String allowedOriginPatterns;
 
   private final ScopeAuthorizationFilter scopeAuthorizationFilter;
+  private final TokenBlacklistService tokenBlacklistService;
 
   private RateLimitingFilter rateLimitingFilter;
 
-  public OAuth2ResourceServerConfig(ScopeAuthorizationFilter scopeAuthorizationFilter) {
+  public OAuth2ResourceServerConfig(
+      ScopeAuthorizationFilter scopeAuthorizationFilter,
+      TokenBlacklistService tokenBlacklistService) {
     this.scopeAuthorizationFilter = scopeAuthorizationFilter;
+    this.tokenBlacklistService = tokenBlacklistService;
   }
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -116,6 +121,11 @@ public class OAuth2ResourceServerConfig {
               if (path.equals("/api/v1/sponsorships/sponsored-organizations")) {
                 return true;
               }
+              // Logout — intentionally public so the frontend can always call it
+              // even with an invalid/expired token
+              if (path.equals("/api/v1/auth/logout")) {
+                return true;
+              }
               // First property media for organization (sponsor carousel fallback)
               if (path.matches("/api/v1/properties/organization/[^/]+/first-media")) {
                 return true;
@@ -155,9 +165,9 @@ public class OAuth2ResourceServerConfig {
                   || path.equals("/error")) {
                 return false;
               }
-              // Exclude public auth endpoints, but include logout
+              // Exclude public auth endpoints AND logout (it's in the public chain)
               if (path.startsWith("/api/v1/auth")) {
-                return path.equals("/api/v1/auth/logout");
+                return false;
               }
               // Exclude property image file endpoints (public access for viewing)
               if (path.matches("/api/v1/properties/[^/]+/images/[^/]+/file")) {
@@ -390,7 +400,8 @@ public class OAuth2ResourceServerConfig {
 
     // Otherwise, use our internal JWT decoder (for self-issued tokens)
     // This allows the application to issue its own tokens via /api/v1/auth/login
-    return new com.housingplatform.shared.security.InternalJwtDecoder(jwtSecret, jwtIssuer);
+    return new com.housingplatform.shared.security.InternalJwtDecoder(
+        jwtSecret, jwtIssuer, tokenBlacklistService);
   }
 
   @Bean

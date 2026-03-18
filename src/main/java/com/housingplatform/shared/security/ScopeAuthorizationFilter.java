@@ -48,11 +48,9 @@ public class ScopeAuthorizationFilter extends OncePerRequestFilter {
 
     String path = request.getRequestURI();
 
-    // Skip public endpoints (but allow /api/v1/auth/logout to go through as it requires
-    // authentication)
-    if (path.equals("/api/v1/auth/logout")) {
-      // Allow logout to proceed - it will be checked by @AuthPolicyScope annotation
-    } else if (path.startsWith("/api/v1/auth")
+    // Skip all /api/v1/auth endpoints (login, register, refresh, logout, etc.)
+    // and non-API paths — these are handled by the public security filter chain.
+    if (path.startsWith("/api/v1/auth")
         || path.startsWith("/swagger-ui")
         || path.startsWith("/api-docs")
         || path.startsWith("/v3/api-docs")

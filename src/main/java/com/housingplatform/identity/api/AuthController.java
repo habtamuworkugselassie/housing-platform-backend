@@ -81,14 +81,19 @@ public class AuthController {
   @PostMapping("/logout")
   @Operation(
       summary = "User logout",
-      description = "Logout user (client should discard tokens). Requires authentication.")
-  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED) // Override class-level UNSECURED policy
-  public ResponseEntity<Void> logout() {
-    // In a stateless JWT system, logout is primarily handled client-side by
-    // discarding tokens
-    // The backend endpoint provides a way to explicitly log out and can be extended
-    // to support token blacklisting (e.g., using Redis) if needed
-    authenticationService.logout();
+      description =
+          "Logout user (client should discard tokens). Intentionally unsecured so clients"
+              + " can always call it, even with an expired or invalid token.")
+  // UNSECURED: logout must be callable regardless of token validity, otherwise clients
+  // with an invalid token would be unable to logout (the 401 from the logout call itself
+  // would be re-intercepted and create an infinite loop on the frontend).
+  public ResponseEntity<Void> logout(
+      @RequestHeader(value = "Authorization", required = false) String authorization) {
+    String accessToken = null;
+    if (authorization != null && authorization.startsWith("Bearer ")) {
+      accessToken = authorization.substring(7).trim();
+    }
+    authenticationService.logout(accessToken);
     return ResponseEntity.ok().build();
   }
 

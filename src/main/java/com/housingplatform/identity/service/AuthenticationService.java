@@ -14,6 +14,7 @@ import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
+import com.housingplatform.shared.security.TokenBlacklistService;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
@@ -39,6 +40,7 @@ public class AuthenticationService {
   private final JwtTokenProvider jwtTokenProvider;
   private final PasswordResetEmailService passwordResetEmailService;
   private final VerificationService verificationService;
+  private final TokenBlacklistService tokenBlacklistService;
 
   @Value("${app.password-reset.expiry-hours:" + RESET_TOKEN_EXPIRY_HOURS + "}")
   private int resetTokenExpiryHours;
@@ -286,13 +288,22 @@ public class AuthenticationService {
         .build();
   }
 
-  public void logout() {
-    // In a stateless JWT system, logout is primarily handled client-side
-    // This method can be extended to:
-    // 1. Blacklist tokens in Redis (if token blacklisting is implemented)
-    // 2. Log logout events for audit purposes
-    // 3. Invalidate refresh tokens
-    // For now, it's a no-op as tokens are stateless
+  /**
+   * Invalidates the given access token by adding it to the Redis blacklist for the remainder of its
+   * natural lifetime. Any subsequent request bearing this token will be rejected with 401.
+   *
+   * @param accessToken the raw JWT access token to invalidate (may be null if none was provided)
+   */
+  public void logout(String accessToken) {
+    if (accessToken != null && !accessToken.isBlank()) {
+      try {
+        var claims = jwtTokenProvider.parseClaims(accessToken);
+        tokenBlacklistService.blacklist(accessToken, claims.getExpiration());
+      } catch (Exception e) {
+        // Token may already be expired or malformed; blacklisting is best-effort.
+        // The client-side state will still be cleared.
+      }
+    }
   }
 
   /**
