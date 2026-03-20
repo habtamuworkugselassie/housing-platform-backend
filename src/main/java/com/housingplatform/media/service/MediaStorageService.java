@@ -1,6 +1,7 @@
 package com.housingplatform.media.service;
 
 import com.housingplatform.shared.exception.BusinessException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -105,9 +106,10 @@ public class MediaStorageService {
   }
 
   /**
-   * Returns an input stream to read the file for the given URL path. Caller must close the stream.
+   * Resolves the on-disk path for an uploads URL. Used for streaming/range responses (video, large
+   * files) without buffering the whole file in memory.
    */
-  public InputStream getInputStream(String imageUrl) throws IOException {
+  public Path resolveUploadPath(String imageUrl) throws IOException {
     if (imageUrl == null || !imageUrl.startsWith(UPLOADS_PREFIX)) {
       throw new IllegalArgumentException("Not an uploads URL: " + imageUrl);
     }
@@ -117,9 +119,16 @@ public class MediaStorageService {
     }
     Path file = uploadDir.resolve(relative).normalize();
     if (!file.startsWith(uploadDir) || !Files.isRegularFile(file)) {
-      throw new java.io.FileNotFoundException("File not found: " + imageUrl);
+      throw new FileNotFoundException("File not found: " + imageUrl);
     }
-    return Files.newInputStream(file);
+    return file;
+  }
+
+  /**
+   * Returns an input stream to read the file for the given URL path. Caller must close the stream.
+   */
+  public InputStream getInputStream(String imageUrl) throws IOException {
+    return Files.newInputStream(resolveUploadPath(imageUrl));
   }
 
   public boolean isUploadsUrl(String imageUrl) {

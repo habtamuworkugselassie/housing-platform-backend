@@ -1,6 +1,7 @@
 package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.SponsorshipApplication;
@@ -146,6 +147,11 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
     req.setEmail(request.getEmail());
     req.setWebsite(request.getWebsite());
+    req.setFacebookUrl(request.getFacebookUrl());
+    req.setInstagramUrl(request.getInstagramUrl());
+    req.setLinkedinUrl(request.getLinkedinUrl());
+    req.setTwitterUrl(request.getTwitterUrl());
+    req.setYoutubeUrl(request.getYoutubeUrl());
     req.setDescription(request.getDescription());
     req.setPrimaryContactUserId(request.getPrimaryContactUserId());
 
@@ -457,10 +463,15 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   private void syncPhonesFromRequest(
       Organization organization, List<OrganizationPhoneDto> phoneNumbers) {
-    List<OrganizationPhone> phones = organization.getPhones();
+    OrganizationContact contact = organization.getContact();
+    if (contact == null) {
+      contact = OrganizationContact.builder().organization(organization).build();
+      organization.setContact(contact);
+    }
+    List<OrganizationPhone> phones = contact.getPhones();
     if (phones == null) {
       phones = new ArrayList<>();
-      organization.setPhones(phones);
+      contact.setPhones(phones);
     }
     phones.clear();
     if (phoneNumbers != null && !phoneNumbers.isEmpty()) {
@@ -470,7 +481,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         if (!num.isEmpty()) {
           OrganizationPhone phone =
               OrganizationPhone.builder()
-                  .organization(organization)
+                  .contact(contact)
                   .countryCode(dto.getCountryCode() != null ? dto.getCountryCode().trim() : "+251")
                   .number(num)
                   .displayOrder(order++)
@@ -482,7 +493,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     if (phones.isEmpty()) {
       phones.add(
           OrganizationPhone.builder()
-              .organization(organization)
+              .contact(contact)
               .countryCode("+251")
               .number("")
               .displayOrder(0)

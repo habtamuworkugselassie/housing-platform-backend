@@ -44,6 +44,13 @@ public class OrganizationRequest {
   private String email;
 
   private String website;
+
+  private String facebookUrl;
+  private String instagramUrl;
+  private String linkedinUrl;
+  private String twitterUrl;
+  private String youtubeUrl;
+
   private String description;
 
   private UUID primaryContactUserId;

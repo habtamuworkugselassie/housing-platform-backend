@@ -5,6 +5,7 @@ import com.housingplatform.exhibition.dto.ExhibitionInterestRequest;
 import com.housingplatform.exhibition.dto.ExhibitionInterestResponse;
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,17 +31,19 @@ public class ExhibitionInterestService {
             .name(orgName)
             .type(Organization.OrganizationType.fromValue(request.getOrganizationType()))
             .status(Organization.OrganizationStatus.PENDING_APPROVAL)
-            .email(email)
             .description(
                 request.getMessage() != null && !request.getMessage().trim().isEmpty()
                     ? request.getMessage().trim()
                     : null)
             .build();
-    organization
+    OrganizationContact contact =
+        OrganizationContact.builder().organization(organization).email(email).build();
+    organization.setContact(contact);
+    contact
         .getPhones()
         .add(
             OrganizationPhone.builder()
-                .organization(organization)
+                .contact(contact)
                 .countryCode("+251")
                 .number(phoneNumber != null ? phoneNumber : "")
                 .displayOrder(0)

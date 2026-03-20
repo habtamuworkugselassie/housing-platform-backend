@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrganizationPhoneRepository extends JpaRepository<OrganizationPhone, UUID> {
 
-  List<OrganizationPhone> findByOrganizationIdOrderByDisplayOrderAsc(UUID organizationId);
+  List<OrganizationPhone> findByContactIdOrderByDisplayOrderAsc(UUID contactId);
 
-  void deleteByOrganizationId(UUID organizationId);
+  void deleteByContactId(UUID contactId);
 }

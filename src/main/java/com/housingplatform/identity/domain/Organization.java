@@ -3,8 +3,6 @@ package com.housingplatform.identity.domain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -56,17 +54,17 @@ public class Organization extends BaseAuditEntity {
 
   private Double longitude;
 
-  @OneToMany(
+  /**
+   * Email, website, social URLs, and phone numbers live in {@link OrganizationContact} (1:1).
+   * Exposed flat on the JSON API via {@link
+   * com.housingplatform.identity.service.OrganizationMapper}.
+   */
+  @OneToOne(
       mappedBy = "organization",
       cascade = CascadeType.ALL,
       orphanRemoval = true,
       fetch = FetchType.LAZY)
-  @OrderBy("displayOrder ASC")
-  @Builder.Default
-  private List<OrganizationPhone> phones = new ArrayList<>();
-
-  private String email;
-  private String website;
+  private OrganizationContact contact;
 
   @Column(columnDefinition = "TEXT")
   private String description;

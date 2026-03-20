@@ -299,8 +299,9 @@ public class PropertyServiceImpl implements PropertyService {
         Organization.VerificationLevel level = org.getVerificationLevel();
         response.setRealEstateCompanyVerified(level == Organization.VerificationLevel.FULL);
         response.setRealEstateCompanyVerificationLevel(level != null ? level.name() : null);
-        if (org.getPhones() != null && !org.getPhones().isEmpty()) {
-          org.getPhones().stream()
+        com.housingplatform.identity.domain.OrganizationContact contact = org.getContact();
+        if (contact != null && contact.getPhones() != null && !contact.getPhones().isEmpty()) {
+          contact.getPhones().stream()
               .min(
                   Comparator.comparing(
                       com.housingplatform.identity.domain.OrganizationPhone::getDisplayOrder))

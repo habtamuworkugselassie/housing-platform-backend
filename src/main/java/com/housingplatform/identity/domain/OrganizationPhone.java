@@ -14,8 +14,8 @@ import lombok.experimental.SuperBuilder;
 public class OrganizationPhone extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "organization_id", nullable = false)
-  private Organization organization;
+  @JoinColumn(name = "contact_id", nullable = false)
+  private OrganizationContact contact;
 
   @Column(name = "country_code", nullable = false, length = 10)
   private String countryCode = "+251";

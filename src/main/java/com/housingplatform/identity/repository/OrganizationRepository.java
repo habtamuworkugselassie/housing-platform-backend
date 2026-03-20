@@ -21,9 +21,9 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
       Organization.OrganizationType type, Organization.OrganizationStatus status);
 
   @Query(
-      "SELECT o FROM Organization o WHERE "
+      "SELECT DISTINCT o FROM Organization o LEFT JOIN o.contact c WHERE "
           + "LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR "
-          + "LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR "
+          + "(c IS NOT NULL AND LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%'))) OR "
           + "LOWER(o.registrationNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR "
           + "LOWER(o.city) LIKE LOWER(CONCAT('%', :search, '%'))")
   List<Organization> searchOrganizations(@Param("search") String search);
