@@ -1,32 +1,34 @@
 package com.housingplatform.shared.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.housingplatform.shared.config.TokenBlacklistCacheConfig;
 import java.util.Date;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
- * Manages a Redis-backed blacklist of invalidated JWT access tokens.
+ * Manages a Caffeine-backed blacklist of invalidated JWT access tokens.
  *
  * <p>When a user logs out, their current access token is stored here with a TTL equal to its
  * remaining validity period. Any subsequent request bearing a blacklisted token is rejected with
  * 401, even if the token's signature and expiry would otherwise be valid.
  *
- * <p>Redis auto-expires entries, so the blacklist never grows unbounded.
+ * <p>Entries expire automatically when the token would have expired, so the blacklist does not grow
+ * unbounded.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenBlacklistService {
 
-  private static final String BLACKLIST_KEY_PREFIX = "jwt:blacklist:";
-
-  private final StringRedisTemplate redisTemplate;
+  @Qualifier(TokenBlacklistCacheConfig.JWT_BLACKLIST_CACHE)
+  private final Cache<String, Long> blacklistCache;
 
   /**
-   * Adds a token to the blacklist. The TTL is set to the token's remaining lifetime so that Redis
-   * automatically removes the entry once the token would have expired anyway.
+   * Adds a token to the blacklist. The TTL is set to the token's remaining lifetime so that the
+   * cache entry is removed once the token would have expired anyway.
    *
    * @param token the raw JWT access token string
    * @param expiration the token's expiration date (from its claims)
@@ -40,16 +42,11 @@ public class TokenBlacklistService {
       // Token is already expired; no need to blacklist — it will be rejected anyway.
       return;
     }
-    String key = BLACKLIST_KEY_PREFIX + token;
     try {
-      redisTemplate
-          .opsForValue()
-          .set(key, "1", ttlMillis, java.util.concurrent.TimeUnit.MILLISECONDS);
+      blacklistCache.put(token, expiration.getTime());
       log.debug("Token blacklisted with TTL {}ms", ttlMillis);
     } catch (Exception e) {
-      // If Redis is unavailable, log the error but don't fail the logout.
-      // The token will expire naturally; this is an acceptable degradation.
-      log.error("Failed to blacklist token in Redis: {}", e.getMessage());
+      log.error("Failed to blacklist token: {}", e.getMessage());
     }
   }
 
@@ -63,10 +60,9 @@ public class TokenBlacklistService {
       return false;
     }
     try {
-      return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_KEY_PREFIX + token));
+      return blacklistCache.getIfPresent(token) != null;
     } catch (Exception e) {
-      // If Redis is unavailable, fail open (allow the request) rather than blocking all traffic.
-      log.error("Redis unavailable during blacklist check, failing open: {}", e.getMessage());
+      log.error("Blacklist check failed, failing open: {}", e.getMessage());
       return false;
     }
   }

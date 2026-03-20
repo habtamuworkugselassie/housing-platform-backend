@@ -289,8 +289,8 @@ public class AuthenticationService {
   }
 
   /**
-   * Invalidates the given access token by adding it to the Redis blacklist for the remainder of its
-   * natural lifetime. Any subsequent request bearing this token will be rejected with 401.
+   * Invalidates the given access token by adding it to the in-memory blacklist for the remainder of
+   * its natural lifetime. Any subsequent request bearing this token will be rejected with 401.
    *
    * @param accessToken the raw JWT access token to invalidate (may be null if none was provided)
    */
