@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.apache.catalina.connector.ClientAbortException;
 
 @Slf4j
 @RestControllerAdvice
@@ -181,6 +182,17 @@ public class GlobalExceptionHandler {
     return json(error, HttpStatus.BAD_REQUEST);
   }
 
+  /**
+   * Client closed the connection while the server was still writing (common for video Range
+   * requests, tab close, seek). Not an application error — avoid ERROR logs and JSON error bodies.
+   */
+  @ExceptionHandler(ClientAbortException.class)
+  public void handleClientAbort(ClientAbortException ex, WebRequest request) {
+    log.debug(
+        "Client aborted response (disconnect/broken pipe): {}",
+        request.getDescription(false).replace("uri=", ""));
+  }
+
   @ExceptionHandler(NoHandlerFoundException.class)
   public ResponseEntity<ErrorResponse> handleNoHandlerFoundException(
       NoHandlerFoundException ex, WebRequest request) {
@@ -211,6 +223,10 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
     String path = request.getDescription(false).replace("uri=", "");
+    if (isClientAbortInChain(ex)) {
+      log.debug("Client aborted response (wrapped): {}", path);
+      return new ResponseEntity<>(null, HttpStatus.NO_CONTENT);
+    }
     Throwable root = ex;
     while (root.getCause() != null && root.getCause() != root) {
       root = root.getCause();
@@ -237,6 +253,15 @@ public class GlobalExceptionHandler {
             .path(path)
             .build();
     return json(error, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  private static boolean isClientAbortInChain(Throwable ex) {
+    for (Throwable t = ex; t != null; t = t.getCause()) {
+      if (t instanceof ClientAbortException) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private ErrorResponse.FieldError mapFieldError(FieldError fieldError) {
