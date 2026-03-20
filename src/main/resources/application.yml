@@ -124,6 +124,11 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+  # Discover every @RestController under the application (including /exhibition/**, etc.)
+  packages-to-scan: com.housingplatform
+  # Expose Spring Boot Actuator endpoints in the same OpenAPI document (health, info, metrics, …)
+  show-actuator: true
+  use-management-port: false
 
 logging:
   level:

@@ -1,6 +1,8 @@
 package com.housingplatform.media.api;
 
 import com.housingplatform.media.service.MediaStorageService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -30,6 +32,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/uploads")
+@Tag(
+    name = "Uploads",
+    description =
+        "Public file serving for stored uploads (images, video, documents). Path after /api/v1/uploads/ is arbitrary.")
 public class UploadsController {
 
   private final MediaStorageService mediaStorageService;
@@ -39,6 +45,11 @@ public class UploadsController {
   }
 
   @GetMapping("/**")
+  @Operation(
+      summary = "Serve uploaded file",
+      description =
+          "Streams a file from disk for URLs like `/api/v1/uploads/properties/{id}/file.jpg`. "
+              + "Supports byte-range requests for video.")
   public ResponseEntity<Resource> serveFile(jakarta.servlet.http.HttpServletRequest request) {
     String prefix = "/api/v1/uploads";
     String uri = request.getRequestURI();
