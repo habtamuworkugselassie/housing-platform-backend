@@ -22,7 +22,7 @@ public class MediaStorageService {
 
   private static final Logger log = LoggerFactory.getLogger(MediaStorageService.class);
   private static final String UPLOADS_PREFIX = "/api/v1/uploads/";
-  private static final String FALLBACK_SUBDIR = "housing-platform-uploads";
+  private static final String FALLBACK_SUBDIR = "ethio-build-connect-uploads";
 
   private final Path uploadDir;
 

@@ -39,7 +39,7 @@ public class PasswordResetEmailService {
       SimpleMailMessage message = new SimpleMailMessage();
       message.setFrom(fromEmail);
       message.setTo(toEmail);
-      message.setSubject("Reset your password - Housing Platform");
+      message.setSubject("Reset your password - Ethio Build Connect");
       message.setText(
           "You requested a password reset. Click the link below to set a new password (valid for 1 hour):\n\n"
               + resetUrl

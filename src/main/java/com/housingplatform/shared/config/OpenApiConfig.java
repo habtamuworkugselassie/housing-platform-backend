@@ -22,16 +22,16 @@ public class OpenApiConfig {
     return new OpenAPI()
         .info(
             new Info()
-                .title("Housing Platform API")
+                .title("Ethio Build Connect API")
                 .description(
-                    "Integrated Real Estate & Housing Ecosystem Platform - REST API Documentation. "
+                    "Ethio Build Connect — REST API documentation. "
                         + "Use **Authorize** and paste a JWT from `POST /api/v1/auth/login` for protected routes.")
                 .version("1.0.0")
                 .contact(
                     new Contact()
-                        .name("Housing Platform Team")
-                        .email("support@housingplatform.com"))
-                .license(new License().name("Proprietary").url("https://housingplatform.com")))
+                        .name("Ethio Build Connect")
+                        .email("support@ethiobuildconnect.com"))
+                .license(new License().name("Proprietary").url("https://ethiobuildconnect.com")))
         .servers(
             List.of(
                 new Server().url("/").description("Current Server (Droplet/Local)"),

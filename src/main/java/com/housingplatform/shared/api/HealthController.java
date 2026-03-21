@@ -21,7 +21,7 @@ public class HealthController {
     Map<String, Object> response = new HashMap<>();
     response.put("status", "UP");
     response.put("timestamp", LocalDateTime.now());
-    response.put("service", "housing-platform");
+    response.put("service", "ethio-build-connect");
     return ResponseEntity.ok(response);
   }
 }

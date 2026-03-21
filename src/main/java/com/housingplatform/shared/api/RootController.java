@@ -17,7 +17,7 @@ public class RootController {
   @Operation(summary = "API root", description = "Returns API information and available endpoints")
   public ResponseEntity<Map<String, Object>> root() {
     Map<String, Object> response = new HashMap<>();
-    response.put("service", "Housing Platform API");
+    response.put("service", "Ethio Build Connect API");
     response.put("version", "1.0.0");
     response.put("status", "UP");
     response.put(

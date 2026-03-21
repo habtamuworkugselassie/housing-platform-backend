@@ -60,7 +60,7 @@ public class VerificationService {
         Message.creator(
                 new com.twilio.type.PhoneNumber("whatsapp:" + phoneNumber),
                 new com.twilio.type.PhoneNumber("whatsapp:" + twilioWhatsappFromNumber),
-                "Your Housing Platform verification code is: " + otp)
+                "Your Ethio Build Connect verification code is: " + otp)
             .create();
         log.info("Real WhatsApp message dispatched to {}", phoneNumber);
       } catch (Exception e) {
@@ -72,7 +72,7 @@ public class VerificationService {
       log.info("================================================");
       log.info("WHATSAPP MOCK DISPATCH");
       log.info("TO: {}", phoneNumber);
-      log.info("MESSAGE: Your Housing Platform verification code is: {}", otp);
+      log.info("MESSAGE: Your Ethio Build Connect verification code is: {}", otp);
       log.info("================================================");
     }
   }

@@ -1,10 +1,10 @@
-# Housing Platform Backend
+# Ethio Build Connect — Backend
 
-Integrated Real Estate & Housing Ecosystem Platform - Backend Service
+Real estate and construction ecosystem — backend service.
 
 ## Overview
 
-This is the backend service for the Integrated Real Estate & Housing Ecosystem Platform, designed to connect real estate companies, house buyers, financing banks, and construction material suppliers into a single, trusted marketplace.
+This backend powers **Ethio Build Connect**, connecting real estate companies, buyers, financing partners, and construction suppliers in one marketplace.
 
 ## Architecture
 
