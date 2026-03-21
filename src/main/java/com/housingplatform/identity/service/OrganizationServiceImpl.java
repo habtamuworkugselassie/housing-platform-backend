@@ -24,6 +24,7 @@ import com.housingplatform.shared.security.UserContext;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -177,6 +178,22 @@ public class OrganizationServiceImpl implements OrganizationService {
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, id);
     return response;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<OrganizationResponse> getOrganizationByRegistrationNumber(String registrationNumber) {
+    if (registrationNumber == null || registrationNumber.isBlank()) {
+      return Optional.empty();
+    }
+    return organizationRepository
+        .findByRegistrationNumber(registrationNumber.trim())
+        .map(
+            org -> {
+              OrganizationResponse response = organizationMapper.toResponse(org);
+              enrichWithMedia(response, org.getId());
+              return response;
+            });
   }
 
   @Override

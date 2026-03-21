@@ -4,6 +4,7 @@ import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +16,9 @@ public interface OrganizationService {
   OrganizationResponse createOrganizationAsAdmin(AdminOrganizationCreateRequest request);
 
   OrganizationResponse getOrganizationById(UUID id);
+
+  /** Public lookup by registration number (e.g. footer base org). Empty if not found. */
+  Optional<OrganizationResponse> getOrganizationByRegistrationNumber(String registrationNumber);
 
   OrganizationResponse getMyOrganization();
 
