@@ -889,9 +889,11 @@ public class PropertyServiceImpl implements PropertyService {
           mediaAttachmentRepository.findByPropertyIdOrderByDisplayOrderAsc(property.getId());
       for (MediaAttachment att : attachments) {
         String url =
-            att.hasFileData()
-                ? "/api/v1/properties/" + property.getId() + "/images/" + att.getId() + "/file"
-                : att.getImageUrl();
+            att.getImageUrl() != null && !att.getImageUrl().isBlank()
+                ? att.getImageUrl()
+                : att.hasFileData()
+                    ? "/api/v1/properties/" + property.getId() + "/images/" + att.getId() + "/file"
+                    : null;
         if (url == null || url.isBlank()) {
           continue;
         }

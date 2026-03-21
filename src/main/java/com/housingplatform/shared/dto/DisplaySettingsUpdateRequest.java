@@ -20,5 +20,7 @@ public record DisplaySettingsUpdateRequest(
     @NotNull
         @Min(5000)
         @Max(600000)
-        @Schema(description = "Time before rotating side columns to the next sponsors", example = "35000")
+        @Schema(
+            description = "Time before rotating side columns to the next sponsors",
+            example = "35000")
         Long sidebarLayoutRotationMs) {}

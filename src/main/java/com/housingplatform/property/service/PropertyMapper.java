@@ -27,15 +27,17 @@ public interface PropertyMapper {
           property.getImages().stream()
               .map(
                   img -> {
-                    // If file is stored in DB, use endpoint URL; otherwise use external URL
+                    // Prefer disk URL (/api/v1/uploads/...) like organization media; else legacy BYTEA
                     String imageUrl =
-                        img.hasFileData()
-                            ? "/api/v1/properties/"
-                                + property.getId()
-                                + "/images/"
-                                + img.getId()
-                                + "/file"
-                            : img.getImageUrl();
+                        img.getImageUrl() != null && !img.getImageUrl().isBlank()
+                            ? img.getImageUrl()
+                            : img.hasFileData()
+                                ? "/api/v1/properties/"
+                                    + property.getId()
+                                    + "/images/"
+                                    + img.getId()
+                                    + "/file"
+                                : null;
                     return PropertyImageResponse.builder()
                         .id(img.getId())
                         .imageUrl(imageUrl)

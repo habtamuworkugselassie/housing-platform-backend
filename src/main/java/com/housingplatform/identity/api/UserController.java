@@ -108,6 +108,16 @@ public class UserController {
     return ResponseEntity.ok(updated);
   }
 
+  @GetMapping("/{id}/profile-image/{attachmentId}/file")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Get user profile image",
+      description = "Retrieve profile image for a user. Public access.")
+  public ResponseEntity<byte[]> getUserProfileImage(
+      @PathVariable UUID id, @PathVariable UUID attachmentId) {
+    return userService.getUserProfileImage(id, attachmentId);
+  }
+
   @PutMapping("/{id}")
   @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
   @AuthActionScope("users.update")

@@ -8,6 +8,8 @@ import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
+import com.housingplatform.media.service.MediaStorageService;
+import com.housingplatform.media.util.UserProfileMediaUrls;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
@@ -19,6 +21,9 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +37,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final OrganizationRepository organizationRepository;
   private final MediaAttachmentRepository mediaAttachmentRepository;
+  private final MediaStorageService mediaStorageService;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
 
@@ -58,10 +64,7 @@ public class UserService {
         mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(user.getId());
     if (!attachments.isEmpty()) {
       for (MediaAttachment att : attachments) {
-        String url =
-            att.hasFileData()
-                ? "/api/v1/properties/" + user.getId() + "/images/" + att.getId() + "/file"
-                : att.getImageUrl();
+        String url = UserProfileMediaUrls.profileImageUrl(att, user.getId());
         if (url != null && !url.isBlank()) {
           response.setProfileImageUrl(url);
           break;
@@ -203,28 +206,63 @@ public class UserService {
             .findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
-    // Remove existing profile images
     List<MediaAttachment> existing =
         mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(userId);
+    for (MediaAttachment att : existing) {
+      mediaStorageService.deleteByUrl(att.getImageUrl());
+    }
     mediaAttachmentRepository.deleteAll(existing);
 
-    try {
-      MediaAttachment attachment =
-          MediaAttachment.builder()
-              .user(user)
-              .fileName(file.getOriginalFilename())
-              .contentType(file.getContentType())
-              .fileData(file.getBytes())
-              .displayOrder(0)
-              .isPrimary(true)
-              .mediaKind(MediaAttachment.MediaKind.IMAGE)
-              .build();
+    String imageUrl = mediaStorageService.save(file, "users/" + userId);
+    MediaAttachment attachment =
+        MediaAttachment.builder()
+            .user(user)
+            .fileName(file.getOriginalFilename())
+            .contentType(file.getContentType())
+            .imageUrl(imageUrl)
+            .displayOrder(0)
+            .isPrimary(true)
+            .mediaKind(MediaAttachment.MediaKind.IMAGE)
+            .build();
 
-      mediaAttachmentRepository.save(attachment);
-    } catch (IOException e) {
-      throw new BusinessException("Failed to read file data", e);
-    }
+    mediaAttachmentRepository.save(attachment);
 
     return getUserById(userId);
+  }
+
+  @Transactional(readOnly = true)
+  public ResponseEntity<byte[]> getUserProfileImage(UUID userId, UUID attachmentId) {
+    MediaAttachment attachment =
+        mediaAttachmentRepository
+            .findByIdAndUserId(attachmentId, userId)
+            .orElseThrow(() -> new ResourceNotFoundException("MediaAttachment", attachmentId));
+
+    String imageUrl = attachment.getImageUrl();
+    if (mediaStorageService.isUploadsUrl(imageUrl)) {
+      try (var in = mediaStorageService.getInputStream(imageUrl)) {
+        byte[] body = in.readAllBytes();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(
+            attachment.getContentType() != null
+                ? MediaType.parseMediaType(attachment.getContentType())
+                : MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentLength(body.length);
+        return ResponseEntity.ok().headers(headers).body(body);
+      } catch (IOException e) {
+        throw new ResourceNotFoundException("Profile image file not found on disk");
+      }
+    }
+
+    if (!attachment.hasFileData()) {
+      throw new BusinessException("No file data found for this attachment");
+    }
+
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_TYPE,
+            attachment.getContentType() != null
+                ? attachment.getContentType()
+                : "application/octet-stream")
+        .body(attachment.getFileData());
   }
 }

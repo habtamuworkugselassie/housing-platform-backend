@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
+import com.housingplatform.media.util.UserProfileMediaUrls;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.domain.Review;
 import com.housingplatform.property.dto.ReviewDto;
@@ -72,10 +73,7 @@ public class ReviewService {
 
       if (!attachments.isEmpty()) {
         for (MediaAttachment att : attachments) {
-          String url =
-              att.hasFileData()
-                  ? "/api/v1/properties/" + user.getId() + "/images/" + att.getId() + "/file"
-                  : att.getImageUrl();
+          String url = UserProfileMediaUrls.profileImageUrl(att, user.getId());
           if (url == null || url.isBlank()) {
             continue;
           }

@@ -46,9 +46,12 @@ public class DisplaySettingsService {
             .collect(Collectors.toMap(SiteSetting::getSettingKey, SiteSetting::getSettingValue));
 
     return DisplaySettingsResponse.builder()
-        .sponsorCarouselAutoplayMs(parseLong(map, KEY_SPONSOR_CAROUSEL_AUTOPLAY_MS, DEFAULT_SPONSOR_CAROUSEL_MS))
-        .sidebarMediaRotationMs(parseLong(map, KEY_SIDEBAR_MEDIA_ROTATION_MS, DEFAULT_SIDEBAR_MEDIA_MS))
-        .sidebarLayoutRotationMs(parseLong(map, KEY_SIDEBAR_LAYOUT_ROTATION_MS, DEFAULT_SIDEBAR_LAYOUT_MS))
+        .sponsorCarouselAutoplayMs(
+            parseLong(map, KEY_SPONSOR_CAROUSEL_AUTOPLAY_MS, DEFAULT_SPONSOR_CAROUSEL_MS))
+        .sidebarMediaRotationMs(
+            parseLong(map, KEY_SIDEBAR_MEDIA_ROTATION_MS, DEFAULT_SIDEBAR_MEDIA_MS))
+        .sidebarLayoutRotationMs(
+            parseLong(map, KEY_SIDEBAR_LAYOUT_ROTATION_MS, DEFAULT_SIDEBAR_LAYOUT_MS))
         .footer(resolveFooterContact(map))
         .build();
   }
@@ -63,9 +66,7 @@ public class DisplaySettingsService {
 
   private void upsert(String key, String value) {
     SiteSetting row =
-        siteSettingRepository
-            .findById(key)
-            .orElse(SiteSetting.builder().settingKey(key).build());
+        siteSettingRepository.findById(key).orElse(SiteSetting.builder().settingKey(key).build());
     row.setSettingValue(value);
     siteSettingRepository.save(row);
   }
@@ -84,8 +85,7 @@ public class DisplaySettingsService {
 
   private FooterContactResponse resolveFooterContact(Map<String, String> map) {
     String raw = map.get(KEY_FOOTER_ORGANIZATION_REGISTRATION_NUMBER);
-    String reg =
-        (raw == null || raw.isBlank()) ? DEFAULT_FOOTER_ORG_REGISTRATION : raw.trim();
+    String reg = (raw == null || raw.isBlank()) ? DEFAULT_FOOTER_ORG_REGISTRATION : raw.trim();
     if (reg.isBlank()) {
       return null;
     }
@@ -98,9 +98,7 @@ public class DisplaySettingsService {
 
   private FooterContactResponse toFooterContact(OrganizationResponse org) {
     String address =
-        firstNonBlank(
-            org.getAddress(),
-            buildCityCountryLine(org.getCity(), org.getCountry()));
+        firstNonBlank(org.getAddress(), buildCityCountryLine(org.getCity(), org.getCountry()));
     return FooterContactResponse.builder()
         .address(address)
         .phoneDisplay(formatPhoneDisplay(org.getPhoneNumbers()))

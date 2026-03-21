@@ -182,7 +182,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   @Override
   @Transactional(readOnly = true)
-  public Optional<OrganizationResponse> getOrganizationByRegistrationNumber(String registrationNumber) {
+  public Optional<OrganizationResponse> getOrganizationByRegistrationNumber(
+      String registrationNumber) {
     if (registrationNumber == null || registrationNumber.isBlank()) {
       return Optional.empty();
     }
