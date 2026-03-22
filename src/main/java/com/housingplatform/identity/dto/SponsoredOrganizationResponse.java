@@ -29,4 +29,10 @@ public class SponsoredOrganizationResponse {
   private String country;
   private String sponsorshipType;
   private BigDecimal basePrice;
+
+  /**
+   * {@link com.housingplatform.identity.domain.Organization.OrganizationType} name, e.g.
+   * REAL_ESTATE_COMPANY.
+   */
+  private String organizationType;
 }

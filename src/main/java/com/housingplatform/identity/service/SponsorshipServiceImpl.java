@@ -447,6 +447,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                   .country(org.getCountry())
                   .sponsorshipType(app.getSponsorship().getType().name())
                   .basePrice(app.getSponsorship().getBasePrice())
+                  .organizationType(
+                      org.getType() != null ? org.getType().name() : null)
                   .build();
             })
         .filter(r -> r != null)

@@ -88,4 +88,13 @@ public class OrganizationResponse {
     if (Boolean.TRUE.equals(verified)) return true;
     return "FULL".equals(verificationLevel);
   }
+
+  /**
+   * Active marketplace sponsorship (approved application, current date in range). Set for public
+   * marketplace listings; null when not sponsored.
+   */
+  private Boolean isSponsored;
+
+  /** {@link com.housingplatform.identity.domain.Sponsorship.SponsorshipType} name, e.g. GOLD. */
+  private String sponsorshipType;
 }

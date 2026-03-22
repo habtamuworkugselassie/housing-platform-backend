@@ -1,6 +1,7 @@
 package com.housingplatform.exhibition.domain;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.shared.domain.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,4 +33,9 @@ public class ExhibitionInterest extends BaseEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "organization_id")
   private Organization organization;
+
+  /** When interest is exhibitor: which sponsorship tier they are interested in (optional FK). */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "sponsorship_id")
+  private Sponsorship sponsorship;
 }

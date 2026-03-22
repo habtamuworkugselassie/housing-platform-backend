@@ -1,5 +1,6 @@
 package com.housingplatform.identity.domain;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -39,9 +40,22 @@ public class Sponsorship extends BaseAuditEntity {
 
   public enum SponsorshipType {
     EXCLUSIVE,
+    @JsonAlias({"PREMIUM"})
+    PLATINUM,
     GOLD,
-    PREMIUM,
-    SILVER
+    SILVER,
+    SPECIAL;
+
+    /** Lower value = higher marketing tier (sort order, conflict resolution). */
+    public int tierRank() {
+      return switch (this) {
+        case EXCLUSIVE -> 0;
+        case PLATINUM -> 1;
+        case GOLD -> 2;
+        case SILVER -> 3;
+        case SPECIAL -> 4;
+      };
+    }
   }
 
   public enum SponsorshipStatus {

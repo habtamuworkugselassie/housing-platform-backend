@@ -19,4 +19,6 @@ public class ExhibitionInterestResponse {
   private String company;
   private String message;
   private UUID organizationId;
+  private UUID sponsorshipId;
+  private String sponsorshipPackageName;
 }

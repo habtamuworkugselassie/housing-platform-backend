@@ -3,6 +3,7 @@ package com.housingplatform.exhibition.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,4 +35,7 @@ public class ExhibitionInterestRequest {
 
   private String company;
   private String message;
+
+  /** Required when interestType is exhibitor: id of an ACTIVE sponsorship package. */
+  private UUID sponsorshipId;
 }

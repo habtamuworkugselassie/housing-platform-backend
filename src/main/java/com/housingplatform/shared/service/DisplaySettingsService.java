@@ -25,6 +25,12 @@ public class DisplaySettingsService {
   public static final String KEY_SIDEBAR_MEDIA_ROTATION_MS = "SIDEBAR_MEDIA_ROTATION_MS";
   public static final String KEY_SIDEBAR_LAYOUT_ROTATION_MS = "SIDEBAR_LAYOUT_ROTATION_MS";
 
+  public static final String KEY_EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE =
+      "EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE";
+
+  public static final String KEY_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE =
+      "EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE";
+
   /** Registration number of the organization that supplies the public footer contact block. */
   public static final String KEY_FOOTER_ORGANIZATION_REGISTRATION_NUMBER =
       "FOOTER_ORGANIZATION_REGISTRATION_NUMBER";
@@ -32,6 +38,8 @@ public class DisplaySettingsService {
   private static final long DEFAULT_SPONSOR_CAROUSEL_MS = 10_000L;
   private static final long DEFAULT_SIDEBAR_MEDIA_MS = 12_000L;
   private static final long DEFAULT_SIDEBAR_LAYOUT_MS = 35_000L;
+  private static final boolean DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE = true;
+  private static final boolean DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE = true;
 
   /** Default base org seed (migration V34 / scripts/create-dream-teams-organization.js). */
   private static final String DEFAULT_FOOTER_ORG_REGISTRATION = "DTT-PLC-FOOTER-001";
@@ -52,6 +60,16 @@ public class DisplaySettingsService {
             parseLong(map, KEY_SIDEBAR_MEDIA_ROTATION_MS, DEFAULT_SIDEBAR_MEDIA_MS))
         .sidebarLayoutRotationMs(
             parseLong(map, KEY_SIDEBAR_LAYOUT_ROTATION_MS, DEFAULT_SIDEBAR_LAYOUT_MS))
+        .exhibitionSponsorshipPackagesVisible(
+            parseBoolean(
+                map,
+                KEY_EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE,
+                DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE))
+        .exhibitionSponsorshipPackagePricesVisible(
+            parseBoolean(
+                map,
+                KEY_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE,
+                DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE))
         .footer(resolveFooterContact(map))
         .build();
   }
@@ -61,6 +79,12 @@ public class DisplaySettingsService {
     upsert(KEY_SPONSOR_CAROUSEL_AUTOPLAY_MS, String.valueOf(request.sponsorCarouselAutoplayMs()));
     upsert(KEY_SIDEBAR_MEDIA_ROTATION_MS, String.valueOf(request.sidebarMediaRotationMs()));
     upsert(KEY_SIDEBAR_LAYOUT_ROTATION_MS, String.valueOf(request.sidebarLayoutRotationMs()));
+    upsert(
+        KEY_EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE,
+        Boolean.TRUE.equals(request.exhibitionSponsorshipPackagesVisible()) ? "true" : "false");
+    upsert(
+        KEY_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE,
+        Boolean.TRUE.equals(request.exhibitionSponsorshipPackagePricesVisible()) ? "true" : "false");
     return getDisplaySettings();
   }
 
@@ -81,6 +105,15 @@ public class DisplaySettingsService {
     } catch (NumberFormatException e) {
       return defaultMs;
     }
+  }
+
+  private static boolean parseBoolean(Map<String, String> map, String key, boolean defaultVal) {
+    String raw = map.get(key);
+    if (raw == null || raw.isBlank()) {
+      return defaultVal;
+    }
+    String v = raw.trim().toLowerCase();
+    return "true".equals(v) || "1".equals(v) || "yes".equals(v);
   }
 
   private FooterContactResponse resolveFooterContact(Map<String, String> map) {

@@ -129,25 +129,7 @@ public class PropertyServiceImpl implements PropertyService {
                   Collectors.toMap(
                       app -> app.getOrganization().getId(),
                       Function.identity(),
-                      (existing, replacement) -> {
-                        // If multiple active applications exist, prefer PREMIUM over GOLD
-                        if (replacement.getSponsorship().getType()
-                            == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                .PREMIUM) {
-                          return replacement;
-                        }
-                        if (existing.getSponsorship().getType()
-                            == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                .PREMIUM) {
-                          return existing;
-                        }
-                        if (replacement.getSponsorship().getType()
-                            == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                .GOLD) {
-                          return replacement;
-                        }
-                        return existing;
-                      }));
+                      PropertyServiceImpl::pickHigherSponsorshipTier));
 
       enrichWithSponsorshipInfo(response, property, organizationsMap, applicationMap);
     }
@@ -230,22 +212,9 @@ public class PropertyServiceImpl implements PropertyService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    PropertyServiceImpl::pickHigherSponsorshipTier));
 
-    // Sort by sponsorship priority: Premium (0) > Gold (1) > None (2)
-    // Then by creation date (newest first)
-    // This ensures sponsored properties always appear at the top of every page
+    // Sort by sponsorship tier (EXCLUSIVE best, then PLATINUM, GOLD, SILVER, SPECIAL), then date
     List<Property> sortedProperties =
         allProperties.stream()
             .sorted(
@@ -254,15 +223,9 @@ public class PropertyServiceImpl implements PropertyService {
                           SponsorshipApplication application =
                               applicationMap.get(p.getRealEstateCompanyId());
                           if (application != null && application.isActive()) {
-                            if (application.getSponsorship().getType()
-                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                    .PREMIUM) return 0;
-                            if (application.getSponsorship().getType()
-                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                    .GOLD) return 1;
-                            return 2; // SILVER gets third priority
+                            return application.getSponsorship().getType().tierRank();
                           }
-                          return 3; // Non-sponsored properties get lowest priority
+                          return 100;
                         })
                     .thenComparing(Property::getCreatedAt, Comparator.reverseOrder()))
             .collect(Collectors.toList());
@@ -460,18 +423,7 @@ public class PropertyServiceImpl implements PropertyService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    PropertyServiceImpl::pickHigherSponsorshipTier));
     return properties.stream()
         .map(
             p -> {
@@ -513,18 +465,7 @@ public class PropertyServiceImpl implements PropertyService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    PropertyServiceImpl::pickHigherSponsorshipTier));
     return properties.stream()
         .map(
             p -> {
@@ -628,21 +569,8 @@ public class PropertyServiceImpl implements PropertyService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    PropertyServiceImpl::pickHigherSponsorshipTier));
 
-    // Sort by sponsorship priority: Premium > Gold > None, then by creation date
-    // (newest first)
     List<Property> sortedProperties =
         properties.stream()
             .sorted(
@@ -651,15 +579,9 @@ public class PropertyServiceImpl implements PropertyService {
                           SponsorshipApplication application =
                               applicationMap.get(p.getRealEstateCompanyId());
                           if (application != null && application.isActive()) {
-                            if (application.getSponsorship().getType()
-                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                    .PREMIUM) return 0;
-                            if (application.getSponsorship().getType()
-                                == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                                    .GOLD) return 1;
-                            return 2; // SILVER gets third priority
+                            return application.getSponsorship().getType().tierRank();
                           }
-                          return 3; // Non-sponsored properties get lowest priority
+                          return 100;
                         })
                     .thenComparing(Property::getCreatedAt, Comparator.reverseOrder()))
             .collect(Collectors.toList());
@@ -912,5 +834,12 @@ public class PropertyServiceImpl implements PropertyService {
         .imageUrl(imageUrl)
         .videoUrl(videoUrl)
         .build();
+  }
+
+  private static SponsorshipApplication pickHigherSponsorshipTier(
+      SponsorshipApplication existing, SponsorshipApplication replacement) {
+    int r = replacement.getSponsorship().getType().tierRank();
+    int e = existing.getSponsorship().getType().tierRank();
+    return r < e ? replacement : existing;
   }
 }

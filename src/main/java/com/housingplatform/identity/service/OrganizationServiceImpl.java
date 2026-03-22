@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.RealEstateAgent;
+import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
@@ -22,8 +23,12 @@ import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -319,13 +324,80 @@ public class OrganizationServiceImpl implements OrganizationService {
         organizationRepository.findByStatus(Organization.OrganizationStatus.APPROVED);
     List<Organization> filtered =
         all.stream().filter(org -> typeSet.contains(org.getType())).collect(Collectors.toList());
+    Set<UUID> marketplaceOrgIds =
+        filtered.stream().map(Organization::getId).collect(Collectors.toSet());
+    Map<UUID, SponsorshipApplication> bestSponsorshipByOrg =
+        resolveBestActiveSponsorshipByOrganizationId(marketplaceOrgIds);
+
     List<OrganizationResponse> responses = new ArrayList<>();
     for (Organization org : filtered) {
       OrganizationResponse resp = organizationMapper.toResponse(org);
       enrichWithMedia(resp, org.getId());
+      SponsorshipApplication active = bestSponsorshipByOrg.get(org.getId());
+      if (active != null && active.getSponsorship() != null) {
+        resp.setIsSponsored(true);
+        resp.setSponsorshipType(active.getSponsorship().getType().name());
+      }
       responses.add(resp);
     }
+    responses.sort(marketplaceOrganizationComparator());
     return responses;
+  }
+
+  /**
+   * For each organization ID, the single best (lowest tier rank) approved active sponsorship
+   * application. Skips suspended organizations.
+   */
+  private Map<UUID, SponsorshipApplication> resolveBestActiveSponsorshipByOrganizationId(
+      Set<UUID> limitToOrgIds) {
+    if (limitToOrgIds == null || limitToOrgIds.isEmpty()) {
+      return Map.of();
+    }
+    LocalDateTime now = LocalDateTime.now();
+    List<SponsorshipApplication> active =
+        sponsorshipApplicationRepository.findAllActiveApplications(now);
+    Map<UUID, SponsorshipApplication> best = new HashMap<>();
+    for (SponsorshipApplication sa : active) {
+      if (sa.getOrganization() == null) {
+        continue;
+      }
+      Organization orgEntity = sa.getOrganization();
+      if (orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
+        continue;
+      }
+      UUID oid = orgEntity.getId();
+      if (!limitToOrgIds.contains(oid)) {
+        continue;
+      }
+      if (sa.getSponsorship() == null) {
+        continue;
+      }
+      best.merge(
+          oid,
+          sa,
+          (a, b) ->
+              a.getSponsorship().getType().tierRank() <= b.getSponsorship().getType().tierRank()
+                  ? a
+                  : b);
+    }
+    return best;
+  }
+
+  private static Comparator<OrganizationResponse> marketplaceOrganizationComparator() {
+    return Comparator.comparingInt(OrganizationServiceImpl::marketplaceSortTierRank)
+        .thenComparing(OrganizationResponse::getName, Comparator.nullsLast(String::compareToIgnoreCase));
+  }
+
+  private static int marketplaceSortTierRank(OrganizationResponse r) {
+    if (!Boolean.TRUE.equals(r.getIsSponsored()) || r.getSponsorshipType() == null) {
+      return 100;
+    }
+    try {
+      return Sponsorship.SponsorshipType.valueOf(r.getSponsorshipType().trim().toUpperCase())
+          .tierRank();
+    } catch (IllegalArgumentException e) {
+      return 100;
+    }
   }
 
   @Override

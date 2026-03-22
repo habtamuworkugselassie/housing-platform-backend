@@ -60,18 +60,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return enrichBuildingResponse(saved, applicationMap);
   }
@@ -93,18 +82,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return enrichBuildingResponse(building, applicationMap);
   }
@@ -121,18 +99,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return buildingRepository.findByRealEstateCompanyId(companyId).stream()
         .map(building -> enrichBuildingResponse(building, applicationMap))
@@ -151,18 +118,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return buildingRepository.findByAgentId(agentId).stream()
         .map(building -> enrichBuildingResponse(building, applicationMap))
@@ -194,18 +150,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return replacement;
-                      if (existing.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) return existing;
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType.GOLD)
-                        return replacement;
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return enrichBuildingResponse(updated, applicationMap);
   }
@@ -290,15 +235,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIUM over GOLD
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
-                        return replacement;
-                      }
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return buildings.stream()
         .map(building -> enrichBuildingResponse(building, applicationMap))
@@ -399,15 +336,7 @@ public class BuildingServiceImpl implements BuildingService {
                 Collectors.toMap(
                     app -> app.getOrganization().getId(),
                     Function.identity(),
-                    (existing, replacement) -> {
-                      // If multiple active applications exist, prefer PREMIUM over GOLD
-                      if (replacement.getSponsorship().getType()
-                          == com.housingplatform.identity.domain.Sponsorship.SponsorshipType
-                              .PREMIUM) {
-                        return replacement;
-                      }
-                      return existing;
-                    }));
+                    BuildingServiceImpl::pickHigherSponsorshipTier));
 
     return buildings.stream()
         .map(building -> enrichBuildingResponse(building, applicationMap))
@@ -473,5 +402,12 @@ public class BuildingServiceImpl implements BuildingService {
     response.setUnits(unitResponses);
 
     return response;
+  }
+
+  private static SponsorshipApplication pickHigherSponsorshipTier(
+      SponsorshipApplication existing, SponsorshipApplication replacement) {
+    int r = replacement.getSponsorship().getType().tierRank();
+    int e = existing.getSponsorship().getType().tierRank();
+    return r < e ? replacement : existing;
   }
 }

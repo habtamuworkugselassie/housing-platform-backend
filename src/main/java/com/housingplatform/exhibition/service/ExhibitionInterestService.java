@@ -5,6 +5,9 @@ import com.housingplatform.exhibition.dto.ExhibitionInterestRequest;
 import com.housingplatform.exhibition.dto.ExhibitionInterestResponse;
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.Sponsorship;
+import com.housingplatform.identity.repository.SponsorshipRepository;
+import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.repository.OrganizationRepository;
@@ -18,9 +21,13 @@ public class ExhibitionInterestService {
 
   private final ExhibitionInterestRepository repository;
   private final OrganizationRepository organizationRepository;
+  private final SponsorshipRepository sponsorshipRepository;
 
   @Transactional
   public ExhibitionInterestResponse register(ExhibitionInterestRequest request) {
+    String interestType = request.getInterestType().trim().toLowerCase();
+    Sponsorship sponsorship = resolveSponsorshipForInterest(interestType, request.getSponsorshipId());
+
     String email = request.getEmail().trim().toLowerCase();
     String company = request.getCompany() != null ? request.getCompany().trim() : null;
     String phoneNumber = request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null;
@@ -54,17 +61,40 @@ public class ExhibitionInterestService {
         ExhibitionInterest.builder()
             .email(email)
             .phoneNumber(phoneNumber)
-            .interestType(request.getInterestType().trim().toLowerCase())
+            .interestType(interestType)
             .company(company)
             .message(request.getMessage() != null ? request.getMessage().trim() : null)
             .organization(organization)
+            .sponsorship(sponsorship)
             .build();
     entity = repository.save(entity);
 
     return toResponse(entity);
   }
 
+  private Sponsorship resolveSponsorshipForInterest(String interestType, java.util.UUID sponsorshipId) {
+    if (!"exhibitor".equals(interestType)) {
+      if (sponsorshipId != null) {
+        throw new BusinessException("Sponsorship package may only be set when registering as an exhibitor");
+      }
+      return null;
+    }
+    if (sponsorshipId == null) {
+      throw new BusinessException("Please select a sponsorship package you are interested in");
+    }
+    Sponsorship s =
+        sponsorshipRepository
+            .findById(sponsorshipId)
+            .orElseThrow(() -> new BusinessException("Unknown sponsorship package"));
+    if (s.getStatus() != Sponsorship.SponsorshipStatus.ACTIVE) {
+      throw new BusinessException("That sponsorship package is not available for selection");
+    }
+    return s;
+  }
+
   private static ExhibitionInterestResponse toResponse(ExhibitionInterest e) {
+    java.util.UUID sid = e.getSponsorship() != null ? e.getSponsorship().getId() : null;
+    String sname = e.getSponsorship() != null ? e.getSponsorship().getName() : null;
     return ExhibitionInterestResponse.builder()
         .id(e.getId())
         .email(e.getEmail())
@@ -73,6 +103,8 @@ public class ExhibitionInterestService {
         .company(e.getCompany())
         .message(e.getMessage())
         .organizationId(e.getOrganization() != null ? e.getOrganization().getId() : null)
+        .sponsorshipId(sid)
+        .sponsorshipPackageName(sname)
         .build();
   }
 }

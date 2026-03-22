@@ -23,4 +23,18 @@ public record DisplaySettingsUpdateRequest(
         @Schema(
             description = "Time before rotating side columns to the next sponsors",
             example = "35000")
-        Long sidebarLayoutRotationMs) {}
+        Long sidebarLayoutRotationMs,
+    @NotNull
+        @Schema(
+            description =
+                "Show the sponsorship packages section (pricing & benefits) on the exhibition"
+                    + " landing page",
+            example = "true")
+        Boolean exhibitionSponsorshipPackagesVisible,
+    @NotNull
+        @Schema(
+            description =
+                "Show base prices on sponsorship package cards and in the details modal on the"
+                    + " exhibition landing page",
+            example = "true")
+        Boolean exhibitionSponsorshipPackagePricesVisible) {}

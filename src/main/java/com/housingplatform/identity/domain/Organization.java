@@ -1,5 +1,6 @@
 package com.housingplatform.identity.domain;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
@@ -145,8 +146,10 @@ public class Organization extends BaseAuditEntity {
   public enum SponsorshipType {
     NONE,
     EXCLUSIVE,
+    @JsonAlias({"PREMIUM"})
+    PLATINUM,
     GOLD,
-    PREMIUM,
-    SILVER
+    SILVER,
+    SPECIAL
   }
 }
