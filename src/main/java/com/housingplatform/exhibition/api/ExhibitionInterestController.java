@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/exhibition/interest")
+@RequestMapping("/api/v1/exhibition/interest")
 @Tag(name = "Exhibition", description = "Exhibition interest (public)")
 @RequiredArgsConstructor
 @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
