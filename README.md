@@ -177,6 +177,7 @@ Key environment variables:
 - `DATABASE_USERNAME`: Database username
 - `DATABASE_PASSWORD`: Database password
 - `FRONTEND_BASE_URL`: Public URL of the frontend (e.g. `https://your-app.com`). Used for password-reset email links. Set as GitHub secret `FRONTEND_BASE_URL` for deploy workflow.
+- `APP_CORS_ALLOWED_ORIGIN_PATTERNS`: Comma-separated CORS origins/patterns (e.g. `https://ethiobuildconnect.et,https://www.ethiobuildconnect.et`). Maps to `app.cors.allowed-origin-patterns`.
 - `REDIS_HOST`: Redis host
 - `REDIS_PORT`: Redis port
 - `KAFKA_BOOTSTRAP_SERVERS`: Kafka bootstrap servers

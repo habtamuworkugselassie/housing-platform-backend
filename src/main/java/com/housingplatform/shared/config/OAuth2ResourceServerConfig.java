@@ -55,7 +55,7 @@ public class OAuth2ResourceServerConfig {
   private String jwtIssuer;
 
   @Value(
-      "${app.cors.allowed-origin-patterns:http://localhost:3000,http://127.0.0.1:3000,http://209.38.204.219*}")
+      "${app.cors.allowed-origin-patterns:http://localhost:3000,http://127.0.0.1:3000,http://209.38.204.219*,https://ethiobuildconnect.et,https://www.ethiobuildconnect.et}")
   private String allowedOriginPatterns;
 
   private final ScopeAuthorizationFilter scopeAuthorizationFilter;
