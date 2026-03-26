@@ -140,7 +140,9 @@ public class Organization extends BaseAuditEntity {
     PENDING_APPROVAL,
     APPROVED,
     REJECTED,
-    SUSPENDED
+    SUSPENDED,
+    /** Awaiting admin sponsorship review; hidden from public marketplace APIs. */
+    SPONSORSHIP_PENDING
   }
 
   public enum SponsorshipType {

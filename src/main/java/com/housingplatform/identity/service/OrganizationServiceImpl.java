@@ -38,6 +38,9 @@ import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -180,6 +183,21 @@ public class OrganizationServiceImpl implements OrganizationService {
         organizationRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
+    if (!canCurrentUserViewOrganization(organization)) {
+      throw new ResourceNotFoundException("Organization", id);
+    }
+    OrganizationResponse response = organizationMapper.toResponse(organization);
+    enrichWithMedia(response, id);
+    return response;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public OrganizationResponse getOrganizationByIdUnrestricted(UUID id) {
+    Organization organization =
+        organizationRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, id);
     return response;
@@ -194,12 +212,57 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
     return organizationRepository
         .findByRegistrationNumber(registrationNumber.trim())
+        .filter(this::canCurrentUserViewOrganization)
         .map(
             org -> {
               OrganizationResponse response = organizationMapper.toResponse(org);
               enrichWithMedia(response, org.getId());
               return response;
             });
+  }
+
+  @Override
+  public void evictListingCachesForOrganization(UUID organizationId) {
+    evictAvailablePropertiesByOrgCache(organizationId);
+    evictSponsorshipCaches();
+  }
+
+  /**
+   * Public marketplace data is only for {@link Organization.OrganizationStatus#APPROVED}
+   * organizations. Members of the organization and admins may still load restricted orgs (e.g. during
+   * sponsorship review).
+   */
+  private boolean canCurrentUserViewOrganization(Organization organization) {
+    if (OrganizationPublicVisibility.isPubliclyListed(organization)) {
+      return true;
+    }
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null
+        || !auth.isAuthenticated()
+        || auth instanceof AnonymousAuthenticationToken) {
+      return false;
+    }
+    if (UserContext.isAdmin()) {
+      return true;
+    }
+    final UUID userId;
+    try {
+      userId = UserContext.getCurrentUserId();
+    } catch (IllegalStateException e) {
+      return false;
+    }
+    if (organization.getPrimaryContact() != null
+        && organization.getPrimaryContact().getId().equals(userId)) {
+      return true;
+    }
+    Optional<UUID> jwtOrg = UserContext.getCurrentUserOrganizationId();
+    if (jwtOrg.isPresent() && jwtOrg.get().equals(organization.getId())) {
+      return true;
+    }
+    return realEstateAgentRepository
+        .findByUserId(userId)
+        .map(a -> a.getOrganizationId().equals(organization.getId()))
+        .orElse(false);
   }
 
   @Override
@@ -362,7 +425,8 @@ public class OrganizationServiceImpl implements OrganizationService {
         continue;
       }
       Organization orgEntity = sa.getOrganization();
-      if (orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
+      if (orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED
+          || orgEntity.getStatus() == Organization.OrganizationStatus.SPONSORSHIP_PENDING) {
         continue;
       }
       UUID oid = orgEntity.getId();

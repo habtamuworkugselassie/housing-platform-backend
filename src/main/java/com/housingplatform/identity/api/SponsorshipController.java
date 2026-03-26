@@ -207,12 +207,41 @@ public class SponsorshipController {
   @AuthActionScope("sponsorships.approve")
   @Operation(
       summary = "Approve application",
-      description = "Approve a sponsorship application (admin only)")
+      description =
+          "Approve a sponsorship application (admin only). Requires organization and user"
+              + " verification first unless created via admin auto-approve.")
   public ResponseEntity<SponsorshipApplicationResponse> approveApplication(
       @PathVariable UUID id, @RequestBody(required = false) java.util.Map<String, String> body) {
     String notes = body != null ? body.get("notes") : null;
     SponsorshipApplicationResponse approved = sponsorshipService.approveApplication(id, notes);
     return ResponseEntity.ok(approved);
+  }
+
+  @PutMapping("/applications/{id}/verify-organization")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @AuthActionScope("sponsorships.approve")
+  @Operation(
+      summary = "Verify organization for sponsorship application",
+      description = "Mark organization documents/details as verified (admin only).")
+  public ResponseEntity<SponsorshipApplicationResponse> verifyOrganizationForApplication(
+      @PathVariable UUID id) {
+    return ResponseEntity.ok(sponsorshipService.verifyOrganizationForApplication(id));
+  }
+
+  @PutMapping("/applications/{id}/verify-user")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @AuthActionScope("sponsorships.approve")
+  @Operation(
+      summary = "Verify user for sponsorship application",
+      description =
+          "If the organization already has a primary contact user or a super agent, marks user "
+              + "verification. If there is only a lead/org contact email and no login yet, the body "
+              + "must include firstName, lastName, and password so the primary user is created (email "
+              + "= organization contact).")
+  public ResponseEntity<SponsorshipApplicationResponse> verifyUserForApplication(
+      @PathVariable UUID id,
+      @RequestBody(required = false) @Valid ProvisionOrganizationPrimaryUserRequest body) {
+    return ResponseEntity.ok(sponsorshipService.verifyUserForApplication(id, body));
   }
 
   @PutMapping("/applications/{id}/reject")

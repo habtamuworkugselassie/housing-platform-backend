@@ -30,4 +30,10 @@ public class AdminExhibitionInterestResponse {
 
   private UUID sponsorshipId;
   private String sponsorshipPackageName;
+
+  /** When set, admin has verified the exhibition registrant contact (email/phone). */
+  private LocalDateTime contactVerifiedAt;
+
+  /** Platform user id when a primary contact user exists for the linked organization. */
+  private UUID primaryContactUserId;
 }

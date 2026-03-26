@@ -11,6 +11,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ExhibitionInterestRepository extends JpaRepository<ExhibitionInterest, UUID> {
 
-  @EntityGraph(attributePaths = {"organization", "sponsorship"})
+  @EntityGraph(
+      attributePaths = {
+        "organization",
+        "organization.contact",
+        "organization.contact.phones",
+        "organization.primaryContact",
+        "sponsorship"
+      })
   Page<ExhibitionInterest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

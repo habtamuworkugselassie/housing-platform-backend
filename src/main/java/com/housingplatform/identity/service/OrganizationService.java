@@ -17,8 +17,17 @@ public interface OrganizationService {
 
   OrganizationResponse getOrganizationById(UUID id);
 
+  /**
+   * Load organization without marketplace visibility checks (e.g. internal enrichment). Prefer {@link
+   * #getOrganizationById(UUID)} for API responses.
+   */
+  OrganizationResponse getOrganizationByIdUnrestricted(UUID id);
+
   /** Public lookup by registration number (e.g. footer base org). Empty if not found. */
   Optional<OrganizationResponse> getOrganizationByRegistrationNumber(String registrationNumber);
+
+  /** Evict caches that depend on organization visibility or listing (properties-by-org, sponsorship). */
+  void evictListingCachesForOrganization(UUID organizationId);
 
   OrganizationResponse getMyOrganization();
 

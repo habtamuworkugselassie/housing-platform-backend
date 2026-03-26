@@ -1,10 +1,15 @@
 package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationContact;
+import com.housingplatform.identity.domain.OrganizationPhone;
+import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.identity.domain.SponsorshipApplication;
+import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.*;
 import com.housingplatform.identity.repository.OrganizationRepository;
+import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.repository.SponsorshipRepository;
 import com.housingplatform.shared.exception.BusinessException;
@@ -28,7 +33,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   private final SponsorshipRepository sponsorshipRepository;
   private final SponsorshipApplicationRepository applicationRepository;
   private final OrganizationRepository organizationRepository;
+  private final RealEstateAgentRepository realEstateAgentRepository;
   private final OrganizationService organizationService;
+  private final OrganizationPrimaryUserProvisioningService organizationPrimaryUserProvisioningService;
 
   // ========== Sponsorship Package Management (Admin Only) ==========
 
@@ -143,27 +150,38 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   // ========== Sponsorship Application Management ==========
 
   @Override
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public SponsorshipApplicationResponse applyForSponsorship(
       UUID organizationId, SponsorshipApplicationRequest request) {
-    // Validate organization exists
     Organization organization =
         organizationRepository
             .findById(organizationId)
             .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
 
-    // Validate sponsorship exists
+    if (organization.getStatus() != Organization.OrganizationStatus.APPROVED) {
+      throw new BusinessException(
+          "Only approved organizations can apply for sponsorship; current status is "
+              + organization.getStatus());
+    }
+
+    if (applicationRepository.existsByOrganization_IdAndStatus(
+        organizationId, SponsorshipApplication.ApplicationStatus.PENDING)) {
+      throw new BusinessException(
+          "A pending sponsorship application already exists for this organization");
+    }
+
     Sponsorship sponsorship =
         sponsorshipRepository
             .findById(request.getSponsorshipId())
             .orElseThrow(
                 () -> new ResourceNotFoundException("Sponsorship", request.getSponsorshipId()));
 
-    // Check if sponsorship is active
     if (sponsorship.getStatus() != Sponsorship.SponsorshipStatus.ACTIVE) {
       throw new BusinessException("Cannot apply for inactive sponsorship");
     }
 
-    // Validate dates
     if (request.getEndDate().isBefore(request.getStartDate())) {
       throw new BusinessException("End date must be after start date");
     }
@@ -173,7 +191,6 @@ public class SponsorshipServiceImpl implements SponsorshipService {
       throw new BusinessException("End date must be in the future");
     }
 
-    // Check for overlapping approved applications
     List<SponsorshipApplication> existingApplications =
         applicationRepository.findBySponsorshipIdAndOrganizationIdAndStatus(
             request.getSponsorshipId(),
@@ -191,7 +208,6 @@ public class SponsorshipServiceImpl implements SponsorshipService {
       }
     }
 
-    // Create application
     SponsorshipApplication application =
         SponsorshipApplication.builder()
             .sponsorship(sponsorship)
@@ -202,9 +218,78 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             .notes(request.getNotes())
             .amount(request.getAmount())
             .paymentReference(request.getPaymentReference())
+            .organizationWasApprovedBeforeApplication(true)
             .build();
 
     SponsorshipApplication saved = applicationRepository.save(application);
+
+    organization.setStatus(Organization.OrganizationStatus.SPONSORSHIP_PENDING);
+    organizationRepository.save(organization);
+    organizationService.evictListingCachesForOrganization(organizationId);
+
+    return toApplicationResponse(saved);
+  }
+
+  @Override
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
+  public SponsorshipApplicationResponse createPendingApplicationForExhibitionInterest(
+      UUID organizationId, UUID sponsorshipId, String registrantMessage) {
+    if (applicationRepository.existsByOrganization_IdAndStatus(
+        organizationId, SponsorshipApplication.ApplicationStatus.PENDING)) {
+      return applicationRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
+          .filter(a -> a.getStatus() == SponsorshipApplication.ApplicationStatus.PENDING)
+          .findFirst()
+          .map(this::toApplicationResponse)
+          .orElseThrow(
+              () ->
+                  new BusinessException(
+                      "Pending sponsorship application expected but was not found for organization"));
+    }
+
+    Organization organization =
+        organizationRepository
+            .findById(organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
+
+    Sponsorship sponsorship =
+        sponsorshipRepository
+            .findById(sponsorshipId)
+            .orElseThrow(() -> new ResourceNotFoundException("Sponsorship", sponsorshipId));
+
+    if (sponsorship.getStatus() != Sponsorship.SponsorshipStatus.ACTIVE) {
+      throw new BusinessException("Cannot apply for inactive sponsorship");
+    }
+
+    LocalDateTime start = LocalDateTime.now();
+    LocalDateTime end = start.plusYears(1);
+
+    StringBuilder notes = new StringBuilder("Exhibition interest registration");
+    if (registrantMessage != null && !registrantMessage.trim().isEmpty()) {
+      String trimmed = registrantMessage.trim();
+      if (trimmed.length() > 800) {
+        trimmed = trimmed.substring(0, 800) + "…";
+      }
+      notes.append(": ").append(trimmed);
+    }
+
+    SponsorshipApplication application =
+        SponsorshipApplication.builder()
+            .sponsorship(sponsorship)
+            .organization(organization)
+            .status(SponsorshipApplication.ApplicationStatus.PENDING)
+            .startDate(start)
+            .endDate(end)
+            .notes(notes.toString())
+            .amount(sponsorship.getBasePrice())
+            .organizationWasApprovedBeforeApplication(false)
+            .build();
+
+    SponsorshipApplication saved = applicationRepository.save(application);
+    organization.setStatus(Organization.OrganizationStatus.SPONSORSHIP_PENDING);
+    organizationRepository.save(organization);
+    organizationService.evictListingCachesForOrganization(organizationId);
     return toApplicationResponse(saved);
   }
 
@@ -249,6 +334,11 @@ public class SponsorshipServiceImpl implements SponsorshipService {
       value = {"sponsoredOrganizations", "exclusiveOrganizations"},
       allEntries = true)
   public SponsorshipApplicationResponse approveApplication(UUID id, String notes) {
+    return approveApplicationInternal(id, notes, true);
+  }
+
+  private SponsorshipApplicationResponse approveApplicationInternal(
+      UUID id, String notes, boolean requireVerification) {
     SponsorshipApplication application =
         applicationRepository
             .findById(id)
@@ -258,7 +348,17 @@ public class SponsorshipServiceImpl implements SponsorshipService {
       throw new BusinessException("Only pending applications can be approved");
     }
 
-    // Cancel any other approved applications that overlap
+    if (requireVerification) {
+      if (application.getOrganizationVerifiedAt() == null || application.getUserVerifiedAt() == null) {
+        throw new BusinessException(
+            "Organization and user must both be verified before approving this sponsorship");
+      }
+    }
+
+    Organization org = application.getOrganization();
+    org.setStatus(Organization.OrganizationStatus.APPROVED);
+    organizationRepository.save(org);
+
     List<SponsorshipApplication> overlapping =
         applicationRepository.findByOrganizationId(application.getOrganization().getId()).stream()
             .filter(
@@ -285,10 +385,77 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     }
 
     SponsorshipApplication saved = applicationRepository.save(application);
+    organizationService.evictListingCachesForOrganization(org.getId());
     return toApplicationResponse(saved);
   }
 
   @Override
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
+  public SponsorshipApplicationResponse verifyOrganizationForApplication(UUID id) {
+    SponsorshipApplication application =
+        applicationRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SponsorshipApplication", id));
+    if (application.getStatus() != SponsorshipApplication.ApplicationStatus.PENDING) {
+      throw new BusinessException("Only pending applications can be verified");
+    }
+    application.setOrganizationVerifiedAt(LocalDateTime.now());
+    SponsorshipApplication saved = applicationRepository.save(application);
+    return toApplicationResponse(saved);
+  }
+
+  @Override
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
+  public SponsorshipApplicationResponse verifyUserForApplication(
+      UUID id, ProvisionOrganizationPrimaryUserRequest provisionRequest) {
+    SponsorshipApplication application =
+        applicationRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SponsorshipApplication", id));
+    if (application.getStatus() != SponsorshipApplication.ApplicationStatus.PENDING) {
+      throw new BusinessException("Only pending applications can be verified");
+    }
+    Organization org =
+        organizationRepository
+            .findById(application.getOrganization().getId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Organization", application.getOrganization().getId()));
+
+    if (resolveVerificationUser(org).isPresent()) {
+      application.setUserVerifiedAt(LocalDateTime.now());
+      SponsorshipApplication saved = applicationRepository.save(application);
+      return toApplicationResponse(saved);
+    }
+
+    if (verificationSubjectFromContact(org) == null) {
+      throw new BusinessException(
+          "No primary contact, super agent, or organization contact email found for this organization");
+    }
+
+    if (provisionRequest == null) {
+      throw new BusinessException(
+          "Include firstName, lastName, and password in the request body to create the organization's primary user "
+              + "(login uses the organization contact email from the registration).");
+    }
+
+    organizationPrimaryUserProvisioningService.provisionPrimaryContactIfMissing(
+        org, provisionRequest, null, null);
+    application.setUserVerifiedAt(LocalDateTime.now());
+    SponsorshipApplication saved = applicationRepository.save(application);
+    organizationService.evictListingCachesForOrganization(org.getId());
+    return toApplicationResponse(saved);
+  }
+
+  @Override
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
   public SponsorshipApplicationResponse rejectApplication(UUID id, String reason) {
     SponsorshipApplication application =
         applicationRepository
@@ -301,8 +468,15 @@ public class SponsorshipServiceImpl implements SponsorshipService {
 
     application.setStatus(SponsorshipApplication.ApplicationStatus.REJECTED);
     application.setRejectionReason(reason);
+    application.setOrganizationVerifiedAt(null);
+    application.setUserVerifiedAt(null);
+
+    Organization org = application.getOrganization();
+    restoreOrganizationStatusAfterPendingRemoval(org, application);
+    organizationRepository.save(org);
 
     SponsorshipApplication saved = applicationRepository.save(application);
+    organizationService.evictListingCachesForOrganization(org.getId());
     return toApplicationResponse(saved);
   }
 
@@ -316,8 +490,6 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("SponsorshipApplication", id));
 
-    // Admin can cancel any; realtor can cancel only their organization's
-    // application
     if (!UserContext.isAdmin()) {
       UUID userOrgId =
           UserContext.getCurrentUserOrganizationId()
@@ -332,10 +504,21 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     }
 
     if (application.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED) {
+      UUID orgId = application.getOrganization().getId();
       application.setStatus(SponsorshipApplication.ApplicationStatus.CANCELLED);
       applicationRepository.save(application);
+      organizationService.evictListingCachesForOrganization(orgId);
+    } else if (application.getStatus() == SponsorshipApplication.ApplicationStatus.PENDING) {
+      application.setStatus(SponsorshipApplication.ApplicationStatus.CANCELLED);
+      application.setOrganizationVerifiedAt(null);
+      application.setUserVerifiedAt(null);
+      Organization org = application.getOrganization();
+      restoreOrganizationStatusAfterPendingRemoval(org, application);
+      organizationRepository.save(org);
+      applicationRepository.save(application);
+      organizationService.evictListingCachesForOrganization(org.getId());
     } else {
-      throw new BusinessException("Only approved applications can be cancelled");
+      throw new BusinessException("Only approved or pending applications can be cancelled");
     }
   }
 
@@ -359,9 +542,58 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     SponsorshipApplicationResponse application =
         applyForSponsorship(request.getOrganizationId(), appRequest);
     if (Boolean.TRUE.equals(request.getAutoApprove())) {
-      application = approveApplication(application.getId(), request.getNotes());
+      application = approveApplicationInternal(application.getId(), request.getNotes(), false);
     }
     return application;
+  }
+
+  /**
+   * User to verify: primary contact when set; otherwise the organization's super agent.
+   */
+  private java.util.Optional<User> resolveVerificationUser(Organization organization) {
+    if (organization.getPrimaryContact() != null) {
+      return java.util.Optional.of(organization.getPrimaryContact());
+    }
+    return realEstateAgentRepository
+        .findSuperAgentByOrganizationId(organization.getId())
+        .map(RealEstateAgent::getUser);
+  }
+
+  /**
+   * Exhibition (and similar) signups: registrant email/phone on {@link OrganizationContact} when no
+   * platform user is linked yet.
+   */
+  private SponsorshipVerificationUserSummary verificationSubjectFromContact(Organization organization) {
+    OrganizationContact contact = organization.getContact();
+    if (contact == null) {
+      return null;
+    }
+    String email = contact.getEmail();
+    if (email == null || email.isBlank()) {
+      return null;
+    }
+    String phone =
+        contact.getPhones().stream()
+            .findFirst()
+            .map(OrganizationPhone::getNumber)
+            .filter(n -> n != null && !n.isBlank())
+            .orElse(null);
+    return SponsorshipVerificationUserSummary.builder()
+        .id(null)
+        .email(email.trim())
+        .firstName(null)
+        .lastName(null)
+        .phoneNumber(phone)
+        .build();
+  }
+
+  private void restoreOrganizationStatusAfterPendingRemoval(
+      Organization org, SponsorshipApplication application) {
+    if (Boolean.FALSE.equals(application.getOrganizationWasApprovedBeforeApplication())) {
+      org.setStatus(Organization.OrganizationStatus.PENDING_APPROVAL);
+    } else {
+      org.setStatus(Organization.OrganizationStatus.APPROVED);
+    }
   }
 
   // ========== Helper Methods ==========
@@ -382,13 +614,29 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   }
 
   private SponsorshipApplicationResponse toApplicationResponse(SponsorshipApplication application) {
+    Organization org = application.getOrganization();
+    User verificationSubject = resolveVerificationUser(org).orElse(null);
+    SponsorshipVerificationUserSummary verificationUser;
+    if (verificationSubject != null) {
+      verificationUser =
+          SponsorshipVerificationUserSummary.builder()
+              .id(verificationSubject.getId())
+              .email(verificationSubject.getEmail())
+              .firstName(verificationSubject.getFirstName())
+              .lastName(verificationSubject.getLastName())
+              .phoneNumber(verificationSubject.getPhoneNumber())
+              .build();
+    } else {
+      verificationUser = verificationSubjectFromContact(org);
+    }
     return SponsorshipApplicationResponse.builder()
         .id(application.getId())
         .sponsorshipId(application.getSponsorship().getId())
         .sponsorshipName(application.getSponsorship().getName())
         .sponsorship(toSponsorshipResponse(application.getSponsorship()))
-        .organizationId(application.getOrganization().getId())
-        .organizationName(application.getOrganization().getName())
+        .organizationId(org.getId())
+        .organizationName(org.getName())
+        .organizationStatus(org.getStatus())
         .status(application.getStatus())
         .startDate(application.getStartDate())
         .endDate(application.getEndDate())
@@ -399,6 +647,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
         .paymentReference(application.getPaymentReference())
         .createdAt(application.getCreatedAt())
         .updatedAt(application.getUpdatedAt())
+        .organizationVerifiedAt(application.getOrganizationVerifiedAt())
+        .userVerifiedAt(application.getUserVerifiedAt())
+        .verificationUser(verificationUser)
         .build();
   }
 
@@ -416,10 +667,12 @@ public class SponsorshipServiceImpl implements SponsorshipService {
               // carousel)
               Organization orgEntity = app.getOrganization();
               if (orgEntity == null
-                  || orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED) {
+                  || orgEntity.getStatus() == Organization.OrganizationStatus.SUSPENDED
+                  || orgEntity.getStatus() == Organization.OrganizationStatus.SPONSORSHIP_PENDING) {
                 return null;
               }
-              OrganizationResponse org = organizationService.getOrganizationById(orgEntity.getId());
+              OrganizationResponse org =
+                  organizationService.getOrganizationByIdUnrestricted(orgEntity.getId());
               String videoUrl = null;
               String splashImageUrl = null;
               if (org.getMedia() != null) {

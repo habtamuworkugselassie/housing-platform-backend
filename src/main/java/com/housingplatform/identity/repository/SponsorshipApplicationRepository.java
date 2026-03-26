@@ -18,6 +18,9 @@ public interface SponsorshipApplicationRepository
 
   List<SponsorshipApplication> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+  boolean existsByOrganization_IdAndStatus(
+      UUID organizationId, SponsorshipApplication.ApplicationStatus status);
+
   List<SponsorshipApplication> findBySponsorshipId(UUID sponsorshipId);
 
   List<SponsorshipApplication> findByStatus(SponsorshipApplication.ApplicationStatus status);

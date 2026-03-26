@@ -1,5 +1,6 @@
 package com.housingplatform.identity.dto;
 
+import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.SponsorshipApplication;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -19,6 +20,8 @@ public class SponsorshipApplicationResponse {
   private SponsorshipResponse sponsorship;
   private UUID organizationId;
   private String organizationName;
+  /** Organization lifecycle status at time of response (e.g. SPONSORSHIP_PENDING during review). */
+  private Organization.OrganizationStatus organizationStatus;
   private SponsorshipApplication.ApplicationStatus status;
   private LocalDateTime startDate;
   private LocalDateTime endDate;
@@ -29,4 +32,10 @@ public class SponsorshipApplicationResponse {
   private String paymentReference;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+
+  private LocalDateTime organizationVerifiedAt;
+  private LocalDateTime userVerifiedAt;
+
+  /** User to verify: primary contact if set, otherwise super agent. */
+  private SponsorshipVerificationUserSummary verificationUser;
 }

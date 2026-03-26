@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
+import com.housingplatform.identity.service.OrganizationPublicVisibility;
 import com.housingplatform.property.domain.Building;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.BuildingRequest;
@@ -205,7 +206,7 @@ public class BuildingServiceImpl implements BuildingService {
       buildings = buildingRepository.findAll();
     }
 
-    // Exclude buildings belonging to suspended organizations (public list)
+    // Exclude buildings for organizations not publicly listed (public list)
     if (!buildings.isEmpty()) {
       java.util.Set<UUID> companyIds =
           buildings.stream()
@@ -220,8 +221,7 @@ public class BuildingServiceImpl implements BuildingService {
               .filter(
                   b -> {
                     Organization org = orgsMap.get(b.getRealEstateCompanyId());
-                    return org == null
-                        || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                    return org == null || OrganizationPublicVisibility.isPubliclyListed(org);
                   })
               .collect(Collectors.toList());
     }
@@ -306,7 +306,7 @@ public class BuildingServiceImpl implements BuildingService {
       buildings = buildings.stream().limit(limit).collect(Collectors.toList());
     }
 
-    // Exclude buildings belonging to suspended organizations (public search)
+    // Exclude buildings for organizations not publicly listed (public search)
     if (!buildings.isEmpty()) {
       java.util.Set<UUID> companyIds =
           buildings.stream()
@@ -321,8 +321,7 @@ public class BuildingServiceImpl implements BuildingService {
               .filter(
                   b -> {
                     Organization org = orgsMap.get(b.getRealEstateCompanyId());
-                    return org == null
-                        || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                    return org == null || OrganizationPublicVisibility.isPubliclyListed(org);
                   })
               .collect(Collectors.toList());
     }

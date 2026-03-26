@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
+import com.housingplatform.identity.service.OrganizationPublicVisibility;
 import com.housingplatform.identity.service.RealEstateAgentService;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
@@ -190,15 +191,14 @@ public class PropertyServiceImpl implements PropertyService {
             : organizationRepository.findAllById(organizationIds).stream()
                 .collect(Collectors.toMap(Organization::getId, Function.identity()));
 
-    // For public access, hide properties belonging to suspended organizations
+    // For public access, only list properties for organizations visible on the marketplace
     if (publicOnly && !organizationsMap.isEmpty()) {
       allProperties =
           allProperties.stream()
               .filter(
                   p -> {
                     Organization org = organizationsMap.get(p.getRealEstateCompanyId());
-                    return org == null
-                        || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                    return org == null || OrganizationPublicVisibility.isPubliclyListed(org);
                   })
               .collect(Collectors.toList());
     }
@@ -398,6 +398,11 @@ public class PropertyServiceImpl implements PropertyService {
   @Transactional(readOnly = true)
   @Cacheable(value = "availablePropertiesByOrg")
   public List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId) {
+    Organization companyOrg =
+        organizationRepository.findById(companyId).orElse(null);
+    if (companyOrg == null || !OrganizationPublicVisibility.isPubliclyListed(companyOrg)) {
+      return List.of();
+    }
     List<Property> properties =
         propertyRepository.findByRealEstateCompanyId(companyId).stream()
             .filter(p -> p.getStatus() == Property.PropertyStatus.AVAILABLE)
@@ -586,14 +591,13 @@ public class PropertyServiceImpl implements PropertyService {
                     .thenComparing(Property::getCreatedAt, Comparator.reverseOrder()))
             .collect(Collectors.toList());
 
-    // Exclude properties from suspended organizations (public search)
+    // Exclude properties from organizations not publicly listed (public search)
     List<Property> visibleProperties =
         sortedProperties.stream()
             .filter(
                 p -> {
                   Organization org = organizationsMap.get(p.getRealEstateCompanyId());
-                  return org == null
-                      || org.getStatus() != Organization.OrganizationStatus.SUSPENDED;
+                  return org == null || OrganizationPublicVisibility.isPubliclyListed(org);
                 })
             .collect(Collectors.toList());
 

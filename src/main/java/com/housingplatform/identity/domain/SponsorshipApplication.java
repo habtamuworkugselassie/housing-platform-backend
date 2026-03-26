@@ -43,6 +43,23 @@ public class SponsorshipApplication extends BaseAuditEntity {
 
   private String paymentReference;
 
+  /** Set when an admin verifies organization documents/details for this application. */
+  private LocalDateTime organizationVerifiedAt;
+
+  /**
+   * Set when an admin verifies the primary contact (or super agent) user for this application.
+   */
+  private LocalDateTime userVerifiedAt;
+
+  /**
+   * When false, the organization was not yet APPROVED when this application was created (e.g.
+   * exhibition exhibitor signup). Reject/cancel pending restores {@code PENDING_APPROVAL} instead
+   * of {@code APPROVED}.
+   */
+  @Column(name = "organization_was_approved_before_application", nullable = false)
+  @Builder.Default
+  private Boolean organizationWasApprovedBeforeApplication = true;
+
   public boolean isActive() {
     if (status != ApplicationStatus.APPROVED) {
       return false;

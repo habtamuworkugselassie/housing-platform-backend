@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.shared.domain.BaseEntity;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -38,4 +39,8 @@ public class ExhibitionInterest extends BaseEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "sponsorship_id")
   private Sponsorship sponsorship;
+
+  /** Set when an admin confirms the registrant email/phone (exhibition lead workflow). */
+  @Column(name = "contact_verified_at")
+  private LocalDateTime contactVerifiedAt;
 }

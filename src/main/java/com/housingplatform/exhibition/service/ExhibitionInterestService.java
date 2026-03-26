@@ -7,6 +7,7 @@ import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.identity.repository.SponsorshipRepository;
+import com.housingplatform.identity.service.SponsorshipService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
@@ -22,6 +23,7 @@ public class ExhibitionInterestService {
   private final ExhibitionInterestRepository repository;
   private final OrganizationRepository organizationRepository;
   private final SponsorshipRepository sponsorshipRepository;
+  private final SponsorshipService sponsorshipService;
 
   @Transactional
   public ExhibitionInterestResponse register(ExhibitionInterestRequest request) {
@@ -68,6 +70,11 @@ public class ExhibitionInterestService {
             .sponsorship(sponsorship)
             .build();
     entity = repository.save(entity);
+
+    if (sponsorship != null) {
+      sponsorshipService.createPendingApplicationForExhibitionInterest(
+          organization.getId(), sponsorship.getId(), request.getMessage());
+    }
 
     return toResponse(entity);
   }
