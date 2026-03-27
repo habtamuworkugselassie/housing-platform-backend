@@ -65,8 +65,7 @@ public class AdminExhibitionInterestService {
         repository
             .findById(interestId)
             .orElseThrow(() -> new ResourceNotFoundException("ExhibitionInterest", interestId));
-    final UUID organizationId =
-        e.getOrganization() != null ? e.getOrganization().getId() : null;
+    final UUID organizationId = e.getOrganization() != null ? e.getOrganization().getId() : null;
     Organization org =
         organizationId != null
             ? organizationRepository

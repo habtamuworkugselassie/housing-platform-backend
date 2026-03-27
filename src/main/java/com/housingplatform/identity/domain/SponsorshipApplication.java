@@ -46,9 +46,7 @@ public class SponsorshipApplication extends BaseAuditEntity {
   /** Set when an admin verifies organization documents/details for this application. */
   private LocalDateTime organizationVerifiedAt;
 
-  /**
-   * Set when an admin verifies the primary contact (or super agent) user for this application.
-   */
+  /** Set when an admin verifies the primary contact (or super agent) user for this application. */
   private LocalDateTime userVerifiedAt;
 
   /**

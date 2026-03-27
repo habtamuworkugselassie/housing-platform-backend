@@ -398,8 +398,7 @@ public class PropertyServiceImpl implements PropertyService {
   @Transactional(readOnly = true)
   @Cacheable(value = "availablePropertiesByOrg")
   public List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId) {
-    Organization companyOrg =
-        organizationRepository.findById(companyId).orElse(null);
+    Organization companyOrg = organizationRepository.findById(companyId).orElse(null);
     if (companyOrg == null || !OrganizationPublicVisibility.isPubliclyListed(companyOrg)) {
       return List.of();
     }

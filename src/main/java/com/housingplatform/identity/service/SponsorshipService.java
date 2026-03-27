@@ -25,8 +25,8 @@ public interface SponsorshipService {
 
   /**
    * Creates a pending sponsorship application when an exhibitor registers interest on the public
-   * exhibition page (organization may still be {@code PENDING_APPROVAL}). Idempotent when a
-   * pending application already exists (returns existing).
+   * exhibition page (organization may still be {@code PENDING_APPROVAL}). Idempotent when a pending
+   * application already exists (returns existing).
    */
   SponsorshipApplicationResponse createPendingApplicationForExhibitionInterest(
       UUID organizationId, UUID sponsorshipId, String registrantMessage);

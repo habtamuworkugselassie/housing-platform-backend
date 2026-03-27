@@ -27,7 +27,8 @@ public interface PropertyMapper {
           property.getImages().stream()
               .map(
                   img -> {
-                    // Prefer disk URL (/api/v1/uploads/...) like organization media; else legacy BYTEA
+                    // Prefer disk URL (/api/v1/uploads/...) like organization media; else legacy
+                    // BYTEA
                     String imageUrl =
                         img.getImageUrl() != null && !img.getImageUrl().isBlank()
                             ? img.getImageUrl()

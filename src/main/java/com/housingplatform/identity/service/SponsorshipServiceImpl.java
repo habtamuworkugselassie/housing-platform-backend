@@ -35,7 +35,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   private final OrganizationRepository organizationRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
   private final OrganizationService organizationService;
-  private final OrganizationPrimaryUserProvisioningService organizationPrimaryUserProvisioningService;
+  private final OrganizationPrimaryUserProvisioningService
+      organizationPrimaryUserProvisioningService;
 
   // ========== Sponsorship Package Management (Admin Only) ==========
 
@@ -349,7 +350,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     }
 
     if (requireVerification) {
-      if (application.getOrganizationVerifiedAt() == null || application.getUserVerifiedAt() == null) {
+      if (application.getOrganizationVerifiedAt() == null
+          || application.getUserVerifiedAt() == null) {
         throw new BusinessException(
             "Organization and user must both be verified before approving this sponsorship");
       }
@@ -547,9 +549,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     return application;
   }
 
-  /**
-   * User to verify: primary contact when set; otherwise the organization's super agent.
-   */
+  /** User to verify: primary contact when set; otherwise the organization's super agent. */
   private java.util.Optional<User> resolveVerificationUser(Organization organization) {
     if (organization.getPrimaryContact() != null) {
       return java.util.Optional.of(organization.getPrimaryContact());
@@ -563,7 +563,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
    * Exhibition (and similar) signups: registrant email/phone on {@link OrganizationContact} when no
    * platform user is linked yet.
    */
-  private SponsorshipVerificationUserSummary verificationSubjectFromContact(Organization organization) {
+  private SponsorshipVerificationUserSummary verificationSubjectFromContact(
+      Organization organization) {
     OrganizationContact contact = organization.getContact();
     if (contact == null) {
       return null;
@@ -700,8 +701,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                   .country(org.getCountry())
                   .sponsorshipType(app.getSponsorship().getType().name())
                   .basePrice(app.getSponsorship().getBasePrice())
-                  .organizationType(
-                      org.getType() != null ? org.getType().name() : null)
+                  .organizationType(org.getType() != null ? org.getType().name() : null)
                   .build();
             })
         .filter(r -> r != null)

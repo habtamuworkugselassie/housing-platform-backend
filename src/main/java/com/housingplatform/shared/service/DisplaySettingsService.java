@@ -84,7 +84,9 @@ public class DisplaySettingsService {
         Boolean.TRUE.equals(request.exhibitionSponsorshipPackagesVisible()) ? "true" : "false");
     upsert(
         KEY_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE,
-        Boolean.TRUE.equals(request.exhibitionSponsorshipPackagePricesVisible()) ? "true" : "false");
+        Boolean.TRUE.equals(request.exhibitionSponsorshipPackagePricesVisible())
+            ? "true"
+            : "false");
     return getDisplaySettings();
   }
 

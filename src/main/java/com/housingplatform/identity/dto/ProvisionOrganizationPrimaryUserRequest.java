@@ -9,8 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Admin sets the first password (and display name) for the organization's primary login. Login email
- * is always the organization contact email (or the same email submitted on the lead form).
+ * Admin sets the first password (and display name) for the organization's primary login. Login
+ * email is always the organization contact email (or the same email submitted on the lead form).
  */
 @Data
 @Builder

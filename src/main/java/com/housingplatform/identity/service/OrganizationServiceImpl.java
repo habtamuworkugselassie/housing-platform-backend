@@ -229,17 +229,15 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   /**
    * Public marketplace data is only for {@link Organization.OrganizationStatus#APPROVED}
-   * organizations. Members of the organization and admins may still load restricted orgs (e.g. during
-   * sponsorship review).
+   * organizations. Members of the organization and admins may still load restricted orgs (e.g.
+   * during sponsorship review).
    */
   private boolean canCurrentUserViewOrganization(Organization organization) {
     if (OrganizationPublicVisibility.isPubliclyListed(organization)) {
       return true;
     }
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null
-        || !auth.isAuthenticated()
-        || auth instanceof AnonymousAuthenticationToken) {
+    if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
       return false;
     }
     if (UserContext.isAdmin()) {
@@ -449,7 +447,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   private static Comparator<OrganizationResponse> marketplaceOrganizationComparator() {
     return Comparator.comparingInt(OrganizationServiceImpl::marketplaceSortTierRank)
-        .thenComparing(OrganizationResponse::getName, Comparator.nullsLast(String::compareToIgnoreCase));
+        .thenComparing(
+            OrganizationResponse::getName, Comparator.nullsLast(String::compareToIgnoreCase));
   }
 
   private static int marketplaceSortTierRank(OrganizationResponse r) {

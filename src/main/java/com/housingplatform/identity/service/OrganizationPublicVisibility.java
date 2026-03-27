@@ -11,7 +11,7 @@ public final class OrganizationPublicVisibility {
    * True when the organization may appear on public listings (marketplace, property search, etc.).
    * Only {@link Organization.OrganizationStatus#APPROVED} organizations are listed publicly.
    */
-  public static boolean isPublliclyListed(Organization organization) {
+  public static boolean isPubliclyListed(Organization organization) {
     if (organization == null) {
       return false;
     }

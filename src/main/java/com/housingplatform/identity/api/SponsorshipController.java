@@ -52,7 +52,8 @@ public class SponsorshipController {
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(
       summary = "Get active sponsorship packages",
-      description = "Public list of active packages (e.g. exhibition landing page pricing and benefits).")
+      description =
+          "Public list of active packages (e.g. exhibition landing page pricing and benefits).")
   public ResponseEntity<List<SponsorshipResponse>> getActiveSponsorships() {
     List<SponsorshipResponse> sponsorships = sponsorshipService.getActiveSponsorships();
     return ResponseEntity.ok(sponsorships);

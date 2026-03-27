@@ -12,8 +12,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MediaAttachmentRepository extends JpaRepository<MediaAttachment, UUID> {
 
-  @Query(
-      "SELECT m FROM MediaAttachment m WHERE m.user.id = :userId ORDER BY m.displayOrder ASC")
+  @Query("SELECT m FROM MediaAttachment m WHERE m.user.id = :userId ORDER BY m.displayOrder ASC")
   List<MediaAttachment> findByUserIdOrderByDisplayOrderAsc(@Param("userId") UUID userId);
 
   List<MediaAttachment> findByPropertyIdOrderByDisplayOrderAsc(UUID propertyId);
@@ -21,8 +20,7 @@ public interface MediaAttachmentRepository extends JpaRepository<MediaAttachment
   List<MediaAttachment> findByOrganizationIdOrderByDisplayOrderAsc(UUID organizationId);
 
   @Query("SELECT m FROM MediaAttachment m WHERE m.id = :id AND m.user.id = :userId")
-  Optional<MediaAttachment> findByIdAndUserId(
-      @Param("id") UUID id, @Param("userId") UUID userId);
+  Optional<MediaAttachment> findByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);
 
   Optional<MediaAttachment> findByIdAndPropertyId(UUID id, UUID propertyId);
 

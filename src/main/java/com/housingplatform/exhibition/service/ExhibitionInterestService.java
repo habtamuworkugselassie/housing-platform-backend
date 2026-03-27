@@ -5,13 +5,13 @@ import com.housingplatform.exhibition.dto.ExhibitionInterestRequest;
 import com.housingplatform.exhibition.dto.ExhibitionInterestResponse;
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationContact;
+import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.Sponsorship;
+import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.SponsorshipRepository;
 import com.housingplatform.identity.service.SponsorshipService;
 import com.housingplatform.shared.exception.BusinessException;
-import com.housingplatform.identity.domain.OrganizationContact;
-import com.housingplatform.identity.domain.OrganizationPhone;
-import com.housingplatform.identity.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +28,8 @@ public class ExhibitionInterestService {
   @Transactional
   public ExhibitionInterestResponse register(ExhibitionInterestRequest request) {
     String interestType = request.getInterestType().trim().toLowerCase();
-    Sponsorship sponsorship = resolveSponsorshipForInterest(interestType, request.getSponsorshipId());
+    Sponsorship sponsorship =
+        resolveSponsorshipForInterest(interestType, request.getSponsorshipId());
 
     String email = request.getEmail().trim().toLowerCase();
     String company = request.getCompany() != null ? request.getCompany().trim() : null;
@@ -79,10 +80,12 @@ public class ExhibitionInterestService {
     return toResponse(entity);
   }
 
-  private Sponsorship resolveSponsorshipForInterest(String interestType, java.util.UUID sponsorshipId) {
+  private Sponsorship resolveSponsorshipForInterest(
+      String interestType, java.util.UUID sponsorshipId) {
     if (!"exhibitor".equals(interestType)) {
       if (sponsorshipId != null) {
-        throw new BusinessException("Sponsorship package may only be set when registering as an exhibitor");
+        throw new BusinessException(
+            "Sponsorship package may only be set when registering as an exhibitor");
       }
       return null;
     }

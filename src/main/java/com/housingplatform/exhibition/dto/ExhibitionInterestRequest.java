@@ -25,7 +25,9 @@ public class ExhibitionInterestRequest {
 
   private String phoneNumber;
 
-  /** Organization type for the created organization (any value of Organization.OrganizationType). */
+  /**
+   * Organization type for the created organization (any value of Organization.OrganizationType).
+   */
   @NotBlank(message = "Organization type is required")
   @Pattern(
       regexp =
