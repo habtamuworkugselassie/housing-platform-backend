@@ -1,9 +1,11 @@
-package com.housingplatform.construction.service;
+package com.housingplatform.construction.service.impl;
 
 import com.housingplatform.construction.domain.Material;
 import com.housingplatform.construction.dto.MaterialRequest;
 import com.housingplatform.construction.dto.MaterialResponse;
 import com.housingplatform.construction.repository.MaterialRepository;
+import com.housingplatform.construction.service.MaterialMapper;
+import com.housingplatform.construction.service.MaterialService;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

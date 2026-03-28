@@ -1,4 +1,4 @@
-package com.housingplatform.identity.service;
+package com.housingplatform.identity.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationContact;
@@ -12,6 +12,9 @@ import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.repository.SponsorshipRepository;
+import com.housingplatform.identity.service.OrganizationPrimaryUserProvisioningService;
+import com.housingplatform.identity.service.OrganizationService;
+import com.housingplatform.identity.service.SponsorshipService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
@@ -429,7 +432,17 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                     new ResourceNotFoundException(
                         "Organization", application.getOrganization().getId()));
 
-    if (resolveVerificationUser(org).isPresent()) {
+    java.util.Optional<User> verificationSubject = resolveVerificationUser(org);
+    if (verificationSubject.isPresent()) {
+      User u = verificationSubject.get();
+      if (u.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
+        if (provisionRequest == null) {
+          throw new BusinessException(
+              "This organization's primary user is pending activation. Include firstName, lastName, and password in the request body.");
+        }
+        organizationPrimaryUserProvisioningService.completePendingPrimaryContact(
+            u, provisionRequest);
+      }
       application.setUserVerifiedAt(LocalDateTime.now());
       SponsorshipApplication saved = applicationRepository.save(application);
       return toApplicationResponse(saved);

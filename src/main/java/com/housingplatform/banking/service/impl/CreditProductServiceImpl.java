@@ -1,9 +1,11 @@
-package com.housingplatform.banking.service;
+package com.housingplatform.banking.service.impl;
 
 import com.housingplatform.banking.domain.CreditProduct;
 import com.housingplatform.banking.dto.CreditProductRequest;
 import com.housingplatform.banking.dto.CreditProductResponse;
 import com.housingplatform.banking.repository.CreditProductRepository;
+import com.housingplatform.banking.service.CreditProductMapper;
+import com.housingplatform.banking.service.CreditProductService;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.UUID;

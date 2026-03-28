@@ -1,4 +1,4 @@
-package com.housingplatform.identity.service;
+package com.housingplatform.identity.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationContact;
@@ -16,6 +16,9 @@ import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.identity.service.OrganizationMapper;
+import com.housingplatform.identity.service.OrganizationPublicVisibility;
+import com.housingplatform.identity.service.OrganizationService;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
 import com.housingplatform.media.service.MediaStorageService;
@@ -100,6 +103,8 @@ public class OrganizationServiceImpl implements OrganizationService {
                     .isSuperAgent(true)
                     .build();
             realEstateAgentRepository.save(superAgent);
+            currentUser.setOrganization(saved);
+            userRepository.save(currentUser);
           } else {
             throw new BusinessException(
                 "User is already registered as a real estate agent for another organization");
@@ -110,6 +115,52 @@ public class OrganizationServiceImpl implements OrganizationService {
         // handle
         // gracefully)
         // This means the organization was created but no agent was linked
+      }
+    } else if (saved.getType() == Organization.OrganizationType.BANK) {
+      try {
+        UUID currentUserId = UserContext.getCurrentUserId();
+        User currentUser =
+            userRepository
+                .findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", currentUserId));
+        if (currentUser.getRoles().contains(User.UserRole.BANKER)) {
+          if (currentUser.getOrganization() != null
+              && !currentUser.getOrganization().getId().equals(saved.getId())) {
+            throw new BusinessException(
+                "You are already linked to another organization. Contact support to change it.");
+          }
+          currentUser.setOrganization(saved);
+          userRepository.save(currentUser);
+          if (saved.getPrimaryContact() == null) {
+            saved.setPrimaryContact(currentUser);
+            organizationRepository.save(saved);
+          }
+        }
+      } catch (IllegalStateException e) {
+        // No security context
+      }
+    } else if (saved.getType() == Organization.OrganizationType.SUPPLIER) {
+      try {
+        UUID currentUserId = UserContext.getCurrentUserId();
+        User currentUser =
+            userRepository
+                .findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", currentUserId));
+        if (currentUser.getRoles().contains(User.UserRole.SUPPLIER)) {
+          if (currentUser.getOrganization() != null
+              && !currentUser.getOrganization().getId().equals(saved.getId())) {
+            throw new BusinessException(
+                "You are already linked to another organization. Contact support to change it.");
+          }
+          currentUser.setOrganization(saved);
+          userRepository.save(currentUser);
+          if (saved.getPrimaryContact() == null) {
+            saved.setPrimaryContact(currentUser);
+            organizationRepository.save(saved);
+          }
+        }
+      } catch (IllegalStateException e) {
+        // No security context
       }
     }
 
@@ -287,24 +338,35 @@ public class OrganizationServiceImpl implements OrganizationService {
   public OrganizationResponse getMyBank() {
     UUID currentUserId = UserContext.getCurrentUserId();
 
-    // Find bank where user is primary contact
     List<Organization> banks =
         organizationRepository.findByType(Organization.OrganizationType.BANK);
-    Organization bank =
+    Optional<Organization> asPrimary =
         banks.stream()
             .filter(
                 b ->
                     b.getPrimaryContact() != null
                         && b.getPrimaryContact().getId().equals(currentUserId))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new ResourceNotFoundException(
-                        "Bank not found for current user. User must be primary contact of a bank organization."));
+            .findFirst();
+    if (asPrimary.isPresent()) {
+      Organization bank = asPrimary.get();
+      OrganizationResponse response = organizationMapper.toResponse(bank);
+      enrichWithMedia(response, bank.getId());
+      return response;
+    }
 
-    OrganizationResponse response = organizationMapper.toResponse(bank);
-    enrichWithMedia(response, bank.getId());
-    return response;
+    User user =
+        userRepository
+            .findById(currentUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", currentUserId));
+    Organization linked = user.getOrganization();
+    if (linked != null && linked.getType() == Organization.OrganizationType.BANK) {
+      OrganizationResponse response = organizationMapper.toResponse(linked);
+      enrichWithMedia(response, linked.getId());
+      return response;
+    }
+
+    throw new ResourceNotFoundException(
+        "Bank not found for current user. Join a verified bank or register a bank organization.");
   }
 
   @Override

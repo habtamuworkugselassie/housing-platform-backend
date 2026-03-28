@@ -1,4 +1,4 @@
-package com.housingplatform.loan.service;
+package com.housingplatform.loan.service.impl;
 
 import com.housingplatform.loan.domain.LoanApplication;
 import com.housingplatform.loan.domain.LoanApplicationStatusHistory;
@@ -7,6 +7,8 @@ import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.dto.LoanApprovalRequest;
 import com.housingplatform.loan.dto.LoanRejectionRequest;
 import com.housingplatform.loan.repository.LoanApplicationRepository;
+import com.housingplatform.loan.service.LoanApplicationMapper;
+import com.housingplatform.loan.service.LoanApplicationService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.time.LocalDateTime;

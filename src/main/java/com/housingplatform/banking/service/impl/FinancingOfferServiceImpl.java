@@ -1,10 +1,12 @@
-package com.housingplatform.banking.service;
+package com.housingplatform.banking.service.impl;
 
 import com.housingplatform.banking.domain.FinancingOffer;
 import com.housingplatform.banking.dto.FinancingOfferRequest;
 import com.housingplatform.banking.dto.FinancingOfferResponse;
 import com.housingplatform.banking.repository.CreditProductRepository;
 import com.housingplatform.banking.repository.FinancingOfferRepository;
+import com.housingplatform.banking.service.FinancingOfferMapper;
+import com.housingplatform.banking.service.FinancingOfferService;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
@@ -33,4 +34,10 @@ public class RegistrationRequest {
 
   @NotNull(message = "Role is required")
   private User.UserRole role;
+
+  /**
+   * Optional. When registering as REALTOR, BANKER, or SUPPLIER, link to an existing
+   * <strong>approved </strong> organization of the matching type (verified on the marketplace).
+   */
+  private UUID organizationId;
 }

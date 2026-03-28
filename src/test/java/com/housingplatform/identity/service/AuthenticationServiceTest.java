@@ -9,9 +9,13 @@ import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AuthResponse;
 import com.housingplatform.identity.dto.LoginRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
+import com.housingplatform.identity.repository.OrganizationRepository;
+import com.housingplatform.identity.repository.PasswordResetTokenRepository;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.identity.service.impl.AuthenticationServiceImpl;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.security.JwtTokenProvider;
+import com.housingplatform.shared.service.TokenBlacklistService;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -37,7 +41,17 @@ class AuthenticationServiceTest {
   private com.housingplatform.identity.repository.RealEstateAgentRepository
       realEstateAgentRepository;
 
-  @InjectMocks private AuthenticationService authenticationService;
+  @Mock private OrganizationRepository organizationRepository;
+
+  @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
+
+  @Mock private PasswordResetEmailService passwordResetEmailService;
+
+  @Mock private VerificationService verificationService;
+
+  @Mock private TokenBlacklistService tokenBlacklistService;
+
+  @InjectMocks private AuthenticationServiceImpl authenticationService;
 
   private User testUser;
   private UUID testUserId;
@@ -75,6 +89,7 @@ class AuthenticationServiceTest {
     when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
         .thenReturn("access-token");
     when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+    when(realEstateAgentRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
 
     // Act
     AuthResponse response = authenticationService.login(request);
@@ -105,6 +120,7 @@ class AuthenticationServiceTest {
     when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
         .thenReturn("access-token");
     when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+    when(realEstateAgentRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
 
     // Act
     AuthResponse response = authenticationService.login(request);
@@ -170,6 +186,7 @@ class AuthenticationServiceTest {
 
     when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
     when(passwordEncoder.matches("password123", testUser.getPasswordHash())).thenReturn(true);
+    when(realEstateAgentRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
 
     // Act & Assert
     BusinessException exception =
@@ -179,7 +196,7 @@ class AuthenticationServiceTest {
               authenticationService.login(request);
             });
 
-    assertEquals("User account is not active", exception.getMessage());
+    assertEquals("User account is disabled", exception.getMessage());
   }
 
   @Test
@@ -206,6 +223,7 @@ class AuthenticationServiceTest {
     when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
         .thenReturn("access-token");
     when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+    when(realEstateAgentRepository.existsByUserId(any(UUID.class))).thenReturn(false);
 
     // Act
     AuthResponse response = authenticationService.register(request);

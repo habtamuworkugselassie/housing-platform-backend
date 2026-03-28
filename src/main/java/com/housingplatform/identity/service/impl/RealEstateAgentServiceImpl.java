@@ -1,4 +1,4 @@
-package com.housingplatform.identity.service;
+package com.housingplatform.identity.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.RealEstateAgent;
@@ -10,6 +10,8 @@ import com.housingplatform.identity.dto.UpdateAgentRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.identity.service.RealEstateAgentMapper;
+import com.housingplatform.identity.service.RealEstateAgentService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;

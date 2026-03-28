@@ -1,8 +1,10 @@
-package com.housingplatform.notification.service;
+package com.housingplatform.notification.service.impl;
 
 import com.housingplatform.notification.domain.Notification;
 import com.housingplatform.notification.dto.NotificationResponse;
 import com.housingplatform.notification.repository.NotificationRepository;
+import com.housingplatform.notification.service.NotificationMapper;
+import com.housingplatform.notification.service.NotificationService;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.time.LocalDateTime;
 import java.util.UUID;

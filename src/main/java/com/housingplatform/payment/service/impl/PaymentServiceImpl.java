@@ -1,10 +1,12 @@
-package com.housingplatform.payment.service;
+package com.housingplatform.payment.service.impl;
 
 import com.housingplatform.payment.domain.Payment;
 import com.housingplatform.payment.dto.LoanDisbursementRequest;
 import com.housingplatform.payment.dto.PaymentRequest;
 import com.housingplatform.payment.dto.PaymentResponse;
 import com.housingplatform.payment.repository.PaymentRepository;
+import com.housingplatform.payment.service.PaymentMapper;
+import com.housingplatform.payment.service.PaymentService;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

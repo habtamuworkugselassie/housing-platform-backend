@@ -3,7 +3,7 @@ package com.housingplatform.shared.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.housingplatform.shared.security.RateLimitingFilter;
 import com.housingplatform.shared.security.ScopeAuthorizationFilter;
-import com.housingplatform.shared.security.TokenBlacklistService;
+import com.housingplatform.shared.service.TokenBlacklistService;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package com.housingplatform.construction.service;
+package com.housingplatform.construction.service.impl;
 
 import com.housingplatform.construction.domain.ConstructionPhase;
 import com.housingplatform.construction.domain.ConstructionProject;
@@ -12,6 +12,8 @@ import com.housingplatform.construction.repository.MaterialInventoryRepository;
 import com.housingplatform.construction.repository.MaterialOrderRepository;
 import com.housingplatform.construction.repository.MaterialRepository;
 import com.housingplatform.construction.repository.MaterialUsageRepository;
+import com.housingplatform.construction.service.MaterialUsageMapper;
+import com.housingplatform.construction.service.MaterialUsageService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;

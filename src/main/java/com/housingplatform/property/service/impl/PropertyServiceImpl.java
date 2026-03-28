@@ -1,4 +1,4 @@
-package com.housingplatform.property.service;
+package com.housingplatform.property.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.SponsorshipApplication;
@@ -15,6 +15,8 @@ import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
 import com.housingplatform.property.repository.BuildingRepository;
 import com.housingplatform.property.repository.PropertyRepository;
+import com.housingplatform.property.service.PropertyMapper;
+import com.housingplatform.property.service.PropertyService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;

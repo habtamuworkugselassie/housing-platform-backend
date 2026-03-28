@@ -1,10 +1,12 @@
-package com.housingplatform.construction.service;
+package com.housingplatform.construction.service.impl;
 
 import com.housingplatform.construction.domain.MaterialInventory;
 import com.housingplatform.construction.dto.MaterialInventoryRequest;
 import com.housingplatform.construction.dto.MaterialInventoryResponse;
 import com.housingplatform.construction.repository.MaterialInventoryRepository;
 import com.housingplatform.construction.repository.MaterialRepository;
+import com.housingplatform.construction.service.MaterialInventoryMapper;
+import com.housingplatform.construction.service.MaterialInventoryService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;

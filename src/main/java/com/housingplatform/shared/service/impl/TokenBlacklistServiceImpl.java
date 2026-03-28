@@ -1,38 +1,30 @@
-package com.housingplatform.shared.security;
+package com.housingplatform.shared.service.impl;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.housingplatform.shared.config.TokenBlacklistCacheConfig;
+import com.housingplatform.shared.service.TokenBlacklistService;
 import java.util.Date;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
- * Manages a Caffeine-backed blacklist of invalidated JWT access tokens.
- *
- * <p>When a user logs out, their current access token is stored here with a TTL equal to its
- * remaining validity period. Any subsequent request bearing a blacklisted token is rejected with
- * 401, even if the token's signature and expiry would otherwise be valid.
- *
- * <p>Entries expire automatically when the token would have expired, so the blacklist does not grow
- * unbounded.
+ * Caffeine-backed implementation. Entries expire automatically when the token would have expired,
+ * so the blacklist does not grow unbounded.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class TokenBlacklistService {
+public class TokenBlacklistServiceImpl implements TokenBlacklistService {
 
-  @Qualifier(TokenBlacklistCacheConfig.JWT_BLACKLIST_CACHE)
   private final Cache<String, Long> blacklistCache;
 
-  /**
-   * Adds a token to the blacklist. The TTL is set to the token's remaining lifetime so that the
-   * cache entry is removed once the token would have expired anyway.
-   *
-   * @param token the raw JWT access token string
-   * @param expiration the token's expiration date (from its claims)
-   */
+  public TokenBlacklistServiceImpl(
+      @Qualifier(TokenBlacklistCacheConfig.JWT_BLACKLIST_CACHE)
+          Cache<String, Long> blacklistCache) {
+    this.blacklistCache = blacklistCache;
+  }
+
+  @Override
   public void blacklist(String token, Date expiration) {
     if (token == null || token.isBlank()) {
       return;
@@ -50,11 +42,7 @@ public class TokenBlacklistService {
     }
   }
 
-  /**
-   * Returns true if the given token has been blacklisted (i.e. the user has logged out).
-   *
-   * @param token the raw JWT access token string
-   */
+  @Override
   public boolean isBlacklisted(String token) {
     if (token == null || token.isBlank()) {
       return false;

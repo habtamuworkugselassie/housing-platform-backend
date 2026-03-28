@@ -1,5 +1,6 @@
 package com.housingplatform.shared.security;
 
+import com.housingplatform.shared.service.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

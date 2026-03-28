@@ -1,4 +1,4 @@
-package com.housingplatform.construction.service;
+package com.housingplatform.construction.service.impl;
 
 import com.housingplatform.construction.domain.ConstructionPhase;
 import com.housingplatform.construction.domain.ConstructionProject;
@@ -7,6 +7,9 @@ import com.housingplatform.construction.dto.ConstructionProjectRequest;
 import com.housingplatform.construction.dto.ConstructionProjectResponse;
 import com.housingplatform.construction.repository.ConstructionPhaseRepository;
 import com.housingplatform.construction.repository.ConstructionProjectRepository;
+import com.housingplatform.construction.service.ConstructionPhaseMapper;
+import com.housingplatform.construction.service.ConstructionProjectMapper;
+import com.housingplatform.construction.service.ConstructionProjectService;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;

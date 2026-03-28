@@ -1,6 +1,7 @@
-package com.housingplatform.admin.service;
+package com.housingplatform.admin.service.impl;
 
 import com.housingplatform.admin.dto.AdminStatsResponse;
+import com.housingplatform.admin.service.AdminService;
 import com.housingplatform.construction.repository.ConstructionProjectRepository;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.repository.OrganizationRepository;
