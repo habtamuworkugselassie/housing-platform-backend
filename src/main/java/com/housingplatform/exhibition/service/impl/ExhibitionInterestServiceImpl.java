@@ -15,6 +15,7 @@ import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.OrganizationPrimaryUserProvisioningService;
 import com.housingplatform.identity.service.SponsorshipService;
 import com.housingplatform.shared.exception.BusinessException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,16 +90,21 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
             .build();
     entity = repository.save(entity);
 
-    if (sponsorship != null) {
+    UUID sponsorshipIdForPendingApplication = sponsorship != null ? sponsorship.getId() : null;
+
+    if (sponsorshipIdForPendingApplication != null) {
+      organizationRepository.flush();
       sponsorshipService.createPendingApplicationForExhibitionInterest(
-          organization.getId(), sponsorship.getId(), request.getMessage());
+          organization.getId(),
+          sponsorshipIdForPendingApplication,
+          request.getMessage(),
+          interestType);
     }
 
     return toResponse(entity);
   }
 
-  private Sponsorship resolveSponsorshipForInterest(
-      String interestType, java.util.UUID sponsorshipId) {
+  private Sponsorship resolveSponsorshipForInterest(String interestType, UUID sponsorshipId) {
     if (!"exhibitor".equals(interestType)) {
       if (sponsorshipId != null) {
         throw new BusinessException(

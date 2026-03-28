@@ -186,9 +186,7 @@ public class UserServiceImpl implements UserService {
     User user =
         userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
 
-    if (UserContext.isAdmin()
-        && request.getRoles() != null
-        && request.getRoles().isEmpty()) {
+    if (UserContext.isAdmin() && request.getRoles() != null && request.getRoles().isEmpty()) {
       throw new BusinessException("At least one role is required");
     }
 

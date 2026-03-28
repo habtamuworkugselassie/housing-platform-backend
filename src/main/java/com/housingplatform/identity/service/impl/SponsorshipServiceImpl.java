@@ -239,7 +239,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
       value = {"sponsoredOrganizations", "exclusiveOrganizations"},
       allEntries = true)
   public SponsorshipApplicationResponse createPendingApplicationForExhibitionInterest(
-      UUID organizationId, UUID sponsorshipId, String registrantMessage) {
+      UUID organizationId, UUID sponsorshipId, String registrantMessage, String interestType) {
     if (applicationRepository.existsByOrganization_IdAndStatus(
         organizationId, SponsorshipApplication.ApplicationStatus.PENDING)) {
       return applicationRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
@@ -269,7 +269,12 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     LocalDateTime start = LocalDateTime.now();
     LocalDateTime end = start.plusYears(1);
 
-    StringBuilder notes = new StringBuilder("Exhibition interest registration");
+    String it = interestType != null ? interestType.trim().toLowerCase() : "";
+    StringBuilder notes =
+        new StringBuilder(
+            "visitor".equals(it)
+                ? "Exhibition visitor interest (default package for admin queue)"
+                : "Exhibition interest registration");
     if (registrantMessage != null && !registrantMessage.trim().isEmpty()) {
       String trimmed = registrantMessage.trim();
       if (trimmed.length() > 800) {

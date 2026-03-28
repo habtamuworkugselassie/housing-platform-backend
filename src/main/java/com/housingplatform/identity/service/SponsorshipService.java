@@ -24,12 +24,14 @@ public interface SponsorshipService {
       UUID organizationId, SponsorshipApplicationRequest request);
 
   /**
-   * Creates a pending sponsorship application when an exhibitor registers interest on the public
-   * exhibition page (organization may still be {@code PENDING_APPROVAL}). Idempotent when a pending
-   * application already exists (returns existing).
+   * Creates a pending sponsorship application when someone registers exhibition interest on the
+   * public page (organization may still be {@code PENDING_APPROVAL}). Used for exhibitors (selected
+   * package) and visitors (a default active package is chosen by the caller for admin queue
+   * linkage). Idempotent when a pending application already exists for the organization (returns
+   * existing).
    */
   SponsorshipApplicationResponse createPendingApplicationForExhibitionInterest(
-      UUID organizationId, UUID sponsorshipId, String registrantMessage);
+      UUID organizationId, UUID sponsorshipId, String registrantMessage, String interestType);
 
   SponsorshipApplicationResponse getApplicationById(UUID id);
 
