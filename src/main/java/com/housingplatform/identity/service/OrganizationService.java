@@ -3,6 +3,7 @@ package com.housingplatform.identity.service;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
+import com.housingplatform.identity.dto.SupplierSubcategoryIdsRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,9 +44,16 @@ public interface OrganizationService {
    *
    * @param types comma-separated organization types (e.g. "BANK" or "CONSULTANT_ARCHITECT")
    */
-  List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types);
+  List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types, UUID subcategoryId);
 
   OrganizationResponse updateOrganization(UUID id, OrganizationRequest request);
+
+  /**
+   * Replace supplier subcategory assignments. Allowed for admin or the organization's primary
+   * contact when the organization type is {@code SUPPLIER}.
+   */
+  OrganizationResponse updateOrganizationSupplierSubcategories(
+      UUID organizationId, SupplierSubcategoryIdsRequest request);
 
   OrganizationResponse approveOrganization(UUID id);
 

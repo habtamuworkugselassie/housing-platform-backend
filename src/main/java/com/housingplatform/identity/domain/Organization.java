@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -73,6 +75,19 @@ public class Organization extends BaseAuditEntity {
   @OneToOne
   @JoinColumn(name = "primary_contact_user_id")
   private User primaryContact;
+
+  /**
+   * Material-specialization tags for {@link OrganizationType#SUPPLIER} (construction suppliers
+   * marketplace). Managed via {@code supplier_subcategories} and join table
+   * {@code organization_supplier_subcategories}.
+   */
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(
+      name = "organization_supplier_subcategories",
+      joinColumns = @JoinColumn(name = "organization_id"),
+      inverseJoinColumns = @JoinColumn(name = "supplier_subcategory_id"))
+  @Builder.Default
+  private Set<SupplierSubcategory> supplierSubcategories = new HashSet<>();
 
   /**
    * Verification level for badge display: FULL = all documents and numbers, HALF = one category

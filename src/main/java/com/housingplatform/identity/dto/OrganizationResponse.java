@@ -97,4 +97,10 @@ public class OrganizationResponse {
 
   /** {@link com.housingplatform.identity.domain.Sponsorship.SponsorshipType} name, e.g. GOLD. */
   private String sponsorshipType;
+
+  /**
+   * Construction material supplier specializations ({@link Organization.OrganizationType#SUPPLIER}
+   * only). Empty for other types.
+   */
+  private List<SupplierSubcategoryResponse> supplierSubcategories;
 }

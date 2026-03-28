@@ -134,6 +134,11 @@ public class OAuth2ResourceServerConfig {
               if (path.startsWith("/api/v1/organizations/marketplace")) {
                 return true;
               }
+              // Material supplier subcategory catalog (marketplace filter); GET only
+              if (path.equals("/api/v1/supplier-subcategories")
+                  && "GET".equalsIgnoreCase(request.getMethod())) {
+                return true;
+              }
               return false;
             })
         .csrf(csrf -> csrf.disable())

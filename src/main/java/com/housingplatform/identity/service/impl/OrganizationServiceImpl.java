@@ -9,10 +9,13 @@ import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationMediaItem;
+import com.housingplatform.identity.domain.SupplierSubcategory;
 import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
+import com.housingplatform.identity.dto.SupplierSubcategoryIdsRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
+import com.housingplatform.identity.repository.SupplierSubcategoryRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.repository.UserRepository;
@@ -30,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,6 +60,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
   private final OrganizationRepository organizationRepository;
+  private final SupplierSubcategoryRepository supplierSubcategoryRepository;
   private final OrganizationMapper organizationMapper;
   private final UserRepository userRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
@@ -164,6 +169,11 @@ public class OrganizationServiceImpl implements OrganizationService {
       }
     }
 
+    if (request.getSupplierSubcategoryIds() != null) {
+      syncSupplierSubcategories(saved, request.getSupplierSubcategoryIds());
+      saved = organizationRepository.save(saved);
+    }
+
     OrganizationResponse response = organizationMapper.toResponse(saved);
     enrichWithMedia(response, saved.getId());
     return response;
@@ -222,6 +232,10 @@ public class OrganizationServiceImpl implements OrganizationService {
             ? request.getInitialStatus()
             : Organization.OrganizationStatus.PENDING_APPROVAL);
     Organization saved = organizationRepository.save(organization);
+    if (request.getSupplierSubcategoryIds() != null) {
+      syncSupplierSubcategories(saved, request.getSupplierSubcategoryIds());
+      saved = organizationRepository.save(saved);
+    }
     OrganizationResponse response = organizationMapper.toResponse(saved);
     enrichWithMedia(response, saved.getId());
     return response;
@@ -232,7 +246,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   public OrganizationResponse getOrganizationById(UUID id) {
     Organization organization =
         organizationRepository
-            .findById(id)
+            .findByIdWithSupplierSubcategories(id)
             .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
     if (!canCurrentUserViewOrganization(organization)) {
       throw new ResourceNotFoundException("Organization", id);
@@ -247,7 +261,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   public OrganizationResponse getOrganizationByIdUnrestricted(UUID id) {
     Organization organization =
         organizationRepository
-            .findById(id)
+            .findByIdWithSupplierSubcategories(id)
             .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, id);
@@ -425,7 +439,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   @Override
   @Transactional(readOnly = true)
-  public List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types) {
+  public List<OrganizationResponse> getApprovedOrganizationsForMarketplace(
+      String types, UUID subcategoryId) {
     if (types == null || types.trim().isEmpty()) {
       return List.of();
     }
@@ -444,9 +459,21 @@ public class OrganizationServiceImpl implements OrganizationService {
       return List.of();
     }
     List<Organization> all =
-        organizationRepository.findByStatus(Organization.OrganizationStatus.APPROVED);
+        organizationRepository.findByStatusWithSupplierSubcategories(
+            Organization.OrganizationStatus.APPROVED);
     List<Organization> filtered =
         all.stream().filter(org -> typeSet.contains(org.getType())).collect(Collectors.toList());
+    if (subcategoryId != null) {
+      filtered =
+          filtered.stream()
+              .filter(
+                  org ->
+                      org.getType() != Organization.OrganizationType.SUPPLIER
+                          || (org.getSupplierSubcategories() != null
+                              && org.getSupplierSubcategories().stream()
+                                  .anyMatch(s -> subcategoryId.equals(s.getId()))))
+              .collect(Collectors.toList());
+    }
     Set<UUID> marketplaceOrgIds =
         filtered.stream().map(Organization::getId).collect(Collectors.toSet());
     Map<UUID, SponsorshipApplication> bestSponsorshipByOrg =
@@ -553,6 +580,9 @@ public class OrganizationServiceImpl implements OrganizationService {
     organizationMapper.updateEntity(organization, request);
     if (request.getPhoneNumbers() != null) {
       syncPhonesFromRequest(organization, request.getPhoneNumbers());
+    }
+    if (request.getSupplierSubcategoryIds() != null) {
+      syncSupplierSubcategories(organization, request.getSupplierSubcategoryIds());
     }
     Organization updated = organizationRepository.save(organization);
     evictAvailablePropertiesByOrgCache(id);
@@ -975,6 +1005,68 @@ public class OrganizationServiceImpl implements OrganizationService {
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, organizationId);
     return response;
+  }
+
+  @Override
+  public OrganizationResponse updateOrganizationSupplierSubcategories(
+      UUID organizationId, SupplierSubcategoryIdsRequest request) {
+    Organization organization =
+        organizationRepository
+            .findByIdWithSupplierSubcategories(organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
+    if (organization.getType() != Organization.OrganizationType.SUPPLIER) {
+      throw new BusinessException("Supplier subcategories apply only to SUPPLIER organizations");
+    }
+    assertCanUpdateSupplierSubcategoryAssignments(organization);
+    List<UUID> ids =
+        request.getSupplierSubcategoryIds() != null ? request.getSupplierSubcategoryIds() : List.of();
+    syncSupplierSubcategories(organization, ids);
+    Organization updated = organizationRepository.save(organization);
+    evictAvailablePropertiesByOrgCache(organizationId);
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, organizationId);
+    return response;
+  }
+
+  private void assertCanUpdateSupplierSubcategoryAssignments(Organization organization) {
+    if (UserContext.isAdmin()) {
+      return;
+    }
+    UUID currentUserId = UserContext.getCurrentUserId();
+    if (organization.getPrimaryContact() != null
+        && organization.getPrimaryContact().getId().equals(currentUserId)) {
+      return;
+    }
+    throw new BusinessException(
+        "Only admin or the supplier organization's primary contact can update material"
+            + " subcategories");
+  }
+
+  private void syncSupplierSubcategories(Organization organization, List<UUID> ids) {
+    if (ids == null) {
+      return;
+    }
+    if (organization.getType() != Organization.OrganizationType.SUPPLIER) {
+      if (!ids.isEmpty()) {
+        throw new BusinessException("Supplier subcategories apply only to SUPPLIER organizations");
+      }
+      return;
+    }
+    Set<SupplierSubcategory> next = new HashSet<>();
+    if (!ids.isEmpty()) {
+      List<SupplierSubcategory> found = supplierSubcategoryRepository.findAllById(ids);
+      if (found.size() != ids.size()) {
+        throw new BusinessException("One or more supplier subcategories were not found");
+      }
+      for (SupplierSubcategory s : found) {
+        if (!s.isActive()) {
+          throw new BusinessException("Cannot assign inactive subcategory: " + s.getName());
+        }
+        next.add(s);
+      }
+    }
+    organization.getSupplierSubcategories().clear();
+    organization.getSupplierSubcategories().addAll(next);
   }
 
   private String getDocumentUrlForType(Organization org, String documentType) {

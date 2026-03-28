@@ -3,6 +3,7 @@ package com.housingplatform.identity.api;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.dto.RejectOrganizationRequest;
+import com.housingplatform.identity.dto.SupplierSubcategoryIdsRequest;
 import com.housingplatform.identity.service.OrganizationService;
 import com.housingplatform.shared.security.annotation.AuthActionScope;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
@@ -73,11 +74,11 @@ public class OrganizationController {
       summary = "List approved organizations for marketplace",
       description =
           "Public. Returns approved organizations by type(s). Query param: type (e.g. BANK or"
-              + " CONSULTANT_ARCHITECT).")
+              + " CONSULTANT_ARCHITECT). Optional subcategoryId filters SUPPLIER orgs.")
   public ResponseEntity<List<OrganizationResponse>> getMarketplaceOrganizations(
-      @RequestParam String type) {
+      @RequestParam String type, @RequestParam(required = false) UUID subcategoryId) {
     List<OrganizationResponse> list =
-        organizationService.getApprovedOrganizationsForMarketplace(type);
+        organizationService.getApprovedOrganizationsForMarketplace(type, subcategoryId);
     return ResponseEntity.ok(list);
   }
 
@@ -109,6 +110,19 @@ public class OrganizationController {
       @PathVariable UUID id, @Valid @RequestBody OrganizationRequest organizationRequest) {
     OrganizationResponse updated = organizationService.updateOrganization(id, organizationRequest);
     return ResponseEntity.ok(updated);
+  }
+
+  @PatchMapping("/{id}/supplier-subcategories")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @Operation(
+      summary = "Update supplier material subcategories",
+      description =
+          "Replaces linked subcategories for a SUPPLIER organization. Admin or supplier primary"
+              + " contact.")
+  public ResponseEntity<OrganizationResponse> patchSupplierSubcategories(
+      @PathVariable UUID id, @Valid @RequestBody SupplierSubcategoryIdsRequest body) {
+    return ResponseEntity.ok(
+        organizationService.updateOrganizationSupplierSubcategories(id, body));
   }
 
   @PutMapping("/{id}/approve")

@@ -59,4 +59,7 @@ public class AdminOrganizationCreateRequest {
 
   /** Initial status when admin creates the organization. Defaults to PENDING_APPROVAL if null. */
   private Organization.OrganizationStatus initialStatus;
+
+  /** Optional material supplier subcategories when {@code type == SUPPLIER}. */
+  private List<UUID> supplierSubcategoryIds;
 }

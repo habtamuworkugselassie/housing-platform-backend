@@ -27,4 +27,17 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
           + "LOWER(o.registrationNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR "
           + "LOWER(o.city) LIKE LOWER(CONCAT('%', :search, '%'))")
   List<Organization> searchOrganizations(@Param("search") String search);
+
+  @Query(
+      "SELECT DISTINCT o FROM Organization o LEFT JOIN FETCH o.supplierSubcategories WHERE o.id = :id")
+  java.util.Optional<Organization> findByIdWithSupplierSubcategories(@Param("id") UUID id);
+
+  @Query(
+      "SELECT DISTINCT o FROM Organization o LEFT JOIN FETCH o.supplierSubcategories WHERE o.status = :status")
+  List<Organization> findByStatusWithSupplierSubcategories(
+      @Param("status") Organization.OrganizationStatus status);
+
+  @Query(
+      "SELECT COUNT(o) FROM Organization o JOIN o.supplierSubcategories s WHERE s.id = :subcategoryId")
+  long countOrganizationsUsingSubcategory(@Param("subcategoryId") UUID subcategoryId);
 }

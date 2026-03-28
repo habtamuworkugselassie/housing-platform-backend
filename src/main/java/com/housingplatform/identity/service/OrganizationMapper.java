@@ -3,10 +3,13 @@ package com.housingplatform.identity.service;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
+import com.housingplatform.identity.domain.SupplierSubcategory;
 import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
+import com.housingplatform.identity.dto.SupplierSubcategoryResponse;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -137,6 +140,27 @@ public class OrganizationMapper {
     }
   }
 
+  private List<SupplierSubcategoryResponse> mapSupplierSubcategories(Organization organization) {
+    if (organization.getSupplierSubcategories() == null
+        || organization.getSupplierSubcategories().isEmpty()) {
+      return List.of();
+    }
+    return organization.getSupplierSubcategories().stream()
+        .sorted(
+            Comparator.comparingInt(SupplierSubcategory::getSortOrder)
+                .thenComparing(s -> s.getName() != null ? s.getName() : "", String.CASE_INSENSITIVE_ORDER))
+        .map(
+            s ->
+                SupplierSubcategoryResponse.builder()
+                    .id(s.getId())
+                    .name(s.getName())
+                    .slug(s.getSlug())
+                    .sortOrder(s.getSortOrder())
+                    .active(s.isActive())
+                    .build())
+        .toList();
+  }
+
   public OrganizationResponse toResponse(Organization organization) {
     if (organization == null) {
       return null;
@@ -191,6 +215,7 @@ public class OrganizationMapper {
             organization.getVerificationLevel() != null
                 ? organization.getVerificationLevel().name()
                 : null)
+        .supplierSubcategories(mapSupplierSubcategories(organization))
         .build();
   }
 }
