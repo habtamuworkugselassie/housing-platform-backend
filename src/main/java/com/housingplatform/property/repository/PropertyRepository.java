@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PropertyRepository
     extends JpaRepository<Property, UUID>, JpaSpecificationExecutor<Property> {
+  @org.springframework.data.jpa.repository.Query("SELECT p.id FROM Property p")
+  List<UUID> findAllIds();
+
   List<Property> findByRealEstateCompanyId(UUID companyId);
 
   List<Property> findByAgentId(UUID agentId);

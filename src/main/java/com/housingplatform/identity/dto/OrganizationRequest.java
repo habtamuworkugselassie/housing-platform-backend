@@ -56,8 +56,8 @@ public class OrganizationRequest {
   private UUID primaryContactUserId;
 
   /**
-   * When non-null, replaces linked supplier subcategories (only for {@code type == SUPPLIER}).
-   * Omit or null to leave assignments unchanged on update.
+   * When non-null, replaces linked supplier subcategories (only for {@code type == SUPPLIER}). Omit
+   * or null to leave assignments unchanged on update.
    */
   private List<UUID> supplierSubcategoryIds;
 }

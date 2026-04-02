@@ -121,8 +121,7 @@ public class OrganizationController {
               + " contact.")
   public ResponseEntity<OrganizationResponse> patchSupplierSubcategories(
       @PathVariable UUID id, @Valid @RequestBody SupplierSubcategoryIdsRequest body) {
-    return ResponseEntity.ok(
-        organizationService.updateOrganizationSupplierSubcategories(id, body));
+    return ResponseEntity.ok(organizationService.updateOrganizationSupplierSubcategories(id, body));
   }
 
   @PutMapping("/{id}/approve")

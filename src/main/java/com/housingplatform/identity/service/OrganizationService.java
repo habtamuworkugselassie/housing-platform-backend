@@ -44,7 +44,8 @@ public interface OrganizationService {
    *
    * @param types comma-separated organization types (e.g. "BANK" or "CONSULTANT_ARCHITECT")
    */
-  List<OrganizationResponse> getApprovedOrganizationsForMarketplace(String types, UUID subcategoryId);
+  List<OrganizationResponse> getApprovedOrganizationsForMarketplace(
+      String types, UUID subcategoryId);
 
   OrganizationResponse updateOrganization(UUID id, OrganizationRequest request);
 

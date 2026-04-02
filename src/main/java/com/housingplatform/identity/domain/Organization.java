@@ -78,8 +78,8 @@ public class Organization extends BaseAuditEntity {
 
   /**
    * Material-specialization tags for {@link OrganizationType#SUPPLIER} (construction suppliers
-   * marketplace). Managed via {@code supplier_subcategories} and join table
-   * {@code organization_supplier_subcategories}.
+   * marketplace). Managed via {@code supplier_subcategories} and join table {@code
+   * organization_supplier_subcategories}.
    */
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(

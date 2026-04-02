@@ -26,7 +26,9 @@ public class SupplierSubcategoryController {
 
   @GetMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
-  @Operation(summary = "List active supplier subcategories", description = "Public. For marketplace filters.")
+  @Operation(
+      summary = "List active supplier subcategories",
+      description = "Public. For marketplace filters.")
   public ResponseEntity<List<SupplierSubcategoryResponse>> listActive() {
     return ResponseEntity.ok(supplierSubcategoryService.listActive());
   }
@@ -57,7 +59,9 @@ public class SupplierSubcategoryController {
 
   @DeleteMapping("/{id}")
   @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
-  @Operation(summary = "Delete supplier subcategory", description = "Admin only; fails if still assigned.")
+  @Operation(
+      summary = "Delete supplier subcategory",
+      description = "Admin only; fails if still assigned.")
   public ResponseEntity<Void> delete(@PathVariable UUID id) {
     supplierSubcategoryService.delete(id);
     return ResponseEntity.noContent().build();

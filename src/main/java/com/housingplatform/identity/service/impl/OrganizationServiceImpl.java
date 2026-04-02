@@ -6,18 +6,18 @@ import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.identity.domain.SponsorshipApplication;
+import com.housingplatform.identity.domain.SupplierSubcategory;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
 import com.housingplatform.identity.dto.OrganizationMediaItem;
-import com.housingplatform.identity.domain.SupplierSubcategory;
 import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.dto.SupplierSubcategoryIdsRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
-import com.housingplatform.identity.repository.SupplierSubcategoryRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
+import com.housingplatform.identity.repository.SupplierSubcategoryRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.OrganizationMapper;
 import com.housingplatform.identity.service.OrganizationPublicVisibility;
@@ -1019,7 +1019,9 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
     assertCanUpdateSupplierSubcategoryAssignments(organization);
     List<UUID> ids =
-        request.getSupplierSubcategoryIds() != null ? request.getSupplierSubcategoryIds() : List.of();
+        request.getSupplierSubcategoryIds() != null
+            ? request.getSupplierSubcategoryIds()
+            : List.of();
     syncSupplierSubcategories(organization, ids);
     Organization updated = organizationRepository.save(organization);
     evictAvailablePropertiesByOrgCache(organizationId);

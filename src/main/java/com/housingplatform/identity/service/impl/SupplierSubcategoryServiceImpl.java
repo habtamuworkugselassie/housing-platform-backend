@@ -118,7 +118,8 @@ public class SupplierSubcategoryServiceImpl implements SupplierSubcategoryServic
   }
 
   private boolean slugTaken(String slug, UUID excludeId) {
-    for (SupplierSubcategory s : supplierSubcategoryRepository.findAllByOrderBySortOrderAscNameAsc()) {
+    for (SupplierSubcategory s :
+        supplierSubcategoryRepository.findAllByOrderBySortOrderAscNameAsc()) {
       if (excludeId != null && excludeId.equals(s.getId())) {
         continue;
       }

@@ -148,7 +148,8 @@ public class OrganizationMapper {
     return organization.getSupplierSubcategories().stream()
         .sorted(
             Comparator.comparingInt(SupplierSubcategory::getSortOrder)
-                .thenComparing(s -> s.getName() != null ? s.getName() : "", String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(
+                    s -> s.getName() != null ? s.getName() : "", String.CASE_INSENSITIVE_ORDER))
         .map(
             s ->
                 SupplierSubcategoryResponse.builder()
