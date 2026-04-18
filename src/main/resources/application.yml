@@ -149,6 +149,32 @@ logging:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  support-chat:
+    enabled: ${SUPPORT_CHAT_ENABLED:true}
+    # OpenAI-compatible HTTP API: OpenAI, Groq (free tier), OpenRouter, Together, local Ollama proxy, etc.
+    # Groq (free tier, no card): set SUPPORT_CHAT_API_BASE_URL=https://api.groq.com/openai/v1 and
+    # SUPPORT_CHAT_MODEL=llama-3.3-70b-versatile — get key at https://console.groq.com
+    api-base-url: ${SUPPORT_CHAT_API_BASE_URL:https://api.openai.com/v1}
+    api-key: ${SUPPORT_CHAT_API_KEY:${OPENAI_API_KEY:}}
+    model: ${SUPPORT_CHAT_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
+    # RAG: inject live DB snippets (properties / orgs / buildings) into the LLM prompt — no vector DB
+    rag-enabled: ${SUPPORT_CHAT_RAG_ENABLED:true}
+    # pgvector semantic index (requires PostgreSQL pgvector extension + table from V46 migration)
+    rag-vector-enabled: ${SUPPORT_CHAT_RAG_VECTOR_ENABLED:false}
+    rag-vector-replaces-lexical-rag: ${SUPPORT_CHAT_RAG_VECTOR_REPLACES_LEXICAL:true}
+    rag-vector-top-k: ${SUPPORT_CHAT_RAG_VECTOR_TOP_K:16}
+    rag-embedding-model: ${SUPPORT_CHAT_RAG_EMBEDDING_MODEL:text-embedding-3-small}
+    rag-embedding-dimensions: ${SUPPORT_CHAT_RAG_EMBEDDING_DIMENSIONS:1536}
+    rag-max-properties: ${SUPPORT_CHAT_RAG_MAX_PROPERTIES:12}
+    rag-max-organizations: ${SUPPORT_CHAT_RAG_MAX_ORGANIZATIONS:8}
+    rag-max-chars: ${SUPPORT_CHAT_RAG_MAX_CHARS:4500}
+    # Include all ACTIVE exhibition sponsorship packages (same source as /api/v1/sponsorships/active)
+    rag-include-sponsorship-packages: ${SUPPORT_CHAT_RAG_INCLUDE_SPONSORSHIP:true}
+    # Ranked marketplace directory (orgs by type + contact + verification + reviews; listings ditto)
+    rag-include-marketplace-directory: ${SUPPORT_CHAT_RAG_INCLUDE_MARKETPLACE_DIRECTORY:${SUPPORT_CHAT_RAG_INCLUDE_REAL_ESTATE_DIRECTORY:true}}
+    rag-max-directory-organizations: ${SUPPORT_CHAT_RAG_MAX_DIRECTORY_ORGANIZATIONS:${SUPPORT_CHAT_RAG_MAX_REAL_ESTATE_COMPANIES:15}}
+    rag-max-directory-properties: ${SUPPORT_CHAT_RAG_MAX_DIRECTORY_PROPERTIES:15}
+    rag-directory-property-candidate-pool: ${SUPPORT_CHAT_RAG_DIRECTORY_PROPERTY_POOL:400}
   password-reset:
     expiry-hours: ${PASSWORD_RESET_EXPIRY_HOURS:1}
   # Directory for storing uploaded media (property/org images). Only URLs are stored in DB.

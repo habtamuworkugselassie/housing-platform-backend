@@ -1,5 +1,6 @@
 package com.housingplatform.identity.api;
 
+import com.housingplatform.identity.dto.OrganizationDocumentReviewsPatchRequest;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.dto.RejectOrganizationRequest;
@@ -122,6 +123,20 @@ public class OrganizationController {
   public ResponseEntity<OrganizationResponse> patchSupplierSubcategories(
       @PathVariable UUID id, @Valid @RequestBody SupplierSubcategoryIdsRequest body) {
     return ResponseEntity.ok(organizationService.updateOrganizationSupplierSubcategories(id, body));
+  }
+
+  @PatchMapping("/{id}/document-reviews")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @AuthActionScope("organizations.approve")
+  @Operation(
+      summary = "Update organization document reviews",
+      description =
+          "Set admin review status and/or comments for business registration, license, VAT, and TIN"
+              + " documents. Only fields present in the body are updated. Admin only.")
+  public ResponseEntity<OrganizationResponse> patchOrganizationDocumentReviews(
+      @PathVariable UUID id, @RequestBody OrganizationDocumentReviewsPatchRequest body) {
+    OrganizationResponse updated = organizationService.patchOrganizationDocumentReviews(id, body);
+    return ResponseEntity.ok(updated);
   }
 
   @PutMapping("/{id}/approve")

@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Includes pgvector for support-chat semantic RAG (see db/migration/V46__support_rag_pgvector.sql)
+    image: pgvector/pgvector:pg16
     container_name: housing-platform-postgres
     environment:
       POSTGRES_DB: housing_platform

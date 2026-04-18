@@ -1,6 +1,7 @@
 package com.housingplatform.identity.repository;
 
 import com.housingplatform.identity.domain.Organization;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,23 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
   List<Organization> findByTypeAndStatus(
       Organization.OrganizationType type, Organization.OrganizationStatus status);
+
+  @Query(
+      "SELECT DISTINCT o FROM Organization o LEFT JOIN FETCH o.contact c "
+          + "WHERE o.type = :type AND o.status = :status")
+  List<Organization> findByTypeAndStatusWithContact(
+      @Param("type") Organization.OrganizationType type,
+      @Param("status") Organization.OrganizationStatus status);
+
+  @Query(
+      "SELECT DISTINCT o FROM Organization o LEFT JOIN FETCH o.contact c "
+          + "WHERE o.status = :status AND o.type IN :types")
+  List<Organization> findByStatusAndTypeInWithContact(
+      @Param("status") Organization.OrganizationStatus status,
+      @Param("types") List<Organization.OrganizationType> types);
+
+  @Query("SELECT DISTINCT o FROM Organization o LEFT JOIN FETCH o.contact c WHERE o.id IN :ids")
+  List<Organization> findAllByIdInWithContact(@Param("ids") Collection<UUID> ids);
 
   @Query(
       "SELECT DISTINCT o FROM Organization o LEFT JOIN o.contact c WHERE "

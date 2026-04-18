@@ -17,6 +17,8 @@ import com.housingplatform.property.repository.BuildingRepository;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.property.service.PropertyMapper;
 import com.housingplatform.property.service.PropertyService;
+import com.housingplatform.publicsupport.rag.SupportRagIndexEvents;
+import com.housingplatform.publicsupport.rag.SupportRagSourceType;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
@@ -33,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -54,6 +57,7 @@ public class PropertyServiceImpl implements PropertyService {
   private final SponsorshipApplicationRepository sponsorshipApplicationRepository;
   private final MediaAttachmentRepository mediaAttachmentRepository;
   private final MediaStorageService mediaStorageService;
+  private final ApplicationEventPublisher eventPublisher;
 
   private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
@@ -95,6 +99,7 @@ public class PropertyServiceImpl implements PropertyService {
     Property saved = propertyRepository.save(property);
     PropertyResponse response = propertyMapper.toResponseWithImages(saved);
     enrichSingleResponse(response, saved);
+    eventPublisher.publishEvent(new SupportRagIndexEvents.RagIndexPropertyEvent(saved.getId()));
     return response;
   }
 
@@ -354,6 +359,7 @@ public class PropertyServiceImpl implements PropertyService {
     Property updated = propertyRepository.save(property);
     PropertyResponse response = propertyMapper.toResponseWithImages(updated);
     enrichSingleResponse(response, updated);
+    eventPublisher.publishEvent(new SupportRagIndexEvents.RagIndexPropertyEvent(updated.getId()));
     return response;
   }
 
@@ -386,7 +392,11 @@ public class PropertyServiceImpl implements PropertyService {
       }
     }
 
+    UUID propertyId = property.getId();
     propertyRepository.delete(property);
+    eventPublisher.publishEvent(
+        new SupportRagIndexEvents.RagDeleteRagSourceEvent(
+            SupportRagSourceType.PROPERTY, propertyId));
   }
 
   @Override

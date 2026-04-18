@@ -139,6 +139,11 @@ public class OAuth2ResourceServerConfig {
                   && "GET".equalsIgnoreCase(request.getMethod())) {
                 return true;
               }
+              // Public support chat (optional AI backend; no auth)
+              if (path.equals("/api/v1/public/support/chat")
+                  && "POST".equalsIgnoreCase(request.getMethod())) {
+                return true;
+              }
               return false;
             })
         .csrf(csrf -> csrf.disable())

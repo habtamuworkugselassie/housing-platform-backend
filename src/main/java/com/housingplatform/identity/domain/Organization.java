@@ -40,6 +40,31 @@ public class Organization extends BaseAuditEntity {
   /** Number in parallel with document URL (tinRegistration). */
   private String tinNumber;
 
+  /** Admin-only review of uploaded verification documents. */
+  @Enumerated(EnumType.STRING)
+  private OrganizationDocumentReviewStatus businessRegistrationReviewStatus;
+
+  @Column(columnDefinition = "TEXT")
+  private String businessRegistrationReviewComment;
+
+  @Enumerated(EnumType.STRING)
+  private OrganizationDocumentReviewStatus licenseReviewStatus;
+
+  @Column(columnDefinition = "TEXT")
+  private String licenseReviewComment;
+
+  @Enumerated(EnumType.STRING)
+  private OrganizationDocumentReviewStatus vatRegistrationReviewStatus;
+
+  @Column(columnDefinition = "TEXT")
+  private String vatRegistrationReviewComment;
+
+  @Enumerated(EnumType.STRING)
+  private OrganizationDocumentReviewStatus tinRegistrationReviewStatus;
+
+  @Column(columnDefinition = "TEXT")
+  private String tinRegistrationReviewComment;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private OrganizationType type;

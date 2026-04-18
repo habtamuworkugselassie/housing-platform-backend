@@ -1,6 +1,7 @@
 package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
+import com.housingplatform.identity.dto.OrganizationDocumentReviewsPatchRequest;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.dto.SupplierSubcategoryIdsRequest;
@@ -48,6 +49,10 @@ public interface OrganizationService {
       String types, UUID subcategoryId);
 
   OrganizationResponse updateOrganization(UUID id, OrganizationRequest request);
+
+  /** Update admin review status and comments for verification documents. Admin only. */
+  OrganizationResponse patchOrganizationDocumentReviews(
+      UUID id, OrganizationDocumentReviewsPatchRequest request);
 
   /**
    * Replace supplier subcategory assignments. Allowed for admin or the organization's primary

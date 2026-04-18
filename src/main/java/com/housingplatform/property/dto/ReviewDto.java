@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class ReviewDto {
   private UUID id;
   private UUID propertyId;
+  private UUID organizationId;
   private UUID userId;
   private String userName;
   private String userImageUrl;

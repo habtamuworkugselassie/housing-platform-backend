@@ -9,6 +9,7 @@ import com.housingplatform.identity.domain.SponsorshipApplication;
 import com.housingplatform.identity.domain.SupplierSubcategory;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AdminOrganizationCreateRequest;
+import com.housingplatform.identity.dto.OrganizationDocumentReviewsPatchRequest;
 import com.housingplatform.identity.dto.OrganizationMediaItem;
 import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
@@ -25,6 +26,7 @@ import com.housingplatform.identity.service.OrganizationService;
 import com.housingplatform.media.domain.MediaAttachment;
 import com.housingplatform.media.repository.MediaAttachmentRepository;
 import com.housingplatform.media.service.MediaStorageService;
+import com.housingplatform.publicsupport.rag.SupportRagIndexEvents;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
@@ -42,6 +44,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -68,6 +71,7 @@ public class OrganizationServiceImpl implements OrganizationService {
   private final MediaAttachmentRepository mediaAttachmentRepository;
   private final MediaStorageService mediaStorageService;
   private final CacheManager cacheManager;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public OrganizationResponse createOrganization(OrganizationRequest request) {
@@ -176,6 +180,7 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     OrganizationResponse response = organizationMapper.toResponse(saved);
     enrichWithMedia(response, saved.getId());
+    publishRagOrganizationIndex(saved.getId());
     return response;
   }
 
@@ -238,6 +243,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
     OrganizationResponse response = organizationMapper.toResponse(saved);
     enrichWithMedia(response, saved.getId());
+    publishRagOrganizationIndex(saved.getId());
     return response;
   }
 
@@ -588,6 +594,52 @@ public class OrganizationServiceImpl implements OrganizationService {
     evictAvailablePropertiesByOrgCache(id);
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
+    publishRagOrganizationIndex(id);
+    return response;
+  }
+
+  @Override
+  public OrganizationResponse patchOrganizationDocumentReviews(
+      UUID id, OrganizationDocumentReviewsPatchRequest request) {
+    if (!UserContext.isAdmin()) {
+      throw new BusinessException("Only administrators can update organization document reviews");
+    }
+    Organization organization =
+        organizationRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
+
+    if (request.getBusinessRegistrationReviewStatus() != null) {
+      organization.setBusinessRegistrationReviewStatus(
+          request.getBusinessRegistrationReviewStatus());
+    }
+    if (request.getBusinessRegistrationReviewComment() != null) {
+      organization.setBusinessRegistrationReviewComment(
+          request.getBusinessRegistrationReviewComment());
+    }
+    if (request.getLicenseReviewStatus() != null) {
+      organization.setLicenseReviewStatus(request.getLicenseReviewStatus());
+    }
+    if (request.getLicenseReviewComment() != null) {
+      organization.setLicenseReviewComment(request.getLicenseReviewComment());
+    }
+    if (request.getVatRegistrationReviewStatus() != null) {
+      organization.setVatRegistrationReviewStatus(request.getVatRegistrationReviewStatus());
+    }
+    if (request.getVatRegistrationReviewComment() != null) {
+      organization.setVatRegistrationReviewComment(request.getVatRegistrationReviewComment());
+    }
+    if (request.getTinRegistrationReviewStatus() != null) {
+      organization.setTinRegistrationReviewStatus(request.getTinRegistrationReviewStatus());
+    }
+    if (request.getTinRegistrationReviewComment() != null) {
+      organization.setTinRegistrationReviewComment(request.getTinRegistrationReviewComment());
+    }
+
+    Organization updated = organizationRepository.save(organization);
+    OrganizationResponse response = organizationMapper.toResponse(updated);
+    enrichWithMedia(response, id);
+    publishRagOrganizationIndex(id);
     return response;
   }
 
@@ -602,6 +654,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     Organization updated = organizationRepository.save(organization);
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
+    publishRagOrganizationIndex(id);
     return response;
   }
 
@@ -616,6 +669,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     Organization updated = organizationRepository.save(organization);
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
+    publishRagOrganizationIndex(id);
     return response;
   }
 
@@ -645,6 +699,7 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
+    publishRagOrganizationIndex(id);
     return response;
   }
 
@@ -678,6 +733,7 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, id);
+    publishRagOrganizationIndex(id);
     return response;
   }
 
@@ -1004,6 +1060,7 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     OrganizationResponse response = organizationMapper.toResponse(organization);
     enrichWithMedia(response, organizationId);
+    publishRagOrganizationIndex(organizationId);
     return response;
   }
 
@@ -1027,6 +1084,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     evictAvailablePropertiesByOrgCache(organizationId);
     OrganizationResponse response = organizationMapper.toResponse(updated);
     enrichWithMedia(response, organizationId);
+    publishRagOrganizationIndex(organizationId);
     return response;
   }
 
@@ -1126,5 +1184,10 @@ public class OrganizationServiceImpl implements OrganizationService {
     if (exclusive != null) {
       exclusive.clear();
     }
+  }
+
+  private void publishRagOrganizationIndex(UUID organizationId) {
+    eventPublisher.publishEvent(
+        new SupportRagIndexEvents.RagIndexOrganizationEvent(organizationId));
   }
 }

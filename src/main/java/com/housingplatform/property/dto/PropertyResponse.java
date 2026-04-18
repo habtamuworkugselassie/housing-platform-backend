@@ -66,4 +66,6 @@ public class PropertyResponse {
   private List<PropertyImageResponse> images;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+  private Double averageRating;
+  private Integer reviewCount;
 }

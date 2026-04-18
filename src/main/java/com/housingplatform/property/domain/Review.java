@@ -1,5 +1,6 @@
 package com.housingplatform.property.domain;
 
+import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
@@ -17,11 +18,15 @@ import lombok.experimental.SuperBuilder;
 public class Review extends BaseAuditEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "property_id", nullable = false)
+  @JoinColumn(name = "property_id")
   private Property property;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "user_id", nullable = false)
+  @JoinColumn(name = "organization_id")
+  private Organization organization;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id", nullable = true)
   private User user;
 
   @Column(nullable = false)

@@ -50,7 +50,9 @@ public class SitemapController {
     // Dynamic properties
     // Using ::text cast for UUID in Postgres
     List<String> propertyIds =
-        jdbcTemplate.queryForList("SELECT id::varchar FROM properties WHERE status != 'SUSPENDED' AND real_estate_company_id IN (SELECT id::uuid FROM organizations WHERE status != 'SUSPENDED')", String.class);
+        jdbcTemplate.queryForList(
+            "SELECT id::varchar FROM properties WHERE status != 'SUSPENDED' AND real_estate_company_id IN (SELECT id::uuid FROM organizations WHERE status != 'SUSPENDED')",
+            String.class);
     for (String id : propertyIds) {
       appendUrl(xml, BASE_URL + "/properties/" + id, "weekly", "0.8");
     }
@@ -58,7 +60,9 @@ public class SitemapController {
     // Dynamic buildings
     try {
       List<String> buildingIds =
-          jdbcTemplate.queryForList("SELECT id::varchar FROM buildings WHERE status != 'SUSPENDED' AND real_estate_company_id IN (SELECT id::uuid FROM organizations WHERE status != 'SUSPENDED')", String.class);
+          jdbcTemplate.queryForList(
+              "SELECT id::varchar FROM buildings WHERE status != 'SUSPENDED' AND real_estate_company_id IN (SELECT id::uuid FROM organizations WHERE status != 'SUSPENDED')",
+              String.class);
       for (String id : buildingIds) {
         appendUrl(xml, BASE_URL + "/buildings/" + id, "weekly", "0.8");
       }
@@ -68,7 +72,8 @@ public class SitemapController {
     // Dynamic organizations
     try {
       List<String> orgIds =
-          jdbcTemplate.queryForList("SELECT id::varchar FROM organizations WHERE status != 'SUSPENDED'", String.class);
+          jdbcTemplate.queryForList(
+              "SELECT id::varchar FROM organizations WHERE status != 'SUSPENDED'", String.class);
       for (String id : orgIds) {
         appendUrl(xml, BASE_URL + "/organizations/" + id, "weekly", "0.7");
       }

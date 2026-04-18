@@ -3,11 +3,15 @@ package com.housingplatform.property.service;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.dto.PropertyRequest;
 import com.housingplatform.property.dto.PropertyResponse;
+import com.housingplatform.property.repository.ReviewRepository;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class PropertyMapperImpl implements PropertyMapper {
+
+  @Autowired private ReviewRepository reviewRepository;
 
   @Override
   public Property toEntity(PropertyRequest request) {
@@ -81,6 +85,14 @@ public class PropertyMapperImpl implements PropertyMapper {
         .isFullyFurnished(property.getIsFullyFurnished())
         .createdAt(property.getCreatedAt())
         .updatedAt(property.getUpdatedAt())
+        .averageRating(
+            reviewRepository != null
+                ? reviewRepository.getAverageRatingForProperty(property.getId())
+                : null)
+        .reviewCount(
+            reviewRepository != null
+                ? reviewRepository.getReviewCountForProperty(property.getId())
+                : 0)
         .build();
   }
 

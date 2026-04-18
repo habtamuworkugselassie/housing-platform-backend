@@ -4,13 +4,24 @@ import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationContact;
 import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.SupplierSubcategory;
+import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.OrganizationPhoneDto;
 import com.housingplatform.identity.dto.OrganizationRequest;
 import com.housingplatform.identity.dto.OrganizationResponse;
 import com.housingplatform.identity.dto.SupplierSubcategoryResponse;
+import com.housingplatform.identity.repository.RealEstateAgentRepository;
+import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.property.repository.ReviewRepository;
+import com.housingplatform.shared.security.UserContext;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,6 +31,60 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class OrganizationMapper {
+
+  @Autowired private ReviewRepository reviewRepository;
+  @Autowired private RealEstateAgentRepository realEstateAgentRepository;
+  @Autowired private UserRepository userRepository;
+
+  /**
+   * Expose admin document review fields to admins and to members of this organization:
+   *
+   * <ul>
+   *   <li>Primary contact (any org type: bank, supplier, real estate, etc.)
+   *   <li>JWT {@code organization_id} claim matches (set from agent link or {@link
+   *       User#getOrganization()} at login — covers bankers, suppliers, realtors)
+   *   <li>{@link User#getOrganization()} matches (banker/supplier/others linked via user row when
+   *       JWT claim is absent or stale)
+   *   <li>Real-estate agent row points at this organization
+   * </ul>
+   *
+   * Not exposed to anonymous users or to authenticated users viewing another org’s public profile.
+   */
+  private boolean shouldExposeDocumentReviews(Organization organization) {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+      return false;
+    }
+    if (UserContext.isAdmin()) {
+      return true;
+    }
+    final UUID userId;
+    try {
+      userId = UserContext.getCurrentUserId();
+    } catch (IllegalStateException e) {
+      return false;
+    }
+    final UUID orgId = organization.getId();
+    if (organization.getPrimaryContact() != null
+        && organization.getPrimaryContact().getId().equals(userId)) {
+      return true;
+    }
+    Optional<UUID> jwtOrg = UserContext.getCurrentUserOrganizationId();
+    if (jwtOrg.isPresent() && jwtOrg.get().equals(orgId)) {
+      return true;
+    }
+    Optional<User> userOpt = userRepository.findById(userId);
+    if (userOpt.isPresent()) {
+      User u = userOpt.get();
+      if (u.getOrganization() != null && u.getOrganization().getId().equals(orgId)) {
+        return true;
+      }
+    }
+    return realEstateAgentRepository
+        .findByUserId(userId)
+        .map(a -> a.getOrganizationId().equals(orgId))
+        .orElse(false);
+  }
 
   public Organization toEntity(OrganizationRequest request) {
     Organization organization =
@@ -177,46 +242,68 @@ public class OrganizationMapper {
                 .build());
       }
     }
-    return OrganizationResponse.builder()
-        .id(organization.getId())
-        .name(organization.getName())
-        .registrationNumber(organization.getRegistrationNumber())
-        .businessRegistration(organization.getBusinessRegistration())
-        .license(organization.getLicense())
-        .vatRegistration(organization.getVatRegistration())
-        .tinRegistration(organization.getTinRegistration())
-        .businessRegistrationNumber(organization.getBusinessRegistrationNumber())
-        .licenseNumber(organization.getLicenseNumber())
-        .vatNumber(organization.getVatNumber())
-        .tinNumber(organization.getTinNumber())
-        .type(organization.getType())
-        .status(organization.getStatus())
-        .address(organization.getAddress())
-        .city(organization.getCity())
-        .country(organization.getCountry())
-        .latitude(organization.getLatitude())
-        .longitude(organization.getLongitude())
-        .phoneNumbers(phoneDtos)
-        .email(c != null ? c.getEmail() : null)
-        .website(c != null ? c.getWebsite() : null)
-        .facebookUrl(c != null ? c.getFacebookUrl() : null)
-        .instagramUrl(c != null ? c.getInstagramUrl() : null)
-        .linkedinUrl(c != null ? c.getLinkedinUrl() : null)
-        .twitterUrl(c != null ? c.getTwitterUrl() : null)
-        .youtubeUrl(c != null ? c.getYoutubeUrl() : null)
-        .description(organization.getDescription())
-        .primaryContactUserId(
-            organization.getPrimaryContact() != null
-                ? organization.getPrimaryContact().getId()
-                : null)
-        .createdAt(organization.getCreatedAt())
-        .updatedAt(organization.getUpdatedAt())
-        .verified(organization.isVerified())
-        .verificationLevel(
-            organization.getVerificationLevel() != null
-                ? organization.getVerificationLevel().name()
-                : null)
-        .supplierSubcategories(mapSupplierSubcategories(organization))
-        .build();
+    var responseBuilder =
+        OrganizationResponse.builder()
+            .id(organization.getId())
+            .name(organization.getName())
+            .registrationNumber(organization.getRegistrationNumber())
+            .businessRegistration(organization.getBusinessRegistration())
+            .license(organization.getLicense())
+            .vatRegistration(organization.getVatRegistration())
+            .tinRegistration(organization.getTinRegistration())
+            .businessRegistrationNumber(organization.getBusinessRegistrationNumber())
+            .licenseNumber(organization.getLicenseNumber())
+            .vatNumber(organization.getVatNumber())
+            .tinNumber(organization.getTinNumber())
+            .type(organization.getType())
+            .status(organization.getStatus())
+            .address(organization.getAddress())
+            .city(organization.getCity())
+            .country(organization.getCountry())
+            .latitude(organization.getLatitude())
+            .longitude(organization.getLongitude())
+            .phoneNumbers(phoneDtos)
+            .email(c != null ? c.getEmail() : null)
+            .website(c != null ? c.getWebsite() : null)
+            .facebookUrl(c != null ? c.getFacebookUrl() : null)
+            .instagramUrl(c != null ? c.getInstagramUrl() : null)
+            .linkedinUrl(c != null ? c.getLinkedinUrl() : null)
+            .twitterUrl(c != null ? c.getTwitterUrl() : null)
+            .youtubeUrl(c != null ? c.getYoutubeUrl() : null)
+            .description(organization.getDescription())
+            .primaryContactUserId(
+                organization.getPrimaryContact() != null
+                    ? organization.getPrimaryContact().getId()
+                    : null)
+            .createdAt(organization.getCreatedAt())
+            .updatedAt(organization.getUpdatedAt())
+            .verified(organization.isVerified())
+            .verificationLevel(
+                organization.getVerificationLevel() != null
+                    ? organization.getVerificationLevel().name()
+                    : null)
+            .supplierSubcategories(mapSupplierSubcategories(organization))
+            .averageRating(
+                reviewRepository != null
+                    ? reviewRepository.getAverageRatingForOrganization(organization.getId())
+                    : null)
+            .reviewCount(
+                reviewRepository != null
+                    ? reviewRepository.getReviewCountForOrganization(organization.getId())
+                    : 0);
+
+    if (shouldExposeDocumentReviews(organization)) {
+      responseBuilder
+          .businessRegistrationReviewStatus(organization.getBusinessRegistrationReviewStatus())
+          .businessRegistrationReviewComment(organization.getBusinessRegistrationReviewComment())
+          .licenseReviewStatus(organization.getLicenseReviewStatus())
+          .licenseReviewComment(organization.getLicenseReviewComment())
+          .vatRegistrationReviewStatus(organization.getVatRegistrationReviewStatus())
+          .vatRegistrationReviewComment(organization.getVatRegistrationReviewComment())
+          .tinRegistrationReviewStatus(organization.getTinRegistrationReviewStatus())
+          .tinRegistrationReviewComment(organization.getTinRegistrationReviewComment());
+    }
+
+    return responseBuilder.build();
   }
 }

@@ -1,6 +1,7 @@
 package com.housingplatform.identity.dto;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationDocumentReviewStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -103,4 +104,20 @@ public class OrganizationResponse {
    * only). Empty for other types.
    */
   private List<SupplierSubcategoryResponse> supplierSubcategories;
+
+  private Double averageRating;
+  private Integer reviewCount;
+
+  /**
+   * Admin-only: review status for each verification document. Omitted for non-admin API consumers.
+   */
+  private OrganizationDocumentReviewStatus businessRegistrationReviewStatus;
+
+  private String businessRegistrationReviewComment;
+  private OrganizationDocumentReviewStatus licenseReviewStatus;
+  private String licenseReviewComment;
+  private OrganizationDocumentReviewStatus vatRegistrationReviewStatus;
+  private String vatRegistrationReviewComment;
+  private OrganizationDocumentReviewStatus tinRegistrationReviewStatus;
+  private String tinRegistrationReviewComment;
 }

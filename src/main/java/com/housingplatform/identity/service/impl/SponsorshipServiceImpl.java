@@ -15,6 +15,8 @@ import com.housingplatform.identity.repository.SponsorshipRepository;
 import com.housingplatform.identity.service.OrganizationPrimaryUserProvisioningService;
 import com.housingplatform.identity.service.OrganizationService;
 import com.housingplatform.identity.service.SponsorshipService;
+import com.housingplatform.publicsupport.rag.SupportRagIndexEvents;
+import com.housingplatform.publicsupport.rag.SupportRagSourceType;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.UserContext;
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
   private final OrganizationService organizationService;
   private final OrganizationPrimaryUserProvisioningService
       organizationPrimaryUserProvisioningService;
+  private final ApplicationEventPublisher eventPublisher;
 
   // ========== Sponsorship Package Management (Admin Only) ==========
 
@@ -65,6 +69,7 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             .build();
 
     Sponsorship saved = sponsorshipRepository.save(sponsorship);
+    eventPublisher.publishEvent(new SupportRagIndexEvents.RagIndexSponsorshipEvent(saved.getId()));
     return toSponsorshipResponse(saved);
   }
 
@@ -137,6 +142,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     }
 
     Sponsorship updated = sponsorshipRepository.save(sponsorship);
+    eventPublisher.publishEvent(
+        new SupportRagIndexEvents.RagIndexSponsorshipEvent(updated.getId()));
     return toSponsorshipResponse(updated);
   }
 
@@ -148,6 +155,8 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     if (!sponsorshipRepository.existsById(id)) {
       throw new ResourceNotFoundException("Sponsorship", id);
     }
+    eventPublisher.publishEvent(
+        new SupportRagIndexEvents.RagDeleteRagSourceEvent(SupportRagSourceType.SPONSORSHIP, id));
     sponsorshipRepository.deleteById(id);
   }
 
