@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +39,16 @@ public class PublicSupportChatService {
 
   @Value("${app.support-chat.model:gpt-4o-mini}")
   private String chatModel;
+
+  @PostConstruct
+  void logSupportChatConfig() {
+    log.info(
+        "Support chat: enabled={}, apiBaseUrl={}, model={}, llmApiKeyConfigured={}",
+        supportChatEnabled,
+        apiBaseUrl,
+        chatModel,
+        StringUtils.hasText(llmApiKey));
+  }
 
   private static final String SYSTEM_PROMPT =
       """

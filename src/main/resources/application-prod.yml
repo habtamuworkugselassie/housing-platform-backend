@@ -25,8 +25,12 @@ spring:
 
 logging:
   level:
+    # root WARN hides most framework INFO (including Spring Boot startup). Explicit loggers below
+    # restore visibility in hosted "Logs" UIs (Render, etc.) without flooding all of Spring.
     root: WARN
     com.housingplatform: INFO
+    org.springframework.boot: INFO
+    org.flywaydb: INFO
     org.springframework.security: WARN
     org.springframework.security.web: WARN
     org.springframework.security.web.FilterChainProxy: WARN
