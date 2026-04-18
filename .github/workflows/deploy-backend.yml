@@ -33,7 +33,11 @@ jobs:
           push: true
           tags: habtamuwgs/housing-platform-backend:latest
 
-      # Requires GitHub secret: FRONTEND_BASE_URL (e.g. https://your-app.com) for password-reset emails
+      # GitHub repo secrets (Settings → Secrets and variables → Actions):
+      #   FRONTEND_BASE_URL — e.g. https://your-app.com (password-reset emails)
+      #   SUPPORT_CHAT_API_BASE_URL — optional; default https://api.openai.com/v1 if unset
+      #   SUPPORT_CHAT_API_KEY — OpenAI-compatible API key (or leave unset for offline fallback)
+      #   SUPPORT_CHAT_MODEL — optional; default gpt-4o-mini if unset
       - name: Deploy on DigitalOcean droplet
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -43,6 +47,9 @@ jobs:
           script: |
             cd ~/housing-platform
             export FRONTEND_BASE_URL="${{ secrets.FRONTEND_BASE_URL }}"
+            export SUPPORT_CHAT_API_BASE_URL="${{ secrets.SUPPORT_CHAT_API_BASE_URL }}"
+            export SUPPORT_CHAT_API_KEY="${{ secrets.SUPPORT_CHAT_API_KEY }}"
+            export SUPPORT_CHAT_MODEL="${{ secrets.SUPPORT_CHAT_MODEL }}"
             docker pull habtamuwgs/housing-platform-backend:latest
             docker compose up -d backend
             docker image prune -f
