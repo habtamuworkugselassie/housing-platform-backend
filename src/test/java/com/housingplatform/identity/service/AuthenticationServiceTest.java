@@ -89,7 +89,6 @@ class AuthenticationServiceTest {
     when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
         .thenReturn("access-token");
     when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
-    when(realEstateAgentRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
 
     // Act
     AuthResponse response = authenticationService.login(request);
@@ -186,7 +185,6 @@ class AuthenticationServiceTest {
 
     when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
     when(passwordEncoder.matches("password123", testUser.getPasswordHash())).thenReturn(true);
-    when(realEstateAgentRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
 
     // Act & Assert
     BusinessException exception =
@@ -223,7 +221,6 @@ class AuthenticationServiceTest {
     when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
         .thenReturn("access-token");
     when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
-    when(realEstateAgentRepository.existsByUserId(any(UUID.class))).thenReturn(false);
 
     // Act
     AuthResponse response = authenticationService.register(request);

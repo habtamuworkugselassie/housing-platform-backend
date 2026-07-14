@@ -13,3 +13,8 @@ spring:
         format_sql: true
   flyway:
     enabled: false # Disable flyway for H2 tests to avoid migration issues, relying on ddl-auto
+
+jwt:
+  # Test-only signing key required by the internal JWT decoder used in integration tests.
+  secret: test-secret-key-for-testing-purposes-only-minimum-32-characters
+  issuer: housing-platform-test

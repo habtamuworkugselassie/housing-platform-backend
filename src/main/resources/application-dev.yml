@@ -5,9 +5,9 @@ spring:
       hibernate:
         format_sql: true
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/housing_platform}
-    username: ${DATABASE_USERNAME:housing_platform}
-    password: ${DATABASE_PASSWORD:housing_platform}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/housing_platform_production_snapshot}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
 
   security:
     oauth2:
