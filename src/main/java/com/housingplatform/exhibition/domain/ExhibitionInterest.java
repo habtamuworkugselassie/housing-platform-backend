@@ -23,7 +23,19 @@ public class ExhibitionInterest extends BaseEntity {
   private String phoneNumber;
 
   @Column(name = "interest_type", nullable = false, length = 50)
-  private String interestType; // "exhibitor" | "visitor"
+  private String interestType; // "exhibitor" | "visitor" | "partner"
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "partner_role", length = 32)
+  private Sponsorship.PartnerRole partnerRole;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "visibility_scope", length = 32)
+  private Sponsorship.VisibilityScope visibilityScope;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "contribution_mode", length = 32)
+  private Sponsorship.ContributionMode contributionMode;
 
   @Column(length = 500)
   private String company;

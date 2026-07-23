@@ -29,6 +29,9 @@ public class SponsoredOrganizationResponse {
   private String country;
   private String sponsorshipType;
   private BigDecimal basePrice;
+  private String partnerRole;
+  private String visibilityScope;
+  private String contributionMode;
 
   /**
    * {@link com.housingplatform.identity.domain.Organization.OrganizationType} name, e.g.

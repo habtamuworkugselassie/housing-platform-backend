@@ -353,6 +353,13 @@ public class SupportChatRagContextService {
     if (lower.contains("finishing")) {
       s.add(Organization.OrganizationType.FINISHING_CONTRACTOR);
     }
+    if (lower.contains("media")
+        || lower.contains("television")
+        || lower.contains("radio")
+        || lower.contains("publisher")
+        || lower.contains("news")) {
+      s.add(Organization.OrganizationType.MEDIA_COMPANY);
+    }
     if (lower.contains("real estate")
         || lower.contains("realtor")
         || lower.contains("estate agent")) {

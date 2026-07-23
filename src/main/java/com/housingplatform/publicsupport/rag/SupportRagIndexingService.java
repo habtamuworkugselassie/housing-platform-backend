@@ -196,6 +196,9 @@ public class SupportRagIndexingService {
     StringBuilder sb = new StringBuilder();
     sb.append("EXHIBITION sponsorship package: name=").append(nullToEmpty(s.getName()));
     sb.append(" | tierType=").append(s.getType());
+    sb.append(" | partnerRole=").append(s.getPartnerRole());
+    sb.append(" | visibilityScope=").append(s.getVisibilityScope());
+    sb.append(" | contributionMode=").append(s.getContributionMode());
     sb.append(" | status=").append(s.getStatus());
     if (s.getBasePrice() != null) {
       sb.append(" | basePriceETB=").append(s.getBasePrice().stripTrailingZeros().toPlainString());

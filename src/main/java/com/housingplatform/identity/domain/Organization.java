@@ -161,7 +161,8 @@ public class Organization extends BaseAuditEntity {
     DEVELOPER,
     INSURANCE,
     CONSULTANT_ARCHITECT,
-    FINISHING_CONTRACTOR;
+    FINISHING_CONTRACTOR,
+    MEDIA_COMPANY;
 
     @JsonCreator
     public static OrganizationType fromValue(String rawValue) {

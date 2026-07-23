@@ -3,7 +3,7 @@ package com.housingplatform.identity.dto;
 import com.housingplatform.identity.domain.Sponsorship;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,10 +24,16 @@ public class CreateSponsorshipRequest {
   private Sponsorship.SponsorshipType type;
 
   @NotNull(message = "Base price is required")
-  @Positive(message = "Base price must be positive")
+  @PositiveOrZero(message = "Base price must be zero or positive")
   private BigDecimal basePrice;
 
   private String features;
 
   private String notes;
+
+  private Sponsorship.PartnerRole partnerRole;
+
+  private Sponsorship.VisibilityScope visibilityScope;
+
+  private Sponsorship.ContributionMode contributionMode;
 }

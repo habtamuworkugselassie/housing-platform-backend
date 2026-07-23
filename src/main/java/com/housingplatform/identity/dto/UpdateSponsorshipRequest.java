@@ -19,4 +19,7 @@ public class UpdateSponsorshipRequest {
   private String features;
   private Sponsorship.SponsorshipStatus status;
   private String notes;
+  private Sponsorship.PartnerRole partnerRole;
+  private Sponsorship.VisibilityScope visibilityScope;
+  private Sponsorship.ContributionMode contributionMode;
 }

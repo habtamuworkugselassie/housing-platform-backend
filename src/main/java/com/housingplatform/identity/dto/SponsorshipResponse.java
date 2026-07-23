@@ -22,6 +22,9 @@ public class SponsorshipResponse {
   private String features;
   private Sponsorship.SponsorshipStatus status;
   private String notes;
+  private Sponsorship.PartnerRole partnerRole;
+  private Sponsorship.VisibilityScope visibilityScope;
+  private Sponsorship.ContributionMode contributionMode;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

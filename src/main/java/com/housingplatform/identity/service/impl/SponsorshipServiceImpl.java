@@ -66,6 +66,18 @@ public class SponsorshipServiceImpl implements SponsorshipService {
             .features(request.getFeatures())
             .status(Sponsorship.SponsorshipStatus.ACTIVE)
             .notes(request.getNotes())
+            .partnerRole(
+                request.getPartnerRole() != null
+                    ? request.getPartnerRole()
+                    : Sponsorship.PartnerRole.SPONSOR)
+            .visibilityScope(
+                request.getVisibilityScope() != null
+                    ? request.getVisibilityScope()
+                    : Sponsorship.VisibilityScope.BOTH)
+            .contributionMode(
+                request.getContributionMode() != null
+                    ? request.getContributionMode()
+                    : Sponsorship.ContributionMode.CASH)
             .build();
 
     Sponsorship saved = sponsorshipRepository.save(sponsorship);
@@ -139,6 +151,18 @@ public class SponsorshipServiceImpl implements SponsorshipService {
 
     if (request.getNotes() != null) {
       sponsorship.setNotes(request.getNotes());
+    }
+
+    if (request.getPartnerRole() != null) {
+      sponsorship.setPartnerRole(request.getPartnerRole());
+    }
+
+    if (request.getVisibilityScope() != null) {
+      sponsorship.setVisibilityScope(request.getVisibilityScope());
+    }
+
+    if (request.getContributionMode() != null) {
+      sponsorship.setContributionMode(request.getContributionMode());
     }
 
     Sponsorship updated = sponsorshipRepository.save(sponsorship);
@@ -636,6 +660,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
         .features(sponsorship.getFeatures())
         .status(sponsorship.getStatus())
         .notes(sponsorship.getNotes())
+        .partnerRole(sponsorship.getPartnerRole())
+        .visibilityScope(sponsorship.getVisibilityScope())
+        .contributionMode(sponsorship.getContributionMode())
         .createdAt(sponsorship.getCreatedAt())
         .updatedAt(sponsorship.getUpdatedAt())
         .build();
@@ -728,6 +755,9 @@ public class SponsorshipServiceImpl implements SponsorshipService {
                   .country(org.getCountry())
                   .sponsorshipType(app.getSponsorship().getType().name())
                   .basePrice(app.getSponsorship().getBasePrice())
+                  .partnerRole(app.getSponsorship().getPartnerRole().name())
+                  .visibilityScope(app.getSponsorship().getVisibilityScope().name())
+                  .contributionMode(app.getSponsorship().getContributionMode().name())
                   .organizationType(org.getType() != null ? org.getType().name() : null)
                   .build();
             })

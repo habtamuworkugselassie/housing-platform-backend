@@ -16,6 +16,9 @@ public class ExhibitionInterestResponse {
   private String email;
   private String phoneNumber;
   private String interestType;
+  private String partnerRole;
+  private String visibilityScope;
+  private String contributionMode;
   private String company;
   private String message;
   private UUID organizationId;

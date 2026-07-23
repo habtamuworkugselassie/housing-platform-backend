@@ -35,6 +35,7 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
   @Transactional
   public ExhibitionInterestResponse register(ExhibitionInterestRequest request) {
     String interestType = request.getInterestType().trim().toLowerCase();
+    validatePartnerInterest(request, interestType);
     Sponsorship sponsorship =
         resolveSponsorshipForInterest(interestType, request.getSponsorshipId());
 
@@ -83,6 +84,9 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
             .email(email)
             .phoneNumber(phoneNumber)
             .interestType(interestType)
+            .partnerRole("partner".equals(interestType) ? request.getPartnerRole() : null)
+            .visibilityScope("partner".equals(interestType) ? request.getVisibilityScope() : null)
+            .contributionMode("partner".equals(interestType) ? request.getContributionMode() : null)
             .company(company)
             .message(request.getMessage() != null ? request.getMessage().trim() : null)
             .organization(organization)
@@ -105,15 +109,18 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
   }
 
   private Sponsorship resolveSponsorshipForInterest(String interestType, UUID sponsorshipId) {
-    if (!"exhibitor".equals(interestType)) {
+    if ("visitor".equals(interestType)) {
       if (sponsorshipId != null) {
         throw new BusinessException(
-            "Sponsorship package may only be set when registering as an exhibitor");
+            "Sponsorship package may only be set for exhibitor or partner interest");
       }
       return null;
     }
-    if (sponsorshipId == null) {
+    if ("exhibitor".equals(interestType) && sponsorshipId == null) {
       throw new BusinessException("Please select a sponsorship package you are interested in");
+    }
+    if (sponsorshipId == null) {
+      return null;
     }
     Sponsorship s =
         sponsorshipRepository
@@ -125,6 +132,22 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
     return s;
   }
 
+  private static void validatePartnerInterest(
+      ExhibitionInterestRequest request, String interestType) {
+    if (!"partner".equals(interestType)) {
+      return;
+    }
+    if (request.getPartnerRole() == null) {
+      throw new BusinessException("Please select the partnership role you are interested in");
+    }
+    if (request.getVisibilityScope() == null) {
+      throw new BusinessException("Please select where the partnership should be visible");
+    }
+    if (request.getContributionMode() == null) {
+      throw new BusinessException("Please select the proposed contribution type");
+    }
+  }
+
   private static ExhibitionInterestResponse toResponse(ExhibitionInterest e) {
     java.util.UUID sid = e.getSponsorship() != null ? e.getSponsorship().getId() : null;
     String sname = e.getSponsorship() != null ? e.getSponsorship().getName() : null;
@@ -133,6 +156,9 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
         .email(e.getEmail())
         .phoneNumber(e.getPhoneNumber())
         .interestType(e.getInterestType())
+        .partnerRole(e.getPartnerRole() != null ? e.getPartnerRole().name() : null)
+        .visibilityScope(e.getVisibilityScope() != null ? e.getVisibilityScope().name() : null)
+        .contributionMode(e.getContributionMode() != null ? e.getContributionMode().name() : null)
         .company(e.getCompany())
         .message(e.getMessage())
         .organizationId(e.getOrganization() != null ? e.getOrganization().getId() : null)

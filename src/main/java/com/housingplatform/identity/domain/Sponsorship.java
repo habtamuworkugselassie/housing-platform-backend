@@ -38,6 +38,21 @@ public class Sponsorship extends BaseAuditEntity {
   @Column(columnDefinition = "TEXT")
   private String notes;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "partner_role", nullable = false)
+  @Builder.Default
+  private PartnerRole partnerRole = PartnerRole.SPONSOR;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "visibility_scope", nullable = false)
+  @Builder.Default
+  private VisibilityScope visibilityScope = VisibilityScope.BOTH;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "contribution_mode", nullable = false)
+  @Builder.Default
+  private ContributionMode contributionMode = ContributionMode.CASH;
+
   public enum SponsorshipType {
     EXCLUSIVE,
     @JsonAlias({"PREMIUM"})
@@ -61,5 +76,22 @@ public class Sponsorship extends BaseAuditEntity {
   public enum SponsorshipStatus {
     ACTIVE,
     INACTIVE
+  }
+
+  public enum PartnerRole {
+    SPONSOR,
+    MEDIA_PARTNER
+  }
+
+  public enum VisibilityScope {
+    EXHIBITION,
+    PLATFORM,
+    BOTH
+  }
+
+  public enum ContributionMode {
+    CASH,
+    IN_KIND,
+    HYBRID
   }
 }
