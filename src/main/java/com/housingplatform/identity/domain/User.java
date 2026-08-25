@@ -64,6 +64,13 @@ public class User extends BaseAuditEntity {
     BANKER,
     REALTOR,
     SUPPLIER,
-    ADMIN
+    ADMIN,
+    /** Platform owner tier: manages admins and sponsor-company credentials. */
+    SUPER_ADMIN;
+
+    /** Roles that may only be granted by a {@link #SUPER_ADMIN}. */
+    public boolean isPrivileged() {
+      return this == ADMIN || this == SUPER_ADMIN;
+    }
   }
 }

@@ -1,6 +1,7 @@
 package com.housingplatform.identity.repository;
 
 import com.housingplatform.identity.domain.User;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,9 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
   boolean existsByEmail(String email);
 
   boolean existsByPhoneNumber(String phoneNumber);
+
+  @Query("SELECT u FROM User u WHERE u.organization.id = :organizationId ORDER BY u.createdAt ASC")
+  List<User> findByOrganizationId(@Param("organizationId") UUID organizationId);
 
   @Query(
       "SELECT u FROM User u WHERE "

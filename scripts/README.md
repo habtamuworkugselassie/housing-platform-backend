@@ -342,3 +342,55 @@ psql -U postgres -d housing_platform -f scripts/create-admin-user.sql
 **Note:** The script is idempotent - it checks if the admin user exists before creating, so it's safe to run multiple times.
 
 **Important:** Change the default password after first login!
+
+### 9. Create or Promote a Super Admin
+
+`SUPER_ADMIN` is the tier that manages platform admins and issues sponsor-company logins
+(Admin → Organizations → **Accounts**). It grants both the `admin` and `super_admin` token
+scopes, so a super admin reaches every admin screen on its own — you do **not** also need to
+give them the `ADMIN` role.
+
+> **Deploy first.** `SUPER_ADMIN` only exists from migration **V51** onwards. Inserting the role
+> into a database whose backend predates it will break that user's login: `User.roles` is an
+> EAGER `@Enumerated(EnumType.STRING)` collection, so Hibernate throws
+> `No enum constant UserRole.SUPER_ADMIN` every time it loads the account. Deploy the new
+> backend (which runs V51 automatically) *before* running this script.
+>
+> V51 already promotes the longest-standing `ADMIN` account, so after a deploy you usually have
+> a super admin without running anything. Use this script for *additional* super admins, or if
+> the automatic pick was the wrong person.
+
+```bash
+# Linux/Mac — prompts for anything you leave out
+./create-super-admin.sh
+
+# Create a new super admin (prompts for the password only)
+./create-super-admin.sh boss@example.com Ada Lovelace
+
+# Promote an existing user, leaving their current password alone
+./create-super-admin.sh --promote-only boss@example.com
+
+# Windows PowerShell
+.\create-super-admin.ps1 -Email boss@example.com -FirstName Ada -LastName Lovelace
+.\create-super-admin.ps1 -Email boss@example.com -PromoteOnly
+```
+
+The script hashes the password with BCrypt cost 10 (matching Spring's default
+`BCryptPasswordEncoder`) using `python3 -c 'import bcrypt'`, falling back to `htpasswd`. If
+neither is installed, generate the hash yourself and call the SQL directly:
+
+```bash
+# Generate a hash
+python3 -c "import bcrypt;print(bcrypt.hashpw(b'YourPassword1', bcrypt.gensalt(10)).decode())"
+htpasswd -bnBC 10 "" 'YourPassword1' | tr -d ':\n'
+
+# Then run the SQL with it (pass password_hash='' to promote without changing the password)
+psql -U "$DB_USER" -d "$DB_NAME" \
+     -v email=boss@example.com -v first_name=Ada -v last_name=Lovelace \
+     -v password_hash='$2a$10$...' \
+     -f create-super-admin.sql
+```
+
+The script is idempotent — re-run it to reset the password or re-grant the role. If the account
+was already signed in, it must sign out and back in for the new `super_admin` scope to appear in
+its token.

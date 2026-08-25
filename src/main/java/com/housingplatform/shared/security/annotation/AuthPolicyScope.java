@@ -31,6 +31,13 @@ public @interface AuthPolicyScope {
     SUPPLIER_SECURED,
 
     /** Requires admin scope */
-    ADMIN_SECURED
+    ADMIN_SECURED,
+
+    /**
+     * Requires super-admin scope. Not satisfied by a plain admin token — the {@code admin} scope
+     * bypass in {@link com.housingplatform.shared.security.ScopeAuthorizationFilter} is disabled
+     * for endpoints carrying this policy.
+     */
+    SUPER_ADMIN_SECURED
   }
 }

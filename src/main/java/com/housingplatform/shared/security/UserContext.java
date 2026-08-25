@@ -26,11 +26,23 @@ public class UserContext {
     return null;
   }
 
+  /**
+   * Exact match against the space-delimited {@code scope} claim. Must not be a substring test:
+   * {@code "super_admin".contains("admin")} would otherwise grant admin rights to any scope that
+   * merely embeds the word.
+   */
   public static boolean hasScope(String scope) {
     Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     if (principal instanceof Jwt jwt) {
       String scopes = jwt.getClaimAsString("scope");
-      return scopes != null && scopes.contains(scope);
+      if (scopes == null || scopes.isBlank()) {
+        return false;
+      }
+      for (String granted : scopes.trim().split("\\s+")) {
+        if (granted.equals(scope)) {
+          return true;
+        }
+      }
     }
     return false;
   }
@@ -47,6 +59,15 @@ public class UserContext {
    */
   public static boolean isAdmin() {
     return hasScope(PortalScope.ADMIN);
+  }
+
+  /**
+   * Check if the current user is a super admin (may manage admins and sponsor-company credentials).
+   *
+   * @return true if user has super admin scope, false otherwise
+   */
+  public static boolean isSuperAdmin() {
+    return hasScope(PortalScope.SUPER_ADMIN);
   }
 
   public static java.util.Optional<UUID> getCurrentUserOrganizationId() {

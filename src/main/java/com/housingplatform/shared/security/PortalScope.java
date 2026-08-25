@@ -11,6 +11,7 @@ public class PortalScope {
   public static final String REALTOR = "realtor";
   public static final String SUPPLIER = "supplier";
   public static final String ADMIN = "admin";
+  public static final String SUPER_ADMIN = "super_admin";
 
   private PortalScope() {
     // Utility class
