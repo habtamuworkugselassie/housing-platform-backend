@@ -1,6 +1,7 @@
 package com.housingplatform.identity.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationRoles;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.UserCreateRequest;
@@ -87,6 +88,7 @@ public class UserServiceImpl implements UserService {
 
   @Override
   public UserResponse createUser(UserCreateRequest request) {
+    requireSuperAdminForPrivilegedRoles(request.getRoles(), Set.of());
     if (userRepository.findByEmail(request.getEmail().trim().toLowerCase()).isPresent()) {
       throw new BusinessException("Email already registered");
     }
@@ -190,6 +192,11 @@ public class UserServiceImpl implements UserService {
       throw new BusinessException("At least one role is required");
     }
 
+    if (UserContext.isAdmin() && request.getRoles() != null) {
+      requireSuperAdminForPrivilegedRoles(request.getRoles(), user.getRoles());
+    }
+    guardAgainstSelfLockout(user, request);
+
     // Admins can update any user
     // Only admins can update roles and status
     // Do not call user.setRoles(request.getRoles()) here: that replaces the Hibernate-managed
@@ -233,17 +240,60 @@ public class UserServiceImpl implements UserService {
     return populateProfileImage(userMapper.toResponse(updated), updated);
   }
 
-  private static void validateOrganizationAssignable(Organization org, Set<User.UserRole> roles) {
-    boolean ok =
-        (roles.contains(User.UserRole.REALTOR)
-                && org.getType() == Organization.OrganizationType.REAL_ESTATE_COMPANY)
-            || (roles.contains(User.UserRole.BANKER)
-                && org.getType() == Organization.OrganizationType.BANK)
-            || (roles.contains(User.UserRole.SUPPLIER)
-                && org.getType() == Organization.OrganizationType.SUPPLIER);
-    if (!ok) {
+  /**
+   * Only a super admin may hand out or take away {@code ADMIN} / {@code SUPER_ADMIN}. Without this
+   * any admin could mint another admin (or promote themselves), which would make the super-admin
+   * tier decorative.
+   *
+   * @param requested roles the caller wants the account to end up with
+   * @param current roles the account holds today (empty for a create)
+   */
+  private static void requireSuperAdminForPrivilegedRoles(
+      Set<User.UserRole> requested, Set<User.UserRole> current) {
+    if (requested == null || UserContext.isSuperAdmin()) {
+      return;
+    }
+    for (User.UserRole role : User.UserRole.values()) {
+      if (!role.isPrivileged()) {
+        continue;
+      }
+      boolean granting = requested.contains(role) && !current.contains(role);
+      boolean revoking = !requested.contains(role) && current.contains(role);
+      if (granting || revoking) {
+        throw new BusinessException(
+            "Only a super admin can grant or revoke the " + role + " role.");
+      }
+    }
+  }
+
+  /**
+   * Stops the last hand on the wheel from removing its own access: a super admin cannot strip their
+   * own privileged roles or deactivate their own account, since nobody else could restore them.
+   */
+  private static void guardAgainstSelfLockout(User target, UserUpdateRequest request) {
+    if (!UserContext.isSuperAdmin() || !target.getId().equals(UserContext.getCurrentUserId())) {
+      return;
+    }
+    if (request.getRoles() != null
+        && !request.getRoles().contains(User.UserRole.SUPER_ADMIN)
+        && target.getRoles().contains(User.UserRole.SUPER_ADMIN)) {
       throw new BusinessException(
-          "Organization type does not match user roles (realtor / banker / supplier).");
+          "You cannot remove your own super admin role. Ask another super admin to do it.");
+    }
+    boolean deactivating =
+        Boolean.FALSE.equals(request.getEnabled())
+            || (request.getStatus() != null && request.getStatus() != User.UserStatus.ACTIVE);
+    if (deactivating) {
+      throw new BusinessException("You cannot deactivate your own super admin account.");
+    }
+  }
+
+  private static void validateOrganizationAssignable(Organization org, Set<User.UserRole> roles) {
+    if (!OrganizationRoles.matchesPortalRole(org.getType(), roles)) {
+      throw new BusinessException(
+          String.format(
+              "Organization type %s requires the %s role on the user.",
+              org.getType(), OrganizationRoles.portalRoleFor(org.getType())));
     }
   }
 

@@ -1,6 +1,7 @@
 package com.housingplatform.identity.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.identity.domain.OrganizationRoles;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.ProvisionOrganizationPrimaryUserRequest;
@@ -11,9 +12,7 @@ import com.housingplatform.identity.service.OrganizationPrimaryUserProvisioningS
 import com.housingplatform.shared.exception.BusinessException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -59,7 +58,7 @@ public class OrganizationPrimaryUserProvisioningServiceImpl
             .status(User.UserStatus.ACTIVE)
             .emailVerified(false)
             .phoneVerified(false)
-            .roles(rolesForOrganizationType(org.getType()))
+            .roles(OrganizationRoles.defaultRolesFor(org.getType()))
             .organization(org)
             .build();
     user = userRepository.save(user);
@@ -109,7 +108,7 @@ public class OrganizationPrimaryUserProvisioningServiceImpl
             .status(User.UserStatus.PENDING_VERIFICATION)
             .emailVerified(false)
             .phoneVerified(false)
-            .roles(rolesForOrganizationType(org.getType()))
+            .roles(OrganizationRoles.defaultRolesFor(org.getType()))
             .organization(org)
             .build();
     user = userRepository.save(user);
@@ -191,24 +190,5 @@ public class OrganizationPrimaryUserProvisioningServiceImpl
       }
     }
     return phoneFallback != null ? phoneFallback.trim() : null;
-  }
-
-  private static Set<User.UserRole> rolesForOrganizationType(Organization.OrganizationType type) {
-    Set<User.UserRole> roles = new HashSet<>();
-    switch (type) {
-      case REAL_ESTATE_COMPANY:
-        roles.add(User.UserRole.REALTOR);
-        break;
-      case BANK:
-        roles.add(User.UserRole.BANKER);
-        break;
-      case SUPPLIER:
-        roles.add(User.UserRole.SUPPLIER);
-        break;
-      default:
-        roles.add(User.UserRole.SUPPLIER);
-        break;
-    }
-    return roles;
   }
 }

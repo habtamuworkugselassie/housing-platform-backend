@@ -77,11 +77,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     // Extract scopes from user roles
-    List<String> scopes =
-        user.getRoles().stream()
-            .map(role -> mapRoleToScope(role))
-            .filter(scope -> scope != null)
-            .collect(Collectors.toList());
+    List<String> scopes = mapRolesToScopes(user.getRoles());
 
     // Extract role names
     List<String> roles = user.getRoles().stream().map(Enum::name).collect(Collectors.toList());
@@ -109,13 +105,26 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         .build();
   }
 
-  private String mapRoleToScope(User.UserRole role) {
+  /**
+   * Token scopes for a role set. {@link User.UserRole#SUPER_ADMIN} carries {@code admin} as well so
+   * every existing {@code ADMIN_SECURED} endpoint stays reachable, plus {@code super_admin} for the
+   * endpoints a plain admin must not touch.
+   */
+  private List<String> mapRolesToScopes(Collection<User.UserRole> roles) {
+    return roles.stream()
+        .flatMap(role -> mapRoleToScopes(role).stream())
+        .distinct()
+        .collect(Collectors.toList());
+  }
+
+  private List<String> mapRoleToScopes(User.UserRole role) {
     return switch (role) {
-      case BUYER -> PortalScope.BUYER;
-      case BANKER -> PortalScope.BANKER;
-      case REALTOR -> PortalScope.REALTOR;
-      case SUPPLIER -> PortalScope.SUPPLIER;
-      case ADMIN -> PortalScope.ADMIN;
+      case BUYER -> List.of(PortalScope.BUYER);
+      case BANKER -> List.of(PortalScope.BANKER);
+      case REALTOR -> List.of(PortalScope.REALTOR);
+      case SUPPLIER -> List.of(PortalScope.SUPPLIER);
+      case ADMIN -> List.of(PortalScope.ADMIN);
+      case SUPER_ADMIN -> List.of(PortalScope.ADMIN, PortalScope.SUPER_ADMIN);
     };
   }
 
@@ -206,11 +215,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       }
 
       // Extract scopes and roles
-      List<String> scopes =
-          user.getRoles().stream()
-              .map(role -> mapRoleToScope(role))
-              .filter(scope -> scope != null)
-              .collect(Collectors.toList());
+      List<String> scopes = mapRolesToScopes(user.getRoles());
 
       List<String> roles = user.getRoles().stream().map(Enum::name).collect(Collectors.toList());
 
@@ -268,8 +273,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       }
     }
 
-    // Validate role - ADMIN cannot be self-assigned
-    if (request.getRole() == User.UserRole.ADMIN) {
+    // Validate role - ADMIN / SUPER_ADMIN cannot be self-assigned
+    if (request.getRole() != null && request.getRole().isPrivileged()) {
       throw new BusinessException(
           "Admin role cannot be self-assigned. Please contact system administrator.");
     }
@@ -318,11 +323,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     // Extract scopes from user roles
-    List<String> scopes =
-        savedUser.getRoles().stream()
-            .map(this::mapRoleToScope)
-            .filter(scope -> scope != null)
-            .collect(Collectors.toList());
+    List<String> scopes = mapRolesToScopes(savedUser.getRoles());
 
     // Extract role names
     List<String> roleNames =
@@ -464,8 +465,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       user = userRepository.save(user);
     }
 
-    List<String> scopes =
-        user.getRoles().stream().map(this::mapRoleToScope).filter(Objects::nonNull).toList();
+    List<String> scopes = mapRolesToScopes(user.getRoles());
 
     List<String> roleNames = user.getRoles().stream().map(Enum::name).collect(Collectors.toList());
 

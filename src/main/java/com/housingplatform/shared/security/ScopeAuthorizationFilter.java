@@ -196,11 +196,21 @@ public class ScopeAuthorizationFilter extends OncePerRequestFilter {
       Set<String> requiredScopesLower =
           requiredScopes.stream().map(String::toLowerCase).collect(Collectors.toSet());
 
-      // Check if token has at least one of the required scopes
-      boolean hasRequiredScope =
-          requiredScopesLower.isEmpty()
-              || requiredScopesLower.stream().anyMatch(tokenScopes::contains)
-              || token.hasScope("admin"); // Admin has access to everything
+      // Super-admin endpoints are the one place the usual "any one of the required scopes wins"
+      // rule is too loose: super_admin is mandatory there, and the blanket admin bypass is off.
+      // Otherwise a plain admin token — or a token holding only the action scope — would pass.
+      boolean superAdminRequired = requiredScopesLower.contains(PortalScope.SUPER_ADMIN);
+
+      boolean hasRequiredScope;
+      if (superAdminRequired) {
+        hasRequiredScope = tokenScopes.contains(PortalScope.SUPER_ADMIN);
+      } else {
+        // Check if token has at least one of the required scopes
+        hasRequiredScope =
+            requiredScopesLower.isEmpty()
+                || requiredScopesLower.stream().anyMatch(tokenScopes::contains)
+                || token.hasScope(PortalScope.ADMIN); // Admin has access to everything else
+      }
 
       if (!hasRequiredScope) {
         log.warn(
@@ -236,6 +246,7 @@ public class ScopeAuthorizationFilter extends OncePerRequestFilter {
       case REALTOR_SECURED -> PortalScope.REALTOR;
       case SUPPLIER_SECURED -> PortalScope.SUPPLIER;
       case ADMIN_SECURED -> PortalScope.ADMIN;
+      case SUPER_ADMIN_SECURED -> PortalScope.SUPER_ADMIN;
     };
   }
 }
