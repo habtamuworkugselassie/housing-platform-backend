@@ -62,13 +62,6 @@ management:
     mail:
       enabled: false
 
-# Rate limiting: on in production (dev leaves it off for convenience). The filter fails open
-# if Redis is unreachable, so this cannot lock users out — it only caps brute-force attempts.
-rate:
-  limit:
-    auth:
-      enabled: ${RATE_LIMIT_AUTH_ENABLED:true}
-
 # API docs are a development aid; exposing the full endpoint map and a live request console in
 # production is unnecessary attack surface. Flip SWAGGER_ENABLED=true only for a debugging window.
 springdoc:
