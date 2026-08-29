@@ -109,4 +109,32 @@ jobs:
             docker tag "$REGISTRY_IMAGE:$SHA" "$DEPLOY_IMAGE:latest"
 
             docker compose up -d backend
+
+            # Health gate. Poll the app's own health endpoint until it reports healthy. Flyway runs
+            # at startup, so a checksum mismatch or a bad migration surfaces here as a container that
+            # never becomes healthy — exactly the failure that showed two green deploys while
+            # production was down. On timeout, roll back to the image that was serving before and
+            # fail the job so the deploy goes red.
+            echo "Waiting for backend to become healthy..."
+            healthy=false
+            for i in $(seq 1 30); do
+              # busybox wget exits 0 only on a 2xx response; anything else (connection refused
+              # while booting, or a non-200 health status) is non-zero.
+              if docker compose exec -T backend wget -q -O /dev/null http://127.0.0.1:8080/actuator/health; then
+                healthy=true; break
+              fi
+              sleep 5
+            done
+
+            if [ "$healthy" != "true" ]; then
+              echo "::error::Backend did not become healthy within 150s — rolling back."
+              docker compose logs --tail 60 backend || true
+              docker tag "$DEPLOY_IMAGE:rollback-$SHA" "$DEPLOY_IMAGE:latest" 2>/dev/null \
+                && docker compose up -d backend \
+                && echo "Rolled back to the previous image." \
+                || echo "::warning::No previous image to roll back to."
+              exit 1
+            fi
+            echo "Backend is healthy."
+
             docker image prune -f

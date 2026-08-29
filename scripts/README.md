@@ -299,50 +299,6 @@ spring:
     password: housing_platform
 ```
 
-### 8. Create Admin User
-
-**create-admin-user.sql / create-admin-user.sh / create-admin-user.ps1**
-
-Creates a default admin user with ADMIN role for accessing the admin portal.
-
-**Default Credentials:**
-- Email: `admin@housingplatform.com`
-- Password: `admin123`
-
-**Usage:**
-
-```bash
-# Linux/Mac
-./scripts/create-admin-user.sh
-
-# Or with custom database settings
-DB_HOST=localhost DB_PORT=5432 DB_NAME=housing_platform DB_USER=postgres ./scripts/create-admin-user.sh
-```
-
-```powershell
-# Windows PowerShell
-.\scripts\create-admin-user.ps1
-
-# Or with custom database settings
-.\scripts\create-admin-user.ps1 -DbHost localhost -DbPort 5432 -DbName housing_platform -DbUser postgres
-```
-
-```sql
-# Direct SQL execution
-psql -U postgres -d housing_platform -f scripts/create-admin-user.sql
-```
-
-**What it creates:**
-- An admin user with email: `admin@housingplatform.com`
-- Password: `admin123` (BCrypt hashed)
-- ADMIN role assigned
-- User status: ACTIVE
-- Email verified: TRUE
-
-**Note:** The script is idempotent - it checks if the admin user exists before creating, so it's safe to run multiple times.
-
-**Important:** Change the default password after first login!
-
 ### 9. Create or Promote a Super Admin
 
 `SUPER_ADMIN` is the tier that manages platform admins and issues sponsor-company logins

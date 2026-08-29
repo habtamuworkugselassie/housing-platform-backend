@@ -13,6 +13,7 @@ import com.housingplatform.identity.dto.OrganizationAccountResponse;
 import com.housingplatform.identity.dto.SetAccountPasswordRequest;
 import com.housingplatform.identity.dto.UpdateAccountStatusRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
+import com.housingplatform.identity.repository.PasswordResetTokenRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.impl.OrganizationAccountServiceImpl;
@@ -39,6 +40,8 @@ class OrganizationAccountServiceTest {
   @Mock private OrganizationRepository organizationRepository;
   @Mock private RealEstateAgentRepository realEstateAgentRepository;
   @Mock private PasswordEncoder passwordEncoder;
+  @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
+  @Mock private PasswordResetEmailService passwordResetEmailService;
 
   @InjectMocks private OrganizationAccountServiceImpl service;
 
@@ -119,6 +122,16 @@ class OrganizationAccountServiceTest {
     assertEquals(User.UserStatus.ACTIVE, user.getStatus());
     assertTrue(response.getPrimaryContact());
     assertSame(user, o.getPrimaryContact());
+  }
+
+  @Test
+  void createAccountSendsAWelcomeEmailWithASetPasswordLink() {
+    org(Organization.OrganizationType.MEDIA_COMPANY);
+
+    service.createAccount(orgId, createRequest());
+
+    verify(passwordResetTokenRepository).save(any());
+    verify(passwordResetEmailService).sendAccountWelcomeEmail(anyString(), anyString(), any());
   }
 
   @Test
