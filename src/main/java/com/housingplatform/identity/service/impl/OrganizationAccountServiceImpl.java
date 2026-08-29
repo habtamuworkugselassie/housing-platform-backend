@@ -2,6 +2,7 @@ package com.housingplatform.identity.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationRoles;
+import com.housingplatform.identity.domain.PasswordResetToken;
 import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.CreateOrganizationAccountRequest;
@@ -9,11 +10,16 @@ import com.housingplatform.identity.dto.OrganizationAccountResponse;
 import com.housingplatform.identity.dto.SetAccountPasswordRequest;
 import com.housingplatform.identity.dto.UpdateAccountStatusRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
+import com.housingplatform.identity.repository.PasswordResetTokenRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.OrganizationAccountService;
+import com.housingplatform.identity.service.PasswordResetEmailService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +40,11 @@ public class OrganizationAccountServiceImpl implements OrganizationAccountServic
   private final OrganizationRepository organizationRepository;
   private final RealEstateAgentRepository realEstateAgentRepository;
   private final PasswordEncoder passwordEncoder;
+  private final PasswordResetTokenRepository passwordResetTokenRepository;
+  private final PasswordResetEmailService passwordResetEmailService;
+
+  /** Hours a newly provisioned account's set-password link stays valid. */
+  private static final long WELCOME_TOKEN_EXPIRY_HOURS = 72;
 
   @Override
   @Transactional(readOnly = true)
@@ -94,6 +105,8 @@ public class OrganizationAccountServiceImpl implements OrganizationAccountServic
     } else {
       syncRealEstateAgent(org, user, false);
     }
+
+    sendWelcomeEmail(user, org);
 
     log.info(
         "Provisioned account {} for organization {} ({})", email, org.getName(), organizationId);
@@ -268,5 +281,33 @@ public class OrganizationAccountServiceImpl implements OrganizationAccountServic
         .createdBy(user.getCreatedBy())
         .updatedBy(user.getUpdatedBy())
         .build();
+  }
+
+  /**
+   * Emails the new account a link to set their own password, so the operator does not have to share
+   * the one they typed. Best-effort: a mail failure must not fail account creation.
+   */
+  private void sendWelcomeEmail(User user, Organization org) {
+    try {
+      passwordResetTokenRepository.deleteByUserId(user.getId());
+      String token = generateSecureToken();
+      Instant expiresAt = Instant.now().plusSeconds(WELCOME_TOKEN_EXPIRY_HOURS * 3600L);
+      passwordResetTokenRepository.save(
+          PasswordResetToken.builder()
+              .token(token)
+              .userId(user.getId())
+              .expiresAt(expiresAt)
+              .build());
+      passwordResetEmailService.sendAccountWelcomeEmail(user.getEmail(), token, org.getName());
+    } catch (Exception e) {
+      log.warn("Could not send welcome email to {}: {}", user.getEmail(), e.getMessage());
+    }
+  }
+
+  private static String generateSecureToken() {
+    SecureRandom random = new SecureRandom();
+    byte[] bytes = new byte[48];
+    random.nextBytes(bytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 }

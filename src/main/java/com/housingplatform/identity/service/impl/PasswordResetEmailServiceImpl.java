@@ -49,4 +49,42 @@ public class PasswordResetEmailServiceImpl implements PasswordResetEmailService 
       log.warn("Password reset link for {}: {}", toEmail, resetUrl);
     }
   }
+
+  @Override
+  public void sendAccountWelcomeEmail(
+      String toEmail, String setPasswordToken, String organizationName) {
+    String setPasswordUrl =
+        frontendBaseUrl.replaceAll("/$", "") + "/reset-password?token=" + setPasswordToken;
+    String org =
+        (organizationName == null || organizationName.isBlank())
+            ? "your organization"
+            : organizationName;
+
+    if (fromEmail == null || fromEmail.isBlank()) {
+      log.warn(
+          "Mail not configured (spring.mail.username empty). Account set-password link for {}: {}",
+          toEmail,
+          setPasswordUrl);
+      return;
+    }
+
+    try {
+      SimpleMailMessage message = new SimpleMailMessage();
+      message.setFrom(fromEmail);
+      message.setTo(toEmail);
+      message.setSubject("Your Ethio Build Connect account");
+      message.setText(
+          "An account has been created for you to manage "
+              + org
+              + " on Ethio Build Connect.\n\n"
+              + "Set your password using the link below (valid for a limited time):\n\n"
+              + setPasswordUrl
+              + "\n\nAfter setting your password, sign in with this email address.");
+      mailSender.send(message);
+      log.info("Account welcome email sent to {}", toEmail);
+    } catch (Exception e) {
+      log.error("Failed to send welcome email to {}: {}", toEmail, e.getMessage());
+      log.warn("Account set-password link for {}: {}", toEmail, setPasswordUrl);
+    }
+  }
 }
