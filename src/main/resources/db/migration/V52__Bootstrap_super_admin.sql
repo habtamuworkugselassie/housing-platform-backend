@@ -1,35 +1,41 @@
--- Bootstrap a SUPER_ADMIN account with a known password.
+-- Bootstrap a SUPER_ADMIN account.
 --
 -- SUPER_ADMIN mints both the `admin` and `super_admin` token scopes
 -- (AuthenticationServiceImpl.mapRoleToScopes), so the ADMIN role is not needed as well.
 -- It is the tier that issues sponsor-company logins at Admin -> Organizations -> Accounts.
 --
--- A dedicated address is used rather than the admin@housingplatform.com that
--- scripts/create-admin-user.sql creates, so this cannot collide with an account already in
--- use. The password is set on every run, not only on insert, so the credential is
--- deterministic even if the row is recreated.
+-- The hash below was produced with Spring's own BCryptPasswordEncoder at cost 10 — the same
+-- class the application verifies with — and confirmed with matches() before committing.
+-- Change v_email below if this is not the address you want.
 --
--- The hash was produced with Spring's own BCryptPasswordEncoder at cost 10 — the same class
--- the application verifies with — and confirmed with matches() before committing. The
--- password also satisfies SetAccountPasswordRequest's own pattern, so it can be re-entered
--- through the UI.
+-- SECURITY: this hash is permanent in git history, and Flyway replays the migration on every
+-- environment, so anyone with repository access can sign in as super admin. Treat the
+-- password as compromised the moment this is committed: sign in once, change it, and prefer
+-- scripts/create-super-admin.sh in future — it writes straight to the database and commits
+-- nothing.
 --
--- The hash is permanent in git history and Flyway replays this on every environment, so
--- change the password once the account is in use. For routine provisioning prefer
--- scripts/create-super-admin.sh, which writes straight to the database and commits nothing.
+-- Note also that this password does not satisfy the platform's own policy
+-- (SetAccountPasswordRequest requires an uppercase letter), so it cannot be re-entered
+-- through the UI later. Login itself does not re-validate, so signing in works.
 
 DO $$
 DECLARE
     v_email TEXT := 'superadmin@ethiobuildconnect.et';
-    -- Password@1212
-    v_hash  TEXT := '$2a$10$HpHy57IqiPDrIYMeBTuWF..Pbj/jKmRSnwdGCHh5GfhWeQn0KJrdy';
+    v_hash  TEXT := '$2a$10$hLgE/57rQzTn3wTfvW2Pa.QlXOH26H8Xs.WMehQPRJyxy8Jw/eidW';
 
     v_first TEXT := 'Super';
     v_last  TEXT := 'Admin';
     v_id    UUID;
 BEGIN
+    IF v_hash NOT LIKE '$2%' THEN
+        RAISE WARNING
+            'V52: super admin NOT created — password_hash placeholder was never replaced.';
+        RETURN;
+    END IF;
+
     v_email := lower(trim(v_email));
 
+    -- Idempotent: an existing account keeps its password and is only granted the role.
     SELECT id INTO v_id FROM users WHERE email = v_email;
 
     IF v_id IS NULL THEN
@@ -47,16 +53,16 @@ BEGIN
 
         RAISE NOTICE 'V52: created super admin %', v_email;
     ELSE
-        -- Keep the credential deterministic, and make sure the account can actually sign in:
-        -- a PENDING_VERIFICATION or disabled status would leave it locked out despite the role.
+        -- Make sure an existing account can actually sign in; PENDING_VERIFICATION or a
+        -- disabled status would leave it locked out despite holding the role.
         UPDATE users
-        SET password_hash = v_hash,
-            status        = 'ACTIVE',
-            updated_at    = CURRENT_TIMESTAMP,
-            updated_by    = 'V52'
-        WHERE id = v_id;
+        SET status     = 'ACTIVE',
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = 'V52'
+        WHERE id = v_id
+          AND status <> 'ACTIVE';
 
-        RAISE NOTICE 'V52: reset password and granted SUPER_ADMIN to existing account %', v_email;
+        RAISE NOTICE 'V52: promoted existing account % (password unchanged)', v_email;
     END IF;
 
     INSERT INTO user_roles (user_id, role)
