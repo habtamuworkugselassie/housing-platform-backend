@@ -25,7 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/property-conversations")
 @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
-@Tag(name = "Property conversations", description = "Buyer and assigned-agent listing conversations")
+@Tag(
+    name = "Property conversations",
+    description = "Buyer and assigned-agent listing conversations")
 @RequiredArgsConstructor
 public class PropertyConversationController {
 
@@ -50,7 +52,8 @@ public class PropertyConversationController {
 
   @GetMapping("/{conversationId}/messages")
   @Operation(summary = "List messages and mark received messages as read")
-  public ResponseEntity<List<PropertyMessageResponse>> getMessages(@PathVariable UUID conversationId) {
+  public ResponseEntity<List<PropertyMessageResponse>> getMessages(
+      @PathVariable UUID conversationId) {
     return ResponseEntity.ok(
         propertyConversationService.getMessages(UserContext.getCurrentUserId(), conversationId));
   }
@@ -58,8 +61,7 @@ public class PropertyConversationController {
   @PostMapping("/{conversationId}/messages")
   @Operation(summary = "Send a message in a property conversation")
   public ResponseEntity<PropertyMessageResponse> sendMessage(
-      @PathVariable UUID conversationId,
-      @Valid @RequestBody CreatePropertyMessageRequest request) {
+      @PathVariable UUID conversationId, @Valid @RequestBody CreatePropertyMessageRequest request) {
     PropertyMessageResponse response =
         propertyConversationService.sendMessage(
             UserContext.getCurrentUserId(), conversationId, request);

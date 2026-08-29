@@ -31,7 +31,6 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -284,121 +283,92 @@ public class OAuth2ResourceServerConfig {
                             jwt.decoder(jwtDecoder())
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter()))
                     .accessDeniedHandler(
-                        (request, response, accessDeniedException) -> {
-                          // For API endpoints, let ScopeAuthorizationFilter handle access control
-                          // Don't block here - let the filter chain continue
-                          String path = request.getRequestURI();
-                          if (path.startsWith("/api/")) {
-                            // Allow request to proceed - ScopeAuthorizationFilter will handle it
-                            return;
-                          }
-                          // For other paths, return 403
-                          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                        })
+                        (request, response, accessDeniedException) ->
+                            writeError(
+                                request,
+                                response,
+                                HttpServletResponse.SC_FORBIDDEN,
+                                "Forbidden",
+                                "You do not have permission to access this resource."))
                     .bearerTokenResolver(
                         request -> {
-                          // Extract bearer token if present, otherwise return null
-                          // ScopeAuthorizationFilter will handle UNSECURED endpoints
+                          // Absent header means "anonymous", not "malformed":
+                          // ScopeAuthorizationFilter
+                          // decides whether the target endpoint is UNSECURED.
                           String authHeader = request.getHeader("Authorization");
                           if (authHeader != null && authHeader.startsWith("Bearer ")) {
                             return authHeader.substring(7);
                           }
-                          return null; // No token present - let ScopeAuthorizationFilter handle it
+                          return null;
                         })
                     .authenticationEntryPoint(
                         (request, response, authException) -> {
-                          try {
-                            // For endpoints that might be public (UNSECURED), don't fail
-                            // immediately
-                            // Let ScopeAuthorizationFilter handle it
-                            String path = request.getRequestURI();
-
-                            // For API endpoints, always allow requests to proceed
-                            // ScopeAuthorizationFilter will check if it's UNSECURED and handle
-                            // accordingly
-                            if (path.startsWith("/api/")) {
-                              // Check if there's actually a token in the request
-                              String authHeader = request.getHeader("Authorization");
-                              boolean hasToken =
-                                  authHeader != null && authHeader.startsWith("Bearer ");
-
-                              // If no token is present, let it proceed to ScopeAuthorizationFilter
-                              // If token is present but invalid, still let it proceed (filter will
-                              // handle it)
-                              // Only block if it's a critical security issue
-                              if (!hasToken) {
-                                // No token - let ScopeAuthorizationFilter handle UNSECURED
-                                // endpoints
-                                return;
-                              }
-
-                              // Token present but invalid - check if it's a validation error
-                              boolean isJwtValidationError =
-                                  authException.getCause() instanceof JwtException
-                                      || (authException.getMessage() != null
-                                          && (authException.getMessage().contains("JWT")
-                                              || authException.getMessage().contains("token")));
-
-                              // For API endpoints, let ScopeAuthorizationFilter handle even invalid
-                              // tokens
-                              // It will check UNSECURED and allow or deny accordingly
-                              if (isJwtValidationError) {
-                                // Invalid token - still let it proceed, filter will handle
-                                return;
-                              }
-                            }
-
-                            // For other cases or JWT validation errors, return error
-                            // Check if it's a JWT-related exception
-                            boolean isJwtError =
-                                authException instanceof AuthenticationServiceException
-                                    || authException.getCause() instanceof JwtException
-                                    || authException.getCause() instanceof ExpiredJwtException;
-
-                            // Determine error message based on exception type
-                            String errorMessage = "Authentication required";
-
-                            if (isJwtError) {
-                              Throwable cause = authException.getCause();
-                              if (cause instanceof ExpiredJwtException
+                          // Previously this returned without writing a status for any /api/ path,
+                          // on the assumption that ScopeAuthorizationFilter would answer instead.
+                          // It runs earlier in the chain, so nothing did: the response completed
+                          // as 200 OK with an empty body and clients read denials as success.
+                          Throwable cause = authException.getCause();
+                          boolean expired =
+                              cause instanceof ExpiredJwtException
                                   || (cause != null
                                       && cause.getMessage() != null
-                                      && cause.getMessage().contains("expired"))) {
-                                errorMessage = "JWT token has expired. Please refresh your token.";
-                              } else if (cause instanceof JwtException
+                                      && cause.getMessage().contains("expired"));
+                          boolean jwtProblem =
+                              expired
+                                  || cause instanceof JwtException
+                                  || authException instanceof AuthenticationServiceException
                                   || (authException.getMessage() != null
-                                      && authException.getMessage().contains("JWT"))) {
-                                errorMessage = "JWT token is invalid.";
-                              }
-                            }
+                                      && authException.getMessage().contains("JWT"));
 
-                            // Return 401 with proper JSON error response
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-
-                            Map<String, Object> errorResponse = new HashMap<>();
-                            errorResponse.put("timestamp", LocalDateTime.now().toString());
-                            errorResponse.put("status", HttpServletResponse.SC_UNAUTHORIZED);
-                            errorResponse.put("error", "Authentication Failed");
-                            errorResponse.put("message", errorMessage);
-                            errorResponse.put("path", path);
-
-                            ObjectMapper mapper = new ObjectMapper();
-                            response.getWriter().write(mapper.writeValueAsString(errorResponse));
-                          } catch (IOException e) {
-                            // Ignore IOException
+                          String message = "Authentication required.";
+                          if (expired) {
+                            message = "JWT token has expired. Please refresh your token.";
+                          } else if (jwtProblem) {
+                            message = "JWT token is invalid.";
                           }
+                          writeError(
+                              request,
+                              response,
+                              HttpServletResponse.SC_UNAUTHORIZED,
+                              "Authentication Failed",
+                              message);
                         }))
         .addFilterBefore(
             new com.housingplatform.shared.security.JwtExceptionHandlerFilter(),
             BearerTokenAuthenticationFilter.class)
-        .addFilterBefore(scopeAuthorizationFilter, UsernamePasswordAuthenticationFilter.class);
+        // Must run AFTER authentication. Spring Security orders
+        // UsernamePasswordAuthenticationFilter *before* BearerTokenAuthenticationFilter, so the
+        // previous addFilterBefore(..., UsernamePasswordAuthenticationFilter.class) placed this
+        // upstream of the JWT filter, where the SecurityContext is always empty.
+        .addFilterAfter(scopeAuthorizationFilter, BearerTokenAuthenticationFilter.class);
     // Add rate limiting filter only if it's enabled
     if (rateLimitingFilter != null) {
       http.addFilterBefore(rateLimitingFilter, BearerTokenAuthenticationFilter.class);
     }
 
     return http.build();
+  }
+
+  /** Writes the platform's standard error envelope. */
+  private static void writeError(
+      jakarta.servlet.http.HttpServletRequest request,
+      HttpServletResponse response,
+      int status,
+      String error,
+      String message) {
+    try {
+      response.setStatus(status);
+      response.setContentType("application/json");
+      Map<String, Object> body = new HashMap<>();
+      body.put("timestamp", LocalDateTime.now().toString());
+      body.put("status", status);
+      body.put("error", error);
+      body.put("message", message);
+      body.put("path", request.getRequestURI());
+      response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+    } catch (IOException e) {
+      // The client is gone; nothing useful to do.
+    }
   }
 
   @Bean

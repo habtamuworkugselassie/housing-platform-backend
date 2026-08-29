@@ -2,6 +2,7 @@ package com.housingplatform.publicsupport;
 
 import com.housingplatform.publicsupport.dto.PublicSupportChatRequest;
 import com.housingplatform.publicsupport.dto.PublicSupportChatResponse;
+import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ public class PublicSupportChatController {
   private final PublicSupportChatService publicSupportChatService;
 
   @PostMapping("/chat")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   public PublicSupportChatResponse chat(@Valid @RequestBody PublicSupportChatRequest request) {
     return publicSupportChatService.reply(request);
   }

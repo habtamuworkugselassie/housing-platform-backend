@@ -9,6 +9,8 @@ import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
@@ -21,7 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.method.HandlerMethod;
@@ -37,6 +39,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 class ScopeAuthorizationFilterTest {
 
   @Mock private RequestMappingHandlerMapping handlerMapping;
+  @Mock private ObjectProvider<RequestMappingHandlerMapping> handlerMappingProvider;
   @Mock private HttpServletRequest request;
   @Mock private HttpServletResponse response;
   @Mock private FilterChain chain;
@@ -44,9 +47,20 @@ class ScopeAuthorizationFilterTest {
   private ScopeAuthorizationFilter filter;
 
   @BeforeEach
-  void setUp() {
-    filter = new ScopeAuthorizationFilter(handlerMapping);
+  void setUp() throws Exception {
+    when(handlerMappingProvider.getObject()).thenReturn(handlerMapping);
+    filter = new ScopeAuthorizationFilter(handlerMappingProvider);
     when(request.getRequestURI()).thenReturn("/api/v1/organizations/abc/users");
+    // The filter writes denials to the response rather than throwing: ExceptionTranslationFilter
+    // runs downstream of it and would not catch an exception raised here.
+    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+  }
+
+  /** Asserts the request was refused: nothing forwarded, and the status says why. */
+  private void assertDenied(int expectedStatus) throws Exception {
+    filter.doFilter(request, response, chain);
+    verify(chain, never()).doFilter(any(), any());
+    verify(response).setStatus(expectedStatus);
   }
 
   @AfterEach
@@ -87,8 +101,7 @@ class ScopeAuthorizationFilterTest {
     handlerIs("createAccount");
     authenticateWithScopes("admin");
 
-    assertThrows(AccessDeniedException.class, () -> filter.doFilter(request, response, chain));
-    verify(chain, never()).doFilter(any(), any());
+    assertDenied(HttpServletResponse.SC_FORBIDDEN);
   }
 
   @Test
@@ -106,7 +119,7 @@ class ScopeAuthorizationFilterTest {
     handlerIs("setPassword");
     authenticateWithScopes("admin");
 
-    assertThrows(AccessDeniedException.class, () -> filter.doFilter(request, response, chain));
+    assertDenied(HttpServletResponse.SC_FORBIDDEN);
   }
 
   @Test
@@ -125,7 +138,7 @@ class ScopeAuthorizationFilterTest {
     handlerIs("getAccounts");
     authenticateWithScopes("realtor");
 
-    assertThrows(AccessDeniedException.class, () -> filter.doFilter(request, response, chain));
+    assertDenied(HttpServletResponse.SC_FORBIDDEN);
   }
 
   @Test
@@ -133,7 +146,7 @@ class ScopeAuthorizationFilterTest {
     handlerIs("unlinkAccount");
     authenticateWithScopes("supplier");
 
-    assertThrows(AccessDeniedException.class, () -> filter.doFilter(request, response, chain));
+    assertDenied(HttpServletResponse.SC_FORBIDDEN);
   }
 
   @Test
