@@ -36,23 +36,39 @@ public class PropertyConversationServiceImpl implements PropertyConversationServ
 
   @Override
   @Transactional
-  public PropertyConversationResponse create(UUID buyerUserId, CreatePropertyConversationRequest request) {
-    User buyer = userRepository.findById(buyerUserId).orElseThrow(() -> new ResourceNotFoundException("User", buyerUserId));
-    Property property = propertyRepository.findById(request.getPropertyId())
-        .orElseThrow(() -> new ResourceNotFoundException("Property", request.getPropertyId()));
+  public PropertyConversationResponse create(
+      UUID buyerUserId, CreatePropertyConversationRequest request) {
+    User buyer =
+        userRepository
+            .findById(buyerUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", buyerUserId));
+    Property property =
+        propertyRepository
+            .findById(request.getPropertyId())
+            .orElseThrow(() -> new ResourceNotFoundException("Property", request.getPropertyId()));
     if (property.getAgentId() == null) {
       throw new BusinessException("This property does not have an assigned agent yet");
     }
-    RealEstateAgent agent = agentRepository.findById(property.getAgentId())
-        .orElseThrow(() -> new BusinessException("The assigned property agent is no longer available"));
+    RealEstateAgent agent =
+        agentRepository
+            .findById(property.getAgentId())
+            .orElseThrow(
+                () -> new BusinessException("The assigned property agent is no longer available"));
     if (agent.getStatus() != RealEstateAgent.AgentStatus.ACTIVE) {
       throw new BusinessException("The assigned property agent is not available for chat");
     }
 
-    PropertyConversation conversation = conversationRepository
-        .findByBuyerIdAndPropertyId(buyerUserId, property.getId())
-        .orElseGet(() -> conversationRepository.save(
-            PropertyConversation.builder().buyer(buyer).agent(agent).property(property).build()));
+    PropertyConversation conversation =
+        conversationRepository
+            .findByBuyerIdAndPropertyId(buyerUserId, property.getId())
+            .orElseGet(
+                () ->
+                    conversationRepository.save(
+                        PropertyConversation.builder()
+                            .buyer(buyer)
+                            .agent(agent)
+                            .property(property)
+                            .build()));
     createMessage(conversation, buyer, request.getMessage());
     return toConversationResponse(conversation);
   }
@@ -69,10 +85,13 @@ public class PropertyConversationServiceImpl implements PropertyConversationServ
   @Transactional
   public List<PropertyMessageResponse> getMessages(UUID actorUserId, UUID conversationId) {
     PropertyConversation conversation = getVisibleConversation(actorUserId, conversationId);
-    List<PropertyMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
+    List<PropertyMessage> messages =
+        messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
     LocalDateTime readAt = LocalDateTime.now();
     messages.stream()
-        .filter(message -> !message.getSender().getId().equals(actorUserId) && message.getReadAt() == null)
+        .filter(
+            message ->
+                !message.getSender().getId().equals(actorUserId) && message.getReadAt() == null)
         .forEach(message -> message.setReadAt(readAt));
     return messages.stream().map(this::toMessageResponse).toList();
   }
@@ -82,13 +101,18 @@ public class PropertyConversationServiceImpl implements PropertyConversationServ
   public PropertyMessageResponse sendMessage(
       UUID actorUserId, UUID conversationId, CreatePropertyMessageRequest request) {
     PropertyConversation conversation = getVisibleConversation(actorUserId, conversationId);
-    User sender = userRepository.findById(actorUserId).orElseThrow(() -> new ResourceNotFoundException("User", actorUserId));
+    User sender =
+        userRepository
+            .findById(actorUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", actorUserId));
     return toMessageResponse(createMessage(conversation, sender, request.getMessage()));
   }
 
   private PropertyConversation getVisibleConversation(UUID actorUserId, UUID conversationId) {
-    PropertyConversation conversation = conversationRepository.findById(conversationId)
-        .orElseThrow(() -> new ResourceNotFoundException("Conversation", conversationId));
+    PropertyConversation conversation =
+        conversationRepository
+            .findById(conversationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Conversation", conversationId));
     boolean isBuyer = conversation.getBuyer().getId().equals(actorUserId);
     boolean isAgent = conversation.getAgent().getUser().getId().equals(actorUserId);
     if (!isBuyer && !isAgent) {
@@ -97,12 +121,14 @@ public class PropertyConversationServiceImpl implements PropertyConversationServ
     return conversation;
   }
 
-  private PropertyMessage createMessage(PropertyConversation conversation, User sender, String content) {
-    PropertyMessage message = PropertyMessage.builder()
-        .conversation(conversation)
-        .sender(sender)
-        .content(content.trim())
-        .build();
+  private PropertyMessage createMessage(
+      PropertyConversation conversation, User sender, String content) {
+    PropertyMessage message =
+        PropertyMessage.builder()
+            .conversation(conversation)
+            .sender(sender)
+            .content(content.trim())
+            .build();
     conversation.setUpdatedAt(LocalDateTime.now());
     return messageRepository.save(message);
   }

@@ -40,12 +40,16 @@ public class FavoritePropertyServiceImpl implements FavoritePropertyService {
     if (favoritePropertyRepository.existsByUserIdAndPropertyId(userId, propertyId)) {
       return;
     }
-    User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", userId));
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
     Property property =
         propertyRepository
             .findById(propertyId)
             .orElseThrow(() -> new ResourceNotFoundException("Property", propertyId));
-    favoritePropertyRepository.save(FavoriteProperty.builder().user(user).property(property).build());
+    favoritePropertyRepository.save(
+        FavoriteProperty.builder().user(user).property(property).build());
   }
 
   @Override
