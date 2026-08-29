@@ -65,6 +65,19 @@ public class InternalJwtDecoder implements JwtDecoder {
       Claims claims =
           Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
 
+      // Refresh tokens are signed with the same key but are not access tokens. They carry
+      // type=refresh and no scope claim; without this check a 7-day refresh token would
+      // authenticate against every endpoint whose policy maps to no specific scope.
+      if ("refresh".equals(claims.get("type", String.class))) {
+        throw new JwtException("Refresh tokens cannot be used to authenticate requests.");
+      }
+
+      // The issuer is configured but was previously never verified — a token minted by any
+      // party holding the signing key, under any issuer, was accepted.
+      if (jwtIssuer != null && !jwtIssuer.isBlank() && !jwtIssuer.equals(claims.getIssuer())) {
+        throw new JwtException("JWT issuer does not match the expected issuer.");
+      }
+
       Instant issuedAt = claims.getIssuedAt().toInstant();
       Instant expiresAt = claims.getExpiration().toInstant();
 

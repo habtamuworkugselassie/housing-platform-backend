@@ -52,8 +52,30 @@ server:
     include-exception: false
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: ${ACTUATOR_EXPOSE:health}
   health:
     redis:
       enabled: false
     mail:
       enabled: false
+
+# Rate limiting: on in production (dev leaves it off for convenience). The filter fails open
+# if Redis is unreachable, so this cannot lock users out — it only caps brute-force attempts.
+rate:
+  limit:
+    auth:
+      enabled: ${RATE_LIMIT_AUTH_ENABLED:true}
+
+# API docs are a development aid; exposing the full endpoint map and a live request console in
+# production is unnecessary attack surface. Flip SWAGGER_ENABLED=true only for a debugging window.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+
+# Actuator: health only (for the deploy gate and uptime checks). The previous config also exposed
+# info, metrics and prometheus publicly; scrape those from a private network or behind auth instead.
