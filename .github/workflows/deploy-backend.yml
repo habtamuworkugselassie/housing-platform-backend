@@ -36,7 +36,11 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          # The image namespace comes from REGISTRY_IMAGE (github.repository), not from this
+          # field — GHCR authorizes on the token, so username is only an identity label.
+          # Use repository_owner rather than github.actor so it always matches that namespace
+          # even when a collaborator or a bot is the one who pushed.
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
@@ -70,7 +74,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           # Short-lived, repo-scoped, read-only. Expires when this job ends.
-          GHCR_USER: ${{ github.actor }}
+          GHCR_USER: ${{ github.repository_owner }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_IMAGE: ${{ env.REGISTRY_IMAGE }}
           DEPLOY_IMAGE: ${{ env.DEPLOY_IMAGE }}
