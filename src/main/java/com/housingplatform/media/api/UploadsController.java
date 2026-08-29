@@ -1,6 +1,7 @@
 package com.housingplatform.media.api;
 
 import com.housingplatform.media.service.MediaStorageService;
+import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.FileNotFoundException;
@@ -45,6 +46,7 @@ public class UploadsController {
   }
 
   @GetMapping("/**")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(
       summary = "Serve uploaded file",
       description =

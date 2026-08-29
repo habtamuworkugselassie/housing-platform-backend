@@ -49,6 +49,7 @@ public class BuildingController {
   }
 
   @GetMapping("/companies/{companyId}")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(
       summary = "Get company buildings",
       description = "Retrieve all buildings for a real estate company")
