@@ -1,0 +1,7 @@
+# LiveKit Ingress: RTMP + WHIP entrypoints for the organizer professional camera.
+redis:
+  address: redis:6379
+ws_url: ws://livekit:7880       # internal; use wss://live.<domain> from outside
+rtmp_port: 1935
+whip_port: 8080
+http_port: 8080

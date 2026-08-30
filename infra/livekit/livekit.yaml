@@ -1,0 +1,20 @@
+# LiveKit server config. Keys are supplied via the LIVEKIT_KEYS env var (see .env)
+# so no secret is committed here.
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 0
+  port_range_start: 50000
+  port_range_end: 50200
+  use_external_ip: true          # set the node's public IP; required behind NAT
+redis:
+  address: redis:6379
+turn:
+  enabled: true
+  domain: live.ethiobuildconnect.et
+  tls_port: 5349
+  # Provide the same TLS cert/key the reverse proxy uses for live.<domain>.
+  cert_file: /etc/livekit/tls/fullchain.pem
+  key_file: /etc/livekit/tls/privkey.pem
+logging:
+  level: info
