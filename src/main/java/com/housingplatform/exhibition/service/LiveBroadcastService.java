@@ -20,6 +20,9 @@ public interface LiveBroadcastService {
   /** Subscribe-only viewer token for a LIVE broadcast (plus HLS url when available). */
   LiveTokenResponse viewerToken(UUID id);
 
+  /** Public status of a single broadcast (so a broadcaster can poll for approval). */
+  LiveBroadcastResponse get(UUID id);
+
   /** Public wall: currently LIVE broadcasts. */
   List<LiveBroadcastResponse> listLive();
 

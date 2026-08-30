@@ -112,6 +112,12 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
 
   @Override
   @Transactional(readOnly = true)
+  public LiveBroadcastResponse get(UUID id) {
+    return LiveBroadcastResponse.from(find(id));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public List<LiveBroadcastResponse> listLive() {
     return repository.findByStatusOrderByUpdatedAtDesc(BroadcastStatus.LIVE).stream()
         .map(LiveBroadcastResponse::from)

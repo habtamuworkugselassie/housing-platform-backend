@@ -42,6 +42,12 @@ public class LiveBroadcastController {
     return ResponseEntity.ok(service.listLive());
   }
 
+  @GetMapping("/{id}")
+  @Operation(summary = "Get a broadcast's public status", description = "Used to poll for approval.")
+  public ResponseEntity<LiveBroadcastResponse> get(@PathVariable UUID id) {
+    return ResponseEntity.ok(service.get(id));
+  }
+
   @GetMapping("/{id}/publish-token")
   @Operation(summary = "Broadcaster publish token", description = "Only when the request is approved.")
   public ResponseEntity<LiveTokenResponse> publishToken(
