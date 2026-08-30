@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS live_broadcast (
     company_name VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
     hls_url VARCHAR(512),
+    ingress_id VARCHAR(64),
     requester_ip VARCHAR(64),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -28,6 +28,9 @@ public interface LiveBroadcastService {
 
   Page<AdminLiveBroadcastResponse> adminList(String status, Pageable pageable);
 
+  /** Provision an RTMP/WHIP ingress for a broadcast so an external encoder (pro camera) can feed it. */
+  com.housingplatform.exhibition.dto.IngressResponse createIngress(UUID id, String type);
+
   AdminLiveBroadcastResponse approve(UUID id);
 
   AdminLiveBroadcastResponse reject(UUID id);

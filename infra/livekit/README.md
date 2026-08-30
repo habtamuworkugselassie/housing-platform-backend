@@ -30,3 +30,18 @@ organizer can cut any stream via the admin kill-switch.
 
 Pin image tags in the compose file to a tested LiveKit release and bump
 server/ingress/egress together.
+
+## Organizer professional camera (OBS → Ingress)
+
+1. In **Admin → Live broadcasts**, find (or create via `/go-live` as Organizer)
+   the broadcast and click **Pro camera**. The app calls
+   `POST /api/v1/admin/exhibition/live/{id}/ingress` and shows an **RTMP server
+   URL** + **stream key** (WHIP is also supported via `?type=WHIP`).
+2. In **OBS → Settings → Stream**: Service = *Custom*, Server = the RTMP URL,
+   Stream Key = the key. **Start Streaming**.
+3. The feed lands in the broadcast's LiveKit room and appears on the public
+   live wall (WebRTC now, HLS once egress is running). **Cut** in the admin
+   view force-stops it and deletes the ingress.
+
+The backend mints the ingress via LiveKit's `IngressService` using an
+`ingressAdmin` token — the API secret never leaves the server.

@@ -35,6 +35,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   private final LiveBroadcastRepository repository;
   private final LiveKitTokenService tokenService;
   private final LiveKitRoomService roomService;
+  private final com.housingplatform.exhibition.service.LiveKitIngressService ingressService;
   private final LiveKitProperties properties;
 
   @Override
@@ -135,6 +136,18 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
 
   @Override
   @Transactional
+  public com.housingplatform.exhibition.dto.IngressResponse createIngress(UUID id, String type) {
+    LiveBroadcast b = find(id);
+    var ingress = ingressService.createIngress(b.getRoom(), b.getTitle(), type);
+    b.setIngressId(ingress.ingressId());
+    // The encoder connecting makes it live; reflect that so it surfaces on the wall.
+    b.setStatus(BroadcastStatus.LIVE);
+    repository.save(b);
+    return ingress;
+  }
+
+  @Override
+  @Transactional
   public AdminLiveBroadcastResponse approve(UUID id) {
     LiveBroadcast b = find(id);
     if (b.getStatus() == BroadcastStatus.REQUESTED || b.getStatus() == BroadcastStatus.REJECTED) {
@@ -158,6 +171,9 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   @Transactional
   public AdminLiveBroadcastResponse end(UUID id) {
     LiveBroadcast b = find(id);
+    if (b.getIngressId() != null) {
+      ingressService.deleteIngress(b.getIngressId());
+    }
     roomService.deleteRoom(b.getRoom());
     b.setStatus(BroadcastStatus.ENDED);
     return AdminLiveBroadcastResponse.from(repository.save(b));

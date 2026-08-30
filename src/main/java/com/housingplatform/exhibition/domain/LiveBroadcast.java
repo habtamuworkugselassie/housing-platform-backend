@@ -45,6 +45,10 @@ public class LiveBroadcast extends BaseEntity {
   @Column(name = "hls_url", length = 512)
   private String hlsUrl;
 
+  /** LiveKit Ingress id when this broadcast is fed by an external encoder (pro camera via OBS). */
+  @Column(name = "ingress_id", length = 64)
+  private String ingressId;
+
   @Column(name = "requester_ip", length = 64)
   private String requesterIp;
 

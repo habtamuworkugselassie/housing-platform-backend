@@ -33,6 +33,15 @@ public class AdminLiveBroadcastController {
     return ResponseEntity.ok(service.adminList(status, pageable));
   }
 
+  @PostMapping("/{id}/ingress")
+  @Operation(
+      summary = "Provision an ingress (organizer professional camera)",
+      description = "Returns RTMP/WHIP connection details to paste into OBS or a hardware encoder.")
+  public ResponseEntity<com.housingplatform.exhibition.dto.IngressResponse> createIngress(
+      @PathVariable UUID id, @RequestParam(value = "type", defaultValue = "RTMP") String type) {
+    return ResponseEntity.ok(service.createIngress(id, type));
+  }
+
   @PutMapping("/{id}/approve")
   @Operation(summary = "Approve a go-live request")
   public ResponseEntity<AdminLiveBroadcastResponse> approve(@PathVariable UUID id) {

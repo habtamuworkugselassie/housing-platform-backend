@@ -74,4 +74,30 @@ public class LiveKitTokenService {
         .signWith(signingKey())
         .compact();
   }
+
+  /** Server-API token for the RoomService / IngressService Twirp calls (kill-switch, ingress). */
+  public String mintServerAdmin(String room, boolean roomAdmin, boolean ingressAdmin, long ttlSeconds) {
+    Instant now = Instant.now();
+    Instant exp = now.plus(ttlSeconds, ChronoUnit.SECONDS);
+    Map<String, Object> video = new LinkedHashMap<>();
+    if (room != null && !room.isBlank()) {
+      video.put("room", room);
+    }
+    if (roomAdmin) {
+      video.put("roomAdmin", true);
+    }
+    if (ingressAdmin) {
+      video.put("ingressAdmin", true);
+    }
+    return Jwts.builder()
+        .issuer(properties.getApiKey())
+        .subject("server")
+        .id(UUID.randomUUID().toString())
+        .issuedAt(Date.from(now))
+        .notBefore(Date.from(now))
+        .expiration(Date.from(exp))
+        .claim("video", video)
+        .signWith(signingKey())
+        .compact();
+  }
 }

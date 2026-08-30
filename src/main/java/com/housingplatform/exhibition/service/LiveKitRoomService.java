@@ -30,7 +30,7 @@ public class LiveKitRoomService {
     }
     try {
       // An admin token scoped to the room authorizes the server API call.
-      String adminToken = tokenService.mint("server-admin", "server-admin", room, false, true, 60);
+      String adminToken = tokenService.mintServerAdmin(room, true, false, 60);
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
       headers.setBearerAuth(adminToken);
