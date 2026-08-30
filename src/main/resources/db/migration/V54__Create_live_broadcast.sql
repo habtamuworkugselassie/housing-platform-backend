@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS live_broadcast (
     title VARCHAR(160) NOT NULL,
     broadcaster_name VARCHAR(120) NOT NULL,
     broadcaster_email VARCHAR(255),
+    broadcaster_user_id UUID,
     broadcaster_role VARCHAR(20) NOT NULL DEFAULT 'VISITOR',
     company_name VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',

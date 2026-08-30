@@ -61,6 +61,13 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     String company =
         request.company() == null || request.company().isBlank() ? null : request.company().trim();
 
+    // Exhibitors and organizers must broadcast under a signed-in account; visitors may be anonymous.
+    BroadcasterRole role = parseRole(request.role());
+    java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
+    if ((role == BroadcasterRole.EXHIBITOR || role == BroadcasterRole.ORGANIZER) && userId == null) {
+      throw new BusinessException("Please sign in to broadcast as an exhibitor or organizer.");
+    }
+
     LiveBroadcast saved =
         repository.save(
             LiveBroadcast.builder()
@@ -68,7 +75,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
                 .title(title)
                 .broadcasterName(name)
                 .broadcasterEmail(email == null || email.isBlank() ? null : email)
-                .broadcasterRole(parseRole(request.role()))
+                .broadcasterUserId(userId)
+                .broadcasterRole(role)
                 .companyName(company)
                 .status(BroadcastStatus.REQUESTED)
                 .requesterIp(ip)
@@ -82,6 +90,15 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     LiveBroadcast b = find(id);
     if (b.getStatus() != BroadcastStatus.APPROVED && b.getStatus() != BroadcastStatus.LIVE) {
       throw new BusinessException("This broadcast has not been approved to go live.");
+    }
+    // For secured roles, only the signed-in owner may publish this stream.
+    if (b.getBroadcasterRole() == BroadcasterRole.EXHIBITOR
+        || b.getBroadcasterRole() == BroadcasterRole.ORGANIZER) {
+      java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
+      if (userId == null
+          || (b.getBroadcasterUserId() != null && !b.getBroadcasterUserId().equals(userId))) {
+        throw new BusinessException("You are not allowed to broadcast this stream.");
+      }
     }
     if (b.getStatus() == BroadcastStatus.APPROVED) {
       b.setStatus(BroadcastStatus.LIVE);

@@ -30,6 +30,10 @@ public class LiveBroadcast extends BaseEntity {
   @Column(name = "broadcaster_email", length = 255)
   private String broadcasterEmail;
 
+  /** The signed-in account that owns this broadcast (required for exhibitor/organizer roles). */
+  @Column(name = "broadcaster_user_id")
+  private java.util.UUID broadcasterUserId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "broadcaster_role", nullable = false, length = 20)
   private BroadcasterRole broadcasterRole;
