@@ -48,4 +48,10 @@ public record DisplaySettingsUpdateRequest(
     @Schema(description = "Heading shown above the live player") String liveTitle,
     @Schema(description = "Watch-on YouTube link for the live zone") String liveYoutubeUrl,
     @Schema(description = "Watch-on TikTok link for the live zone") String liveTiktokUrl,
-    @Schema(description = "Watch-on Facebook link for the live zone") String liveFacebookUrl) {}
+    @Schema(description = "Watch-on Facebook link for the live zone") String liveFacebookUrl,
+    @Schema(description = "Show the visitor video-feedback section on the exhibition page", example = "false")
+        Boolean exhibitionFeedbackVisible,
+    @Schema(
+            description = "Publish submitted feedback videos immediately (else hold for review)",
+            example = "false")
+        Boolean exhibitionFeedbackAutoPublish) {}

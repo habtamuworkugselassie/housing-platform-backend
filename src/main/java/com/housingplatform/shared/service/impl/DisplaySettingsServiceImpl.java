@@ -71,6 +71,8 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
         .liveYoutubeUrl(parseString(map, KEY_LIVE_YOUTUBE_URL, ""))
         .liveTiktokUrl(parseString(map, KEY_LIVE_TIKTOK_URL, ""))
         .liveFacebookUrl(parseString(map, KEY_LIVE_FACEBOOK_URL, ""))
+        .exhibitionFeedbackVisible(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_VISIBLE, false))
+        .exhibitionFeedbackAutoPublish(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH, false))
         .footer(resolveFooterContact(map))
         .build();
   }
@@ -116,6 +118,16 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
     }
     if (request.liveFacebookUrl() != null) {
       upsert(KEY_LIVE_FACEBOOK_URL, request.liveFacebookUrl().trim());
+    }
+    if (request.exhibitionFeedbackVisible() != null) {
+      upsert(
+          KEY_EXHIBITION_FEEDBACK_VISIBLE,
+          Boolean.TRUE.equals(request.exhibitionFeedbackVisible()) ? "true" : "false");
+    }
+    if (request.exhibitionFeedbackAutoPublish() != null) {
+      upsert(
+          KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH,
+          Boolean.TRUE.equals(request.exhibitionFeedbackAutoPublish()) ? "true" : "false");
     }
     return getDisplaySettings();
   }
