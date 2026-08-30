@@ -6,10 +6,22 @@ import java.util.UUID;
 
 /** Public view of an approved video feedback clip (no email / IP). */
 public record VideoFeedbackResponse(
-    UUID id, String submitterName, String caption, String videoUrl, LocalDateTime createdAt) {
+    UUID id,
+    String submitterName,
+    String submitterRole,
+    String companyName,
+    String caption,
+    String videoUrl,
+    LocalDateTime createdAt) {
 
   public static VideoFeedbackResponse from(ExhibitionVideoFeedback f) {
     return new VideoFeedbackResponse(
-        f.getId(), f.getSubmitterName(), f.getCaption(), f.getVideoUrl(), f.getCreatedAt());
+        f.getId(),
+        f.getSubmitterName(),
+        f.getSubmitterRole() == null ? null : f.getSubmitterRole().name(),
+        f.getCompanyName(),
+        f.getCaption(),
+        f.getVideoUrl(),
+        f.getCreatedAt());
   }
 }

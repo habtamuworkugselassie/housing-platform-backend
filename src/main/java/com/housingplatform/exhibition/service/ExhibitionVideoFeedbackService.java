@@ -14,7 +14,13 @@ public interface ExhibitionVideoFeedbackService {
    * is decided by the exhibitionFeedbackAutoPublish display setting.
    */
   VideoFeedbackResponse submit(
-      String submitterName, String submitterEmail, String caption, MultipartFile file, String ip);
+      String submitterName,
+      String submitterEmail,
+      String submitterRole,
+      String companyName,
+      String caption,
+      MultipartFile file,
+      String ip);
 
   /** Public feed: approved clips only. */
   Page<VideoFeedbackResponse> listApproved(Pageable pageable);

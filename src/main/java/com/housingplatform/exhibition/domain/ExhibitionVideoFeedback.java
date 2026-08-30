@@ -24,6 +24,14 @@ public class ExhibitionVideoFeedback extends BaseEntity {
   @Column(name = "submitter_email", nullable = false, length = 255)
   private String submitterEmail;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "submitter_role", nullable = false, length = 20)
+  private SubmitterRole submitterRole;
+
+  /** Optional company / booth, mainly for exhibitor submissions. */
+  @Column(name = "company_name", length = 255)
+  private String companyName;
+
   @Column(columnDefinition = "TEXT")
   private String caption;
 
@@ -46,5 +54,10 @@ public class ExhibitionVideoFeedback extends BaseEntity {
     PENDING,
     APPROVED,
     REJECTED
+  }
+
+  public enum SubmitterRole {
+    VISITOR,
+    EXHIBITOR
   }
 }

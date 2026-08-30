@@ -2,6 +2,7 @@ package com.housingplatform.exhibition.service.impl;
 
 import com.housingplatform.exhibition.domain.ExhibitionVideoFeedback;
 import com.housingplatform.exhibition.domain.ExhibitionVideoFeedback.FeedbackStatus;
+import com.housingplatform.exhibition.domain.ExhibitionVideoFeedback.SubmitterRole;
 import com.housingplatform.exhibition.dto.AdminVideoFeedbackResponse;
 import com.housingplatform.exhibition.dto.VideoFeedbackResponse;
 import com.housingplatform.exhibition.repository.ExhibitionVideoFeedbackRepository;
@@ -35,7 +36,13 @@ public class ExhibitionVideoFeedbackServiceImpl implements ExhibitionVideoFeedba
   @Override
   @Transactional
   public VideoFeedbackResponse submit(
-      String submitterName, String submitterEmail, String caption, MultipartFile file, String ip) {
+      String submitterName,
+      String submitterEmail,
+      String submitterRole,
+      String companyName,
+      String caption,
+      MultipartFile file,
+      String ip) {
     String name = submitterName == null ? "" : submitterName.trim();
     String email = submitterEmail == null ? "" : submitterEmail.trim();
     if (name.isBlank()) {
@@ -65,6 +72,9 @@ public class ExhibitionVideoFeedbackServiceImpl implements ExhibitionVideoFeedba
             ExhibitionVideoFeedback.builder()
                 .submitterName(name)
                 .submitterEmail(email)
+                .submitterRole(parseRole(submitterRole))
+                .companyName(
+                    companyName == null || companyName.isBlank() ? null : companyName.trim())
                 .caption(caption == null ? null : caption.trim())
                 .videoUrl(videoUrl)
                 .contentType(file.getContentType())
@@ -136,6 +146,12 @@ public class ExhibitionVideoFeedbackServiceImpl implements ExhibitionVideoFeedba
     if (contentType == null || !contentType.startsWith("video/")) {
       throw new BusinessException("The uploaded file must be a video.");
     }
+  }
+
+  private static SubmitterRole parseRole(String role) {
+    return "EXHIBITOR".equalsIgnoreCase(role == null ? "" : role.trim())
+        ? SubmitterRole.EXHIBITOR
+        : SubmitterRole.VISITOR;
   }
 
   private static FeedbackStatus parseStatus(String status) {

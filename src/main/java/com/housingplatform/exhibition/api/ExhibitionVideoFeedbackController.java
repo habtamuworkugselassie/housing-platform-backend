@@ -36,11 +36,13 @@ public class ExhibitionVideoFeedbackController {
   public ResponseEntity<VideoFeedbackResponse> submit(
       @RequestParam("name") String name,
       @RequestParam("email") String email,
+      @RequestParam(value = "role", required = false) String role,
+      @RequestParam(value = "company", required = false) String company,
       @RequestParam(value = "caption", required = false) String caption,
       @RequestParam("file") MultipartFile file,
       HttpServletRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(service.submit(name, email, caption, file, clientIp(request)));
+        .body(service.submit(name, email, role, company, caption, file, clientIp(request)));
   }
 
   @GetMapping
