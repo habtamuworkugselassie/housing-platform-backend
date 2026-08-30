@@ -18,6 +18,23 @@ public class UserContext {
     throw new IllegalStateException("User ID not found in security context");
   }
 
+  /** Current user id, or null when the request is unauthenticated/anonymous. */
+  public static UUID getCurrentUserIdOrNull() {
+    var auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
+      return null;
+    }
+    String userId = jwt.getClaimAsString("sub");
+    if (userId == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
   public static String getCurrentUserEmail() {
     Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     if (principal instanceof Jwt jwt) {

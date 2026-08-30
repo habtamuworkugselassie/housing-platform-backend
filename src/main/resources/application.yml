@@ -185,6 +185,13 @@ jwt:
   expiration: ${JWT_EXPIRATION:3600}
   issuer: ${JWT_ISSUER:housing-platform}
 
+# Self-hosted LiveKit (Phase 5 live broadcasting). Empty by default — the live
+# features report "not configured" until these are set. See infra/livekit/.
+livekit:
+  url: ${LIVEKIT_URL:}
+  api-key: ${LIVEKIT_API_KEY:}
+  api-secret: ${LIVEKIT_API_SECRET:}
+
 rate:
   limit:
     auth:

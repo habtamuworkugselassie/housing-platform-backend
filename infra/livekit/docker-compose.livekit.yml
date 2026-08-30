@@ -1,0 +1,65 @@
+# Self-hosted LiveKit stack for Ethio Build Connect live broadcasting (Phase 5).
+#
+# Components:
+#   redis    – coordination between server / ingress / egress
+#   livekit  – WebRTC SFU + embedded TURN (browser & mobile broadcasters/viewers)
+#   ingress  – RTMP / WHIP ingest (organizer professional camera via OBS/encoder)
+#   egress   – transcodes rooms to HLS + records (scalable viewing / audit)
+#
+# Put the LiveKit signaling port (7880) behind a TLS reverse proxy on a
+# `live.` subdomain (wss://live.ethiobuildconnect.et). Open the RTC UDP range
+# and the TURN TLS port on the firewall. Image tags below are pinned; verify
+# against the LiveKit release notes before deploying and bump together.
+#
+# Secrets come from infra/livekit/.env (copy from .env.livekit.example).
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+    restart: unless-stopped
+    networks: [livekit]
+
+  livekit:
+    image: livekit/livekit-server:v1.8
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    env_file: [.env]
+    ports:
+      - "7880:7880"                      # HTTP/WS signaling + server API (behind TLS proxy)
+      - "7881:7881"                      # ICE/TCP fallback
+      - "5349:5349"                      # TURN over TLS
+      - "50000-50200:50000-50200/udp"    # WebRTC media (UDP)
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    depends_on: [redis]
+    networks: [livekit]
+
+  ingress:
+    image: livekit/ingress:v1.5
+    restart: unless-stopped
+    command: --config /etc/ingress.yaml
+    env_file: [.env]
+    ports:
+      - "1935:1935"                      # RTMP (OBS / hardware encoder)
+      - "8085:8080"                      # WHIP (WebRTC-HTTP ingest)
+    volumes:
+      - ./ingress.yaml:/etc/ingress.yaml:ro
+    depends_on: [redis, livekit]
+    networks: [livekit]
+
+  egress:
+    image: livekit/egress:v1.9
+    restart: unless-stopped
+    command: --config /etc/egress.yaml
+    env_file: [.env]
+    cap_add: [SYS_ADMIN]                 # required by the headless Chromium compositor
+    volumes:
+      - ./egress.yaml:/etc/egress.yaml:ro
+      - ./recordings:/out                # HLS segments + recordings; back this by object storage in prod
+    depends_on: [redis, livekit]
+    networks: [livekit]
+
+networks:
+  livekit:
+    driver: bridge

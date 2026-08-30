@@ -29,6 +29,8 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
   private static final long DEFAULT_SIDEBAR_LAYOUT_MS = 35_000L;
   private static final boolean DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGES_VISIBLE = true;
   private static final boolean DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE = true;
+  private static final boolean DEFAULT_EXHIBITION_LIVE_VISIBLE = false;
+  private static final String DEFAULT_LIVE_SOURCE_TYPE = "EXTERNAL_EMBED";
 
   /** Default base org seed (migration V34 / scripts/create-dream-teams-organization.js). */
   private static final String DEFAULT_FOOTER_ORG_REGISTRATION = "DTT-PLC-FOOTER-001";
@@ -60,6 +62,17 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
                 map,
                 KEY_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE,
                 DEFAULT_EXHIBITION_SPONSORSHIP_PACKAGE_PRICES_VISIBLE))
+        .exhibitionLiveVisible(
+            parseBoolean(map, KEY_EXHIBITION_LIVE_VISIBLE, DEFAULT_EXHIBITION_LIVE_VISIBLE))
+        .liveSourceType(parseString(map, KEY_LIVE_SOURCE_TYPE, DEFAULT_LIVE_SOURCE_TYPE))
+        .liveEmbedUrl(parseString(map, KEY_LIVE_EMBED_URL, ""))
+        .liveHlsUrl(parseString(map, KEY_LIVE_HLS_URL, ""))
+        .liveTitle(parseString(map, KEY_LIVE_TITLE, ""))
+        .liveYoutubeUrl(parseString(map, KEY_LIVE_YOUTUBE_URL, ""))
+        .liveTiktokUrl(parseString(map, KEY_LIVE_TIKTOK_URL, ""))
+        .liveFacebookUrl(parseString(map, KEY_LIVE_FACEBOOK_URL, ""))
+        .exhibitionFeedbackVisible(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_VISIBLE, false))
+        .exhibitionFeedbackAutoPublish(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH, false))
         .footer(resolveFooterContact(map))
         .build();
   }
@@ -78,6 +91,44 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
         Boolean.TRUE.equals(request.exhibitionSponsorshipPackagePricesVisible())
             ? "true"
             : "false");
+    // Live broadcast fields are optional; only write those actually provided so a
+    // partial update never wipes stored values.
+    if (request.exhibitionLiveVisible() != null) {
+      upsert(
+          KEY_EXHIBITION_LIVE_VISIBLE,
+          Boolean.TRUE.equals(request.exhibitionLiveVisible()) ? "true" : "false");
+    }
+    if (request.liveSourceType() != null) {
+      upsert(KEY_LIVE_SOURCE_TYPE, normalizeSourceType(request.liveSourceType()));
+    }
+    if (request.liveEmbedUrl() != null) {
+      upsert(KEY_LIVE_EMBED_URL, request.liveEmbedUrl().trim());
+    }
+    if (request.liveHlsUrl() != null) {
+      upsert(KEY_LIVE_HLS_URL, request.liveHlsUrl().trim());
+    }
+    if (request.liveTitle() != null) {
+      upsert(KEY_LIVE_TITLE, request.liveTitle().trim());
+    }
+    if (request.liveYoutubeUrl() != null) {
+      upsert(KEY_LIVE_YOUTUBE_URL, request.liveYoutubeUrl().trim());
+    }
+    if (request.liveTiktokUrl() != null) {
+      upsert(KEY_LIVE_TIKTOK_URL, request.liveTiktokUrl().trim());
+    }
+    if (request.liveFacebookUrl() != null) {
+      upsert(KEY_LIVE_FACEBOOK_URL, request.liveFacebookUrl().trim());
+    }
+    if (request.exhibitionFeedbackVisible() != null) {
+      upsert(
+          KEY_EXHIBITION_FEEDBACK_VISIBLE,
+          Boolean.TRUE.equals(request.exhibitionFeedbackVisible()) ? "true" : "false");
+    }
+    if (request.exhibitionFeedbackAutoPublish() != null) {
+      upsert(
+          KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH,
+          Boolean.TRUE.equals(request.exhibitionFeedbackAutoPublish()) ? "true" : "false");
+    }
     return getDisplaySettings();
   }
 
@@ -107,6 +158,15 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
     }
     String v = raw.trim().toLowerCase();
     return "true".equals(v) || "1".equals(v) || "yes".equals(v);
+  }
+
+  private static String parseString(Map<String, String> map, String key, String defaultVal) {
+    String raw = map.get(key);
+    return (raw == null) ? defaultVal : raw;
+  }
+
+  private static String normalizeSourceType(String raw) {
+    return "HLS".equalsIgnoreCase(raw == null ? "" : raw.trim()) ? "HLS" : "EXTERNAL_EMBED";
   }
 
   private FooterContactResponse resolveFooterContact(Map<String, String> map) {

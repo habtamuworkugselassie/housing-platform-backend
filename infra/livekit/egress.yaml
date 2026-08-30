@@ -1,0 +1,5 @@
+# LiveKit Egress: HLS distribution + recording of live rooms.
+redis:
+  address: redis:6379
+ws_url: ws://livekit:7880
+# api_key / api_secret are read from LIVEKIT_API_KEY / LIVEKIT_API_SECRET (.env).
