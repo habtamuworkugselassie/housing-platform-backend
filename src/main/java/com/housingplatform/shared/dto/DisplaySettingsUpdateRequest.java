@@ -37,4 +37,15 @@ public record DisplaySettingsUpdateRequest(
                 "Show base prices on sponsorship package cards and in the details modal on the"
                     + " exhibition landing page",
             example = "true")
-        Boolean exhibitionSponsorshipPackagePricesVisible) {}
+        Boolean exhibitionSponsorshipPackagePricesVisible,
+    @Schema(description = "Show the live broadcast section on the exhibition page", example = "false")
+        Boolean exhibitionLiveVisible,
+    @Schema(description = "Live video source: EXTERNAL_EMBED or HLS", example = "EXTERNAL_EMBED")
+        String liveSourceType,
+    @Schema(description = "External live watch/embed URL (YouTube or Facebook Live)")
+        String liveEmbedUrl,
+    @Schema(description = "Self-hosted HLS (.m3u8) stream URL") String liveHlsUrl,
+    @Schema(description = "Heading shown above the live player") String liveTitle,
+    @Schema(description = "Watch-on YouTube link for the live zone") String liveYoutubeUrl,
+    @Schema(description = "Watch-on TikTok link for the live zone") String liveTiktokUrl,
+    @Schema(description = "Watch-on Facebook link for the live zone") String liveFacebookUrl) {}
