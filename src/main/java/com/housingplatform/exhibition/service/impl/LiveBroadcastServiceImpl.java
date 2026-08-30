@@ -61,11 +61,22 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     String company =
         request.company() == null || request.company().isBlank() ? null : request.company().trim();
 
-    // Exhibitors and organizers must broadcast under a signed-in account; visitors may be anonymous.
+    // Visitors may be anonymous; exhibitors need a signed-in account; organizer broadcasting is
+    // reserved for admins / super-admins (the event staff).
     BroadcasterRole role = parseRole(request.role());
     java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
-    if ((role == BroadcasterRole.EXHIBITOR || role == BroadcasterRole.ORGANIZER) && userId == null) {
-      throw new BusinessException("Please sign in to broadcast as an exhibitor or organizer.");
+    if (role == BroadcasterRole.ORGANIZER) {
+      boolean isAdmin =
+          userId != null
+              && (com.housingplatform.shared.security.UserContext.hasScope(
+                      com.housingplatform.shared.security.PortalScope.ADMIN)
+                  || com.housingplatform.shared.security.UserContext.hasScope(
+                      com.housingplatform.shared.security.PortalScope.SUPER_ADMIN));
+      if (!isAdmin) {
+        throw new BusinessException("Only an admin can broadcast as an organizer.");
+      }
+    } else if (role == BroadcasterRole.EXHIBITOR && userId == null) {
+      throw new BusinessException("Please sign in to broadcast as an exhibitor.");
     }
 
     LiveBroadcast saved =
