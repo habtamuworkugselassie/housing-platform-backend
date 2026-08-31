@@ -79,6 +79,12 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       throw new BusinessException("Please sign in to broadcast as an exhibitor.");
     }
 
+    // Organizers are admins/super-admins (checked above), so their streams are
+    // auto-approved — one-click go-live for staff. Visitor/exhibitor streams
+    // still start as REQUESTED and wait for an organizer to approve.
+    BroadcastStatus initialStatus =
+        role == BroadcasterRole.ORGANIZER ? BroadcastStatus.APPROVED : BroadcastStatus.REQUESTED;
+
     LiveBroadcast saved =
         repository.save(
             LiveBroadcast.builder()
@@ -89,7 +95,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
                 .broadcasterUserId(userId)
                 .broadcasterRole(role)
                 .companyName(company)
-                .status(BroadcastStatus.REQUESTED)
+                .status(initialStatus)
                 .requesterIp(ip)
                 .build());
     return LiveBroadcastResponse.from(saved);
