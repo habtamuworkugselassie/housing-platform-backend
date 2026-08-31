@@ -180,6 +180,14 @@ app:
   # Directory for storing uploaded media (property/org images). Only URLs are stored in DB.
   upload-dir: ${UPLOAD_DIR:./uploads}
 
+  # Public app downloads. Drop the built Android APK at <dir>/<android-file> on
+  # the server; point IOS_APP_URL at the TestFlight/App Store link when ready.
+  downloads:
+    dir: ${APP_DOWNLOAD_DIR:./downloads}
+    android-file: ${ANDROID_APK_FILE:ethio-build-connect.apk}
+    android-version: ${ANDROID_APK_VERSION:1.0.0}
+    ios-url: ${IOS_APP_URL:}
+
 jwt:
   secret: ${JWT_SECRET:}
   expiration: ${JWT_EXPIRATION:3600}
