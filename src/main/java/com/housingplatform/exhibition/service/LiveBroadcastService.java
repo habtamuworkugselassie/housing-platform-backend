@@ -31,6 +31,12 @@ public interface LiveBroadcastService {
   /** Provision an RTMP/WHIP ingress for a broadcast so an external encoder (pro camera) can feed it. */
   com.housingplatform.exhibition.dto.IngressResponse createIngress(UUID id, String type);
 
+  /** Start a real-time RTMP simulcast of a LIVE broadcast to the given targets (or all enabled). */
+  AdminLiveBroadcastResponse startSimulcast(UUID id, java.util.List<UUID> targetIds);
+
+  /** Stop the running social simulcast for a broadcast. */
+  AdminLiveBroadcastResponse stopSimulcast(UUID id);
+
   AdminLiveBroadcastResponse approve(UUID id);
 
   AdminLiveBroadcastResponse reject(UUID id);

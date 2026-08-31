@@ -53,6 +53,10 @@ public class LiveBroadcast extends BaseEntity {
   @Column(name = "ingress_id", length = 64)
   private String ingressId;
 
+  /** LiveKit Egress id while this broadcast is being simulcast to social RTMP destinations. */
+  @Column(name = "egress_id", length = 64)
+  private String egressId;
+
   @Column(name = "requester_ip", length = 64)
   private String requesterIp;
 

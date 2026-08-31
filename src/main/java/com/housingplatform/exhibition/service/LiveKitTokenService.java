@@ -100,4 +100,22 @@ public class LiveKitTokenService {
         .signWith(signingKey())
         .compact();
   }
+
+  /** Server-API token for the EgressService Twirp calls (start/stop RTMP simulcast, recording). */
+  public String mintEgressAdmin(long ttlSeconds) {
+    Instant now = Instant.now();
+    Instant exp = now.plus(ttlSeconds, ChronoUnit.SECONDS);
+    Map<String, Object> video = new LinkedHashMap<>();
+    video.put("roomRecord", true);
+    return Jwts.builder()
+        .issuer(properties.getApiKey())
+        .subject("server")
+        .id(UUID.randomUUID().toString())
+        .issuedAt(Date.from(now))
+        .notBefore(Date.from(now))
+        .expiration(Date.from(exp))
+        .claim("video", video)
+        .signWith(signingKey())
+        .compact();
+  }
 }
