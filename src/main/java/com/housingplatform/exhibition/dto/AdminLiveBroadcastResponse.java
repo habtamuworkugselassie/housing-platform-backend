@@ -16,6 +16,7 @@ public record AdminLiveBroadcastResponse(
     String status,
     String hlsUrl,
     String requesterIp,
+    boolean simulcasting,
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {
 
@@ -31,6 +32,7 @@ public record AdminLiveBroadcastResponse(
         b.getStatus() == null ? null : b.getStatus().name(),
         b.getHlsUrl(),
         b.getRequesterIp(),
+        b.getEgressId() != null && !b.getEgressId().isBlank(),
         b.getCreatedAt(),
         b.getUpdatedAt());
   }

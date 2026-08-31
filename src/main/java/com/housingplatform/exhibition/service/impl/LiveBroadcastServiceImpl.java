@@ -36,6 +36,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   private final LiveKitTokenService tokenService;
   private final LiveKitRoomService roomService;
   private final com.housingplatform.exhibition.service.LiveKitIngressService ingressService;
+  private final com.housingplatform.exhibition.service.LiveKitEgressService egressService;
+  private final com.housingplatform.exhibition.repository.SimulcastTargetRepository targetRepository;
   private final LiveKitProperties properties;
 
   @Override
@@ -182,6 +184,47 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
 
   @Override
   @Transactional
+  public AdminLiveBroadcastResponse startSimulcast(UUID id, java.util.List<UUID> targetIds) {
+    LiveBroadcast b = find(id);
+    if (b.getStatus() != BroadcastStatus.LIVE) {
+      throw new BusinessException("Only a live broadcast can be simulcast to social media.");
+    }
+    if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
+      throw new BusinessException("This broadcast is already being simulcast.");
+    }
+    java.util.List<com.housingplatform.exhibition.domain.SimulcastTarget> targets =
+        (targetIds == null || targetIds.isEmpty())
+            ? targetRepository.findAllByOrderByCreatedAtAsc().stream()
+                .filter(com.housingplatform.exhibition.domain.SimulcastTarget::isEnabled)
+                .toList()
+            : targetRepository.findAllById(targetIds);
+    java.util.List<String> urls =
+        targets.stream()
+            .filter(com.housingplatform.exhibition.domain.SimulcastTarget::isEnabled)
+            .map(com.housingplatform.exhibition.domain.SimulcastTarget::fullUrl)
+            .filter(u -> u != null && !u.isBlank() && !u.endsWith("/"))
+            .toList();
+    if (urls.isEmpty()) {
+      throw new BusinessException("No enabled social destinations with a stream key were selected.");
+    }
+    String egressId = egressService.startRtmp(b.getRoom(), urls);
+    b.setEgressId(egressId);
+    return AdminLiveBroadcastResponse.from(repository.save(b));
+  }
+
+  @Override
+  @Transactional
+  public AdminLiveBroadcastResponse stopSimulcast(UUID id) {
+    LiveBroadcast b = find(id);
+    if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
+      egressService.stop(b.getEgressId());
+      b.setEgressId(null);
+    }
+    return AdminLiveBroadcastResponse.from(repository.save(b));
+  }
+
+  @Override
+  @Transactional
   public AdminLiveBroadcastResponse approve(UUID id) {
     LiveBroadcast b = find(id);
     if (b.getStatus() == BroadcastStatus.REQUESTED || b.getStatus() == BroadcastStatus.REJECTED) {
@@ -195,6 +238,10 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   public AdminLiveBroadcastResponse reject(UUID id) {
     LiveBroadcast b = find(id);
     if (b.getStatus() == BroadcastStatus.LIVE) {
+      if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
+        egressService.stop(b.getEgressId());
+        b.setEgressId(null);
+      }
       roomService.deleteRoom(b.getRoom());
     }
     b.setStatus(BroadcastStatus.REJECTED);
@@ -205,6 +252,10 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   @Transactional
   public AdminLiveBroadcastResponse end(UUID id) {
     LiveBroadcast b = find(id);
+    if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
+      egressService.stop(b.getEgressId());
+      b.setEgressId(null);
+    }
     if (b.getIngressId() != null) {
       ingressService.deleteIngress(b.getIngressId());
     }

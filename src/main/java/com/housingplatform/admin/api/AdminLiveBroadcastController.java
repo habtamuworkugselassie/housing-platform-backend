@@ -42,6 +42,25 @@ public class AdminLiveBroadcastController {
     return ResponseEntity.ok(service.createIngress(id, type));
   }
 
+  @PostMapping("/{id}/simulcast")
+  @Operation(
+      summary = "Start a social simulcast",
+      description =
+          "Re-streams a LIVE broadcast to the given RTMP destinations (or all enabled ones) in real time.")
+  public ResponseEntity<AdminLiveBroadcastResponse> startSimulcast(
+      @PathVariable UUID id,
+      @RequestBody(required = false)
+          com.housingplatform.exhibition.dto.SimulcastStartRequest request) {
+    return ResponseEntity.ok(
+        service.startSimulcast(id, request == null ? null : request.targetIds()));
+  }
+
+  @DeleteMapping("/{id}/simulcast")
+  @Operation(summary = "Stop the social simulcast")
+  public ResponseEntity<AdminLiveBroadcastResponse> stopSimulcast(@PathVariable UUID id) {
+    return ResponseEntity.ok(service.stopSimulcast(id));
+  }
+
   @PutMapping("/{id}/approve")
   @Operation(summary = "Approve a go-live request")
   public ResponseEntity<AdminLiveBroadcastResponse> approve(@PathVariable UUID id) {
