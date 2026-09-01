@@ -57,8 +57,9 @@ public class LiveBroadcastController {
 
   @GetMapping("/{id}/viewer-token")
   @Operation(summary = "Viewer token", description = "Subscribe-only token for a live broadcast.")
-  public ResponseEntity<LiveTokenResponse> viewerToken(@PathVariable UUID id) {
-    return ResponseEntity.ok(service.viewerToken(id));
+  public ResponseEntity<LiveTokenResponse> viewerToken(
+      @PathVariable UUID id, @RequestParam(name = "name", required = false) String name) {
+    return ResponseEntity.ok(service.viewerToken(id, name));
   }
 
   private static String clientIp(HttpServletRequest req) {
