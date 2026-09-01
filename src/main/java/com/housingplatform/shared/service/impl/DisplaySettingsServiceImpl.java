@@ -73,6 +73,8 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
         .liveFacebookUrl(parseString(map, KEY_LIVE_FACEBOOK_URL, ""))
         .exhibitionFeedbackVisible(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_VISIBLE, false))
         .exhibitionFeedbackAutoPublish(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH, false))
+        .exhibitionLiveAutoSimulcast(
+            parseBoolean(map, KEY_EXHIBITION_LIVE_AUTO_SIMULCAST, false))
         .footer(resolveFooterContact(map))
         .build();
   }
@@ -128,6 +130,11 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
       upsert(
           KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH,
           Boolean.TRUE.equals(request.exhibitionFeedbackAutoPublish()) ? "true" : "false");
+    }
+    if (request.exhibitionLiveAutoSimulcast() != null) {
+      upsert(
+          KEY_EXHIBITION_LIVE_AUTO_SIMULCAST,
+          Boolean.TRUE.equals(request.exhibitionLiveAutoSimulcast()) ? "true" : "false");
     }
     return getDisplaySettings();
   }

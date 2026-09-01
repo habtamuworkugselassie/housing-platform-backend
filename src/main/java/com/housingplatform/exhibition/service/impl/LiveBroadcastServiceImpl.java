@@ -38,6 +38,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   private final com.housingplatform.exhibition.service.LiveKitIngressService ingressService;
   private final com.housingplatform.exhibition.service.LiveKitEgressService egressService;
   private final com.housingplatform.exhibition.repository.SimulcastTargetRepository targetRepository;
+  private final com.housingplatform.shared.service.DisplaySettingsService displaySettingsService;
   private final LiveKitProperties properties;
 
   @Override
@@ -122,6 +123,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     if (b.getStatus() == BroadcastStatus.APPROVED) {
       b.setStatus(BroadcastStatus.LIVE);
       repository.save(b);
+      maybeAutoSimulcast(b);
     }
     String token =
         tokenService.mint(
@@ -262,6 +264,35 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     roomService.deleteRoom(b.getRoom());
     b.setStatus(BroadcastStatus.ENDED);
     return AdminLiveBroadcastResponse.from(repository.save(b));
+  }
+
+  /**
+   * If auto-simulcast is enabled in display settings, start an egress to all enabled destinations
+   * when a broadcast goes live. Best-effort: never blocks the broadcaster's publish token.
+   */
+  private void maybeAutoSimulcast(LiveBroadcast b) {
+    if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
+      return;
+    }
+    try {
+      if (!displaySettingsService.getDisplaySettings().isExhibitionLiveAutoSimulcast()) {
+        return;
+      }
+      java.util.List<String> urls =
+          targetRepository.findAllByOrderByCreatedAtAsc().stream()
+              .filter(com.housingplatform.exhibition.domain.SimulcastTarget::isEnabled)
+              .map(com.housingplatform.exhibition.domain.SimulcastTarget::fullUrl)
+              .filter(u -> u != null && !u.isBlank() && !u.endsWith("/"))
+              .toList();
+      if (urls.isEmpty()) {
+        return;
+      }
+      String egressId = egressService.startRtmp(b.getRoom(), urls);
+      b.setEgressId(egressId);
+      repository.save(b);
+    } catch (Exception e) {
+      // Auto-simulcast is a convenience; never fail the go-live because of it.
+    }
   }
 
   private LiveBroadcast find(UUID id) {
