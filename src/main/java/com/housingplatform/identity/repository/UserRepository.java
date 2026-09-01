@@ -32,4 +32,13 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
           + "LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR "
           + "LOWER(u.phoneNumber) LIKE LOWER(CONCAT('%', :search, '%'))")
   Page<User> searchUsers(@Param("search") String search, Pageable pageable);
+
+  /** Count active users holding a role, excluding one user — used to guard the last super-admin. */
+  @Query(
+      "SELECT COUNT(u) FROM User u JOIN u.roles r "
+          + "WHERE r = :role AND u.status = :status AND u.id <> :excludeId")
+  long countByRoleAndStatusExcludingId(
+      @Param("role") User.UserRole role,
+      @Param("status") User.UserStatus status,
+      @Param("excludeId") UUID excludeId);
 }

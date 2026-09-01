@@ -79,9 +79,17 @@ public class UserServiceImpl implements UserService {
     if (user.getStatus() == User.UserStatus.DELETED) {
       return; // already deleted — idempotent
     }
+    // Admins and super-admins may delete their own account. The one exception:
+    // the last remaining super-admin can't delete themselves, or nobody could
+    // administer the platform. Assign another super-admin first.
     if (user.getRoles() != null && user.getRoles().contains(User.UserRole.SUPER_ADMIN)) {
-      throw new BusinessException(
-          "A super-admin account cannot be self-deleted. Transfer ownership first.");
+      long otherSuperAdmins =
+          userRepository.countByRoleAndStatusExcludingId(
+              User.UserRole.SUPER_ADMIN, User.UserStatus.ACTIVE, userId);
+      if (otherSuperAdmins == 0) {
+        throw new BusinessException(
+            "You are the last super-admin. Assign another super-admin before deleting your account.");
+      }
     }
     // Irreversibly scrub personal data and close the account.
     user.setEmail("deleted-" + user.getId() + "@deleted.invalid");
