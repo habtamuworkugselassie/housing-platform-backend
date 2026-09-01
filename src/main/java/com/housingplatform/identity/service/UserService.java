@@ -26,5 +26,8 @@ public interface UserService {
 
   UserResponse uploadProfileImage(UUID userId, MultipartFile file);
 
+  /** Self-service account deletion: scrub the signed-in user's personal data and close the account. */
+  void deleteOwnAccount();
+
   ResponseEntity<byte[]> getUserProfileImage(UUID userId, UUID attachmentId);
 }

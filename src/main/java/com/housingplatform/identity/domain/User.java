@@ -56,7 +56,9 @@ public class User extends BaseAuditEntity {
     ACTIVE,
     INACTIVE,
     SUSPENDED,
-    PENDING_VERIFICATION
+    PENDING_VERIFICATION,
+    /** Self-deleted: PII scrubbed, account closed and unrecoverable. */
+    DELETED
   }
 
   public enum UserRole {

@@ -71,6 +71,34 @@ public class UserServiceImpl implements UserService {
     return getUserById(userId);
   }
 
+  @Override
+  public void deleteOwnAccount() {
+    UUID userId = UserContext.getCurrentUserId();
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", userId));
+    if (user.getStatus() == User.UserStatus.DELETED) {
+      return; // already deleted — idempotent
+    }
+    if (user.getRoles() != null && user.getRoles().contains(User.UserRole.SUPER_ADMIN)) {
+      throw new BusinessException(
+          "A super-admin account cannot be self-deleted. Transfer ownership first.");
+    }
+    // Irreversibly scrub personal data and close the account.
+    user.setEmail("deleted-" + user.getId() + "@deleted.invalid");
+    user.setFirstName("Deleted");
+    user.setLastName("User");
+    user.setPhoneNumber(null);
+    user.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+    user.setEmailVerified(false);
+    user.setPhoneVerified(false);
+    if (user.getRoles() != null) {
+      user.getRoles().clear();
+    }
+    user.setOrganization(null);
+    user.setStatus(User.UserStatus.DELETED);
+    userRepository.save(user);
+  }
+
   private UserResponse populateProfileImage(UserResponse response, User user) {
     List<MediaAttachment> attachments =
         mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(user.getId());

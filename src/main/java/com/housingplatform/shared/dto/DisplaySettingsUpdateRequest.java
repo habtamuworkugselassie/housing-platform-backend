@@ -54,4 +54,5 @@ public record DisplaySettingsUpdateRequest(
     @Schema(
             description = "Publish submitted feedback videos immediately (else hold for review)",
             example = "false")
-        Boolean exhibitionFeedbackAutoPublish) {}
+        Boolean exhibitionFeedbackAutoPublish,
+        Boolean exhibitionLiveAutoSimulcast) {}

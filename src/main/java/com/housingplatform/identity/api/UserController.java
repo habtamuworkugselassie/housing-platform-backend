@@ -108,6 +108,16 @@ public class UserController {
     return ResponseEntity.ok(updated);
   }
 
+  @DeleteMapping("/me")
+  @Operation(
+      summary = "Delete my account",
+      description =
+          "Permanently closes the signed-in user's account and scrubs their personal data. Irreversible.")
+  public ResponseEntity<Void> deleteCurrentUser() {
+    userService.deleteOwnAccount();
+    return ResponseEntity.noContent().build();
+  }
+
   @GetMapping("/{id}/profile-image/{attachmentId}/file")
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(

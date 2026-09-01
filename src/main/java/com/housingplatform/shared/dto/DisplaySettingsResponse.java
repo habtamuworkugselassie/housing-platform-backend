@@ -52,4 +52,8 @@ public class DisplaySettingsResponse {
   /** When true, submitted feedback videos are published immediately; when false they await review. */
   @JsonProperty("exhibitionFeedbackAutoPublish")
   boolean exhibitionFeedbackAutoPublish;
+
+  /** When on, an admin/organizer stream auto-simulcasts to all enabled RTMP destinations. */
+  @JsonProperty("exhibitionLiveAutoSimulcast")
+  boolean exhibitionLiveAutoSimulcast;
 }
