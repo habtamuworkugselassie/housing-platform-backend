@@ -18,7 +18,7 @@ public interface LiveBroadcastService {
   LiveTokenResponse publishToken(UUID id, String ip);
 
   /** Subscribe-only viewer token for a LIVE broadcast (plus HLS url when available). */
-  LiveTokenResponse viewerToken(UUID id);
+  LiveTokenResponse viewerToken(UUID id, String viewerName);
 
   /** Public status of a single broadcast (so a broadcaster can poll for approval). */
   LiveBroadcastResponse get(UUID id);

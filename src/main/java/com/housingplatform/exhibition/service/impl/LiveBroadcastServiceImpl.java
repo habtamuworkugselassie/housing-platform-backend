@@ -133,19 +133,24 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
 
   @Override
   @Transactional(readOnly = true)
-  public LiveTokenResponse viewerToken(UUID id) {
+  public LiveTokenResponse viewerToken(UUID id, String viewerName) {
     LiveBroadcast b = find(id);
     if (b.getStatus() != BroadcastStatus.LIVE) {
       throw new BusinessException("This broadcast is not live.");
     }
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    // The display name shows next to a viewer's live-chat messages. Sanitize and cap it;
+    // fall back to a friendly guest handle so anonymous viewers still have a name.
+    String name = viewerName == null ? "" : viewerName.replaceAll("[\\r\\n]", " ").trim();
+    if (name.length() > 40) {
+      name = name.substring(0, 40);
+    }
+    if (name.isBlank()) {
+      name = "Guest " + suffix.substring(0, 4);
+    }
     String token =
         tokenService.mint(
-            "view-" + UUID.randomUUID().toString().substring(0, 8),
-            "viewer",
-            b.getRoom(),
-            false,
-            false,
-            VIEWER_TTL_SECONDS);
+            "view-" + suffix, name, b.getRoom(), false, false, VIEWER_TTL_SECONDS);
     return new LiveTokenResponse(properties.getUrl(), token, b.getRoom(), b.getHlsUrl());
   }
 
