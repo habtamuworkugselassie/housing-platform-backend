@@ -32,7 +32,10 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   private static final int RATE_LIMIT_WINDOW_MINUTES = 60;
   private static final int RATE_LIMIT_MAX_PER_WINDOW = 5;
 
+  private static final int MAX_PENDING_COHOSTS = 20;
+
   private final LiveBroadcastRepository repository;
+  private final com.housingplatform.exhibition.repository.LiveCohostRequestRepository cohostRepository;
   private final LiveKitTokenService tokenService;
   private final LiveKitRoomService roomService;
   private final com.housingplatform.exhibition.service.LiveKitIngressService ingressService;
@@ -270,16 +273,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   @Transactional
   public LiveBroadcastResponse endByBroadcaster(UUID id, String ip) {
     LiveBroadcast b = find(id);
-    // Secured roles: only the signed-in owner may end their own stream. Visitor streams are
-    // anonymous, so the broadcast id itself is the capability (same model as the publish token).
-    if (b.getBroadcasterRole() == BroadcasterRole.EXHIBITOR
-        || b.getBroadcasterRole() == BroadcasterRole.ORGANIZER) {
-      java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
-      if (userId == null
-          || (b.getBroadcasterUserId() != null && !b.getBroadcasterUserId().equals(userId))) {
-        throw new BusinessException("You are not allowed to end this stream.");
-      }
-    }
+    assertBroadcasterAllowed(b, "You are not allowed to end this stream.");
     // Idempotent: ending an already-ended/rejected broadcast is a no-op.
     if (b.getStatus() == BroadcastStatus.ENDED || b.getStatus() == BroadcastStatus.REJECTED) {
       return LiveBroadcastResponse.from(b);
@@ -331,6 +325,114 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       repository.save(b);
     } catch (Exception e) {
       // Auto-simulcast is a convenience; never fail the go-live because of it.
+    }
+  }
+
+  // --- Co-hosting ------------------------------------------------------------
+
+  @Override
+  @Transactional
+  public com.housingplatform.exhibition.dto.CohostRequestResponse requestCohost(
+      UUID broadcastId, String name) {
+    LiveBroadcast b = find(broadcastId);
+    if (b.getStatus() != BroadcastStatus.LIVE) {
+      throw new BusinessException("You can only ask to join a broadcast that is live.");
+    }
+    String display = name == null ? "" : name.replaceAll("[\\r\\n]", " ").trim();
+    if (display.length() > 40) {
+      display = display.substring(0, 40);
+    }
+    if (display.isBlank()) {
+      display = "Guest " + UUID.randomUUID().toString().substring(0, 4);
+    }
+    if (cohostRepository.countByBroadcastIdAndStatus(
+            broadcastId, com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
+        >= MAX_PENDING_COHOSTS) {
+      throw new BusinessException("Too many pending join requests. Please try again shortly.");
+    }
+    var saved =
+        cohostRepository.save(
+            com.housingplatform.exhibition.domain.LiveCohostRequest.builder()
+                .broadcastId(broadcastId)
+                .displayName(display)
+                .participantIdentity("cohost-" + UUID.randomUUID().toString().substring(0, 8))
+                .status(com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
+                .requesterUserId(
+                    com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull())
+                .build());
+    return com.housingplatform.exhibition.dto.CohostRequestResponse.from(saved);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<com.housingplatform.exhibition.dto.CohostRequestResponse> listPendingCohosts(
+      UUID broadcastId) {
+    return cohostRepository
+        .findByBroadcastIdAndStatusOrderByCreatedAtAsc(
+            broadcastId, com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
+        .stream()
+        .map(com.housingplatform.exhibition.dto.CohostRequestResponse::from)
+        .toList();
+  }
+
+  @Override
+  @Transactional
+  public com.housingplatform.exhibition.dto.CohostRequestResponse decideCohost(
+      UUID broadcastId, UUID requestId, boolean approve, String ip) {
+    LiveBroadcast b = find(broadcastId);
+    // Only the broadcaster (owner for secured roles; id-holder for visitor streams) moderates.
+    assertBroadcasterAllowed(b, "Only the broadcaster can approve co-hosts.");
+    var req =
+        cohostRepository
+            .findByIdAndBroadcastId(requestId, broadcastId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Co-host request", requestId));
+    req.setStatus(
+        approve
+            ? com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.APPROVED
+            : com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.DENIED);
+    return com.housingplatform.exhibition.dto.CohostRequestResponse.from(cohostRepository.save(req));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public LiveTokenResponse cohostToken(UUID broadcastId, UUID requestId) {
+    LiveBroadcast b = find(broadcastId);
+    if (b.getStatus() != BroadcastStatus.LIVE) {
+      throw new BusinessException("This broadcast is not live.");
+    }
+    var req =
+        cohostRepository
+            .findByIdAndBroadcastId(requestId, broadcastId)
+            .orElseThrow(() -> new ResourceNotFoundException("Co-host request", requestId));
+    if (req.getStatus()
+        != com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.APPROVED) {
+      throw new BusinessException("Your request to join has not been approved yet.");
+    }
+    // Publish token for the same room: the co-host may send audio/video and subscribe to others.
+    String token =
+        tokenService.mint(
+            req.getParticipantIdentity(),
+            req.getDisplayName(),
+            b.getRoom(),
+            true,
+            false,
+            PUBLISH_TTL_SECONDS);
+    return new LiveTokenResponse(properties.getUrl(), token, b.getRoom(), b.getHlsUrl());
+  }
+
+  /**
+   * Authorize an action as "the broadcaster". Secured roles (exhibitor/organizer) require the
+   * signed-in owner; anonymous visitor streams treat the broadcast id as the capability.
+   */
+  private void assertBroadcasterAllowed(LiveBroadcast b, String message) {
+    if (b.getBroadcasterRole() == BroadcasterRole.EXHIBITOR
+        || b.getBroadcasterRole() == BroadcasterRole.ORGANIZER) {
+      java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
+      if (userId == null
+          || (b.getBroadcasterUserId() != null && !b.getBroadcasterUserId().equals(userId))) {
+        throw new BusinessException(message);
+      }
     }
   }
 

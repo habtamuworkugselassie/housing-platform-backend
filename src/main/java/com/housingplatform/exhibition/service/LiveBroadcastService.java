@@ -49,4 +49,19 @@ public interface LiveBroadcastService {
    * stops simulcast, closes the room and marks it ENDED. Idempotent.
    */
   LiveBroadcastResponse endByBroadcaster(UUID id, String ip);
+
+  // --- Co-hosting: approved viewers publish into the same live room -----------
+
+  /** A viewer asks to co-host a LIVE broadcast; held PENDING until the broadcaster approves. */
+  com.housingplatform.exhibition.dto.CohostRequestResponse requestCohost(UUID broadcastId, String name);
+
+  /** Pending co-host requests for a broadcast (the broadcaster's moderation queue). */
+  List<com.housingplatform.exhibition.dto.CohostRequestResponse> listPendingCohosts(UUID broadcastId);
+
+  /** Broadcaster approves/denies a co-host request. */
+  com.housingplatform.exhibition.dto.CohostRequestResponse decideCohost(
+      UUID broadcastId, UUID requestId, boolean approve, String ip);
+
+  /** Co-host publish token — issued only once the request is APPROVED (viewer polls for it). */
+  LiveTokenResponse cohostToken(UUID broadcastId, UUID requestId);
 }

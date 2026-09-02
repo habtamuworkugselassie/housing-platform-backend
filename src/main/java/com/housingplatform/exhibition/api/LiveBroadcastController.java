@@ -72,6 +72,46 @@ public class LiveBroadcastController {
     return ResponseEntity.ok(service.endByBroadcaster(id, clientIp(http)));
   }
 
+  // --- Co-hosting: approved viewers publish into the live room ----------------
+
+  @PostMapping("/{id}/cohost/request")
+  @Operation(summary = "Ask to co-host", description = "Viewer requests to publish into a live room.")
+  public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> requestCohost(
+      @PathVariable UUID id,
+      @RequestParam(name = "name", required = false) String name) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(service.requestCohost(id, name));
+  }
+
+  @GetMapping("/{id}/cohost/requests")
+  @Operation(summary = "Pending co-host requests", description = "Broadcaster's moderation queue.")
+  public ResponseEntity<List<com.housingplatform.exhibition.dto.CohostRequestResponse>>
+      listCohostRequests(@PathVariable UUID id) {
+    return ResponseEntity.ok(service.listPendingCohosts(id));
+  }
+
+  @PostMapping("/{id}/cohost/{requestId}/approve")
+  @Operation(summary = "Approve a co-host", description = "Broadcaster admits a viewer to publish.")
+  public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> approveCohost(
+      @PathVariable UUID id, @PathVariable UUID requestId, HttpServletRequest http) {
+    return ResponseEntity.ok(service.decideCohost(id, requestId, true, clientIp(http)));
+  }
+
+  @PostMapping("/{id}/cohost/{requestId}/deny")
+  @Operation(summary = "Deny a co-host", description = "Broadcaster rejects a join request.")
+  public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> denyCohost(
+      @PathVariable UUID id, @PathVariable UUID requestId, HttpServletRequest http) {
+    return ResponseEntity.ok(service.decideCohost(id, requestId, false, clientIp(http)));
+  }
+
+  @GetMapping("/{id}/cohost/{requestId}/token")
+  @Operation(
+      summary = "Co-host publish token",
+      description = "Issued once the request is APPROVED; the viewer polls this endpoint.")
+  public ResponseEntity<LiveTokenResponse> cohostToken(
+      @PathVariable UUID id, @PathVariable UUID requestId) {
+    return ResponseEntity.ok(service.cohostToken(id, requestId));
+  }
+
   private static String clientIp(HttpServletRequest req) {
     String xff = req.getHeader("X-Forwarded-For");
     if (xff != null && !xff.isBlank()) {
