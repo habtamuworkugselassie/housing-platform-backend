@@ -57,6 +57,14 @@ public class LiveBroadcast extends BaseEntity {
   @Column(name = "egress_id", length = 64)
   private String egressId;
 
+  /** LiveKit Egress id of the local MP4 file recording (separate from social simulcast). */
+  @Column(name = "recording_egress_id", length = 64)
+  private String recordingEgressId;
+
+  /** Public URL of the finished recording, set when the broadcast ends. */
+  @Column(name = "recording_url", length = 512)
+  private String recordingUrl;
+
   @Column(name = "requester_ip", length = 64)
   private String requesterIp;
 

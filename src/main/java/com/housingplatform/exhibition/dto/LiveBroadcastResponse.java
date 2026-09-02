@@ -11,7 +11,8 @@ public record LiveBroadcastResponse(
     String broadcasterRole,
     String companyName,
     String status,
-    String hlsUrl) {
+    String hlsUrl,
+    String recordingUrl) {
 
   public static LiveBroadcastResponse from(LiveBroadcast b) {
     return new LiveBroadcastResponse(
@@ -21,6 +22,7 @@ public record LiveBroadcastResponse(
         b.getBroadcasterRole() == null ? null : b.getBroadcasterRole().name(),
         b.getCompanyName(),
         b.getStatus() == null ? null : b.getStatus().name(),
-        b.getHlsUrl());
+        b.getHlsUrl(),
+        b.getRecordingUrl());
   }
 }

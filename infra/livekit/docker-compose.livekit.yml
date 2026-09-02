@@ -21,7 +21,9 @@ services:
     networks: [livekit]
 
   livekit:
-    image: livekit/livekit-server:v1.8
+    # v1.9+ required: v1.8 could not complete a WebRTC publish from livekit-client 2.22
+    # ("pcManager is not ready") — video never published and viewers saw a black player.
+    image: livekit/livekit-server:v1.9
     restart: unless-stopped
     command: --config /etc/livekit.yaml
     env_file: [.env]
@@ -56,7 +58,10 @@ services:
     cap_add: [SYS_ADMIN]                 # required by the headless Chromium compositor
     volumes:
       - ./egress.yaml:/etc/egress.yaml:ro
-      - ./recordings:/out                # HLS segments + recordings; back this by object storage in prod
+      # Mount the app's uploads volume so MP4 recordings land where the frontend already
+      # serves /api/v1/uploads/* from. The backend writes to /out/live-recordings (see
+      # livekit.recording-dir) and stores the public URL /api/v1/uploads/live-recordings/<file>.
+      - /var/lib/housing-platform/uploads:/out
     depends_on: [redis, livekit]
     networks: [livekit]
 

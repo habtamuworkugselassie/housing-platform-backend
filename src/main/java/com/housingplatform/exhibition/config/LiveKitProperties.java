@@ -22,6 +22,19 @@ public class LiveKitProperties {
 
   private String apiSecret = "";
 
+  /**
+   * Directory the egress container writes MP4 recordings to. This is a path *inside the egress
+   * container*, which mounts the shared uploads volume — e.g. /out/live-recordings maps to the
+   * host uploads dir served at {@link #recordingPublicBase}.
+   */
+  private String recordingDir = "/out/live-recordings";
+
+  /** Public URL base the finished recording is served from (uploads volume via the frontend). */
+  private String recordingPublicBase = "/api/v1/uploads/live-recordings";
+
+  /** Master switch: only start file recordings when true (needs the egress container running). */
+  private boolean recordingEnabled = false;
+
   public boolean isConfigured() {
     return !url.isBlank() && !apiKey.isBlank() && !apiSecret.isBlank();
   }

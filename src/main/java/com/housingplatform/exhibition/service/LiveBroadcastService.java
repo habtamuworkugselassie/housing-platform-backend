@@ -43,4 +43,10 @@ public interface LiveBroadcastService {
 
   /** Kill-switch: force-close the room and mark it ENDED. */
   AdminLiveBroadcastResponse end(UUID id);
+
+  /**
+   * Broadcaster ends their own stream (Stop broadcasting / tab close): finalizes the recording,
+   * stops simulcast, closes the room and marks it ENDED. Idempotent.
+   */
+  LiveBroadcastResponse endByBroadcaster(UUID id, String ip);
 }

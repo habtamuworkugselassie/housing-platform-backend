@@ -124,6 +124,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       b.setStatus(BroadcastStatus.LIVE);
       repository.save(b);
       maybeAutoSimulcast(b);
+      maybeStartRecording(b);
     }
     String token =
         tokenService.mint(
@@ -245,6 +246,10 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   public AdminLiveBroadcastResponse reject(UUID id) {
     LiveBroadcast b = find(id);
     if (b.getStatus() == BroadcastStatus.LIVE) {
+      if (b.getRecordingEgressId() != null && !b.getRecordingEgressId().isBlank()) {
+        egressService.stop(b.getRecordingEgressId());
+        b.setRecordingEgressId(null);
+      }
       if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
         egressService.stop(b.getEgressId());
         b.setEgressId(null);
@@ -258,7 +263,36 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   @Override
   @Transactional
   public AdminLiveBroadcastResponse end(UUID id) {
+    return AdminLiveBroadcastResponse.from(endInternal(find(id)));
+  }
+
+  @Override
+  @Transactional
+  public LiveBroadcastResponse endByBroadcaster(UUID id, String ip) {
     LiveBroadcast b = find(id);
+    // Secured roles: only the signed-in owner may end their own stream. Visitor streams are
+    // anonymous, so the broadcast id itself is the capability (same model as the publish token).
+    if (b.getBroadcasterRole() == BroadcasterRole.EXHIBITOR
+        || b.getBroadcasterRole() == BroadcasterRole.ORGANIZER) {
+      java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
+      if (userId == null
+          || (b.getBroadcasterUserId() != null && !b.getBroadcasterUserId().equals(userId))) {
+        throw new BusinessException("You are not allowed to end this stream.");
+      }
+    }
+    // Idempotent: ending an already-ended/rejected broadcast is a no-op.
+    if (b.getStatus() == BroadcastStatus.ENDED || b.getStatus() == BroadcastStatus.REJECTED) {
+      return LiveBroadcastResponse.from(b);
+    }
+    return LiveBroadcastResponse.from(endInternal(b));
+  }
+
+  /** Shared teardown: stop recording + simulcast egress, drop ingress, close the room. */
+  private LiveBroadcast endInternal(LiveBroadcast b) {
+    if (b.getRecordingEgressId() != null && !b.getRecordingEgressId().isBlank()) {
+      egressService.stop(b.getRecordingEgressId());
+      b.setRecordingEgressId(null);
+    }
     if (b.getEgressId() != null && !b.getEgressId().isBlank()) {
       egressService.stop(b.getEgressId());
       b.setEgressId(null);
@@ -268,7 +302,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     }
     roomService.deleteRoom(b.getRoom());
     b.setStatus(BroadcastStatus.ENDED);
-    return AdminLiveBroadcastResponse.from(repository.save(b));
+    return repository.save(b);
   }
 
   /**
@@ -297,6 +331,28 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       repository.save(b);
     } catch (Exception e) {
       // Auto-simulcast is a convenience; never fail the go-live because of it.
+    }
+  }
+
+  /**
+   * Start a local MP4 recording of the room when it goes live (if recording is enabled). The
+   * public replay URL is derived from the deterministic output filename and stored now; it becomes
+   * playable once the egress finalizes the file on {@link #endInternal}. Best-effort.
+   */
+  private void maybeStartRecording(LiveBroadcast b) {
+    if (b.getRecordingEgressId() != null && !b.getRecordingEgressId().isBlank()) {
+      return;
+    }
+    try {
+      var rec = egressService.startFileRecording(b.getRoom());
+      if (rec != null) {
+        b.setRecordingEgressId(rec.egressId());
+        b.setRecordingUrl(
+            properties.getRecordingPublicBase().replaceAll("/+$", "") + "/" + rec.filename());
+        repository.save(b);
+      }
+    } catch (Exception e) {
+      // Recording is a convenience; never fail the go-live because of it.
     }
   }
 

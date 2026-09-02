@@ -199,6 +199,12 @@ livekit:
   url: ${LIVEKIT_URL:}
   api-key: ${LIVEKIT_API_KEY:}
   api-secret: ${LIVEKIT_API_SECRET:}
+  # Local MP4 recording of live rooms (needs the egress container running — see infra/livekit).
+  # recording-dir is a path inside the egress container; it mounts the uploads volume so files
+  # land where the frontend serves recording-public-base from.
+  recording-enabled: ${LIVEKIT_RECORDING_ENABLED:false}
+  recording-dir: ${LIVEKIT_RECORDING_DIR:/out/live-recordings}
+  recording-public-base: ${LIVEKIT_RECORDING_PUBLIC_BASE:/api/v1/uploads/live-recordings}
 
 rate:
   limit:

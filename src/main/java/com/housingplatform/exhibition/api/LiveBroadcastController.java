@@ -62,6 +62,16 @@ public class LiveBroadcastController {
     return ResponseEntity.ok(service.viewerToken(id, name));
   }
 
+  @PostMapping("/{id}/end")
+  @Operation(
+      summary = "Broadcaster ends their stream",
+      description =
+          "Stops recording + simulcast, closes the room and marks it ENDED. Called on Stop"
+              + " broadcasting or when the broadcaster's tab closes (sendBeacon). Idempotent.")
+  public ResponseEntity<LiveBroadcastResponse> end(@PathVariable UUID id, HttpServletRequest http) {
+    return ResponseEntity.ok(service.endByBroadcaster(id, clientIp(http)));
+  }
+
   private static String clientIp(HttpServletRequest req) {
     String xff = req.getHeader("X-Forwarded-For");
     if (xff != null && !xff.isBlank()) {

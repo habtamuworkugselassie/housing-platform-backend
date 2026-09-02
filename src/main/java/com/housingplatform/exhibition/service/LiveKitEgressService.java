@@ -27,6 +27,8 @@ public class LiveKitEgressService {
 
   // LiveKit StreamProtocol enum: DEFAULT_PROTOCOL=0, RTMP=1, SRT=2
   private static final int PROTOCOL_RTMP = 1;
+  // LiveKit EncodedFileType enum: DEFAULT_FILETYPE=0, MP4=1, OGG=2
+  private static final int FILETYPE_MP4 = 1;
 
   private final LiveKitProperties properties;
   private final LiveKitTokenService tokenService;
@@ -61,6 +63,48 @@ public class LiveKitEgressService {
     }
     return egressId;
   }
+
+  /**
+   * Start a RoomComposite <b>file</b> egress that records {@code room} to a single MP4 written into
+   * the egress container's {@code livekit.recordingDir}. Returns the relative filename (used to
+   * build the public URL) plus the egress id, or {@code null} if recording is disabled/unconfigured.
+   *
+   * @return a {@link Recording} handle, or {@code null} when recording is off
+   */
+  public Recording startFileRecording(String room) {
+    if (!properties.isConfigured() || !properties.isRecordingEnabled()) {
+      return null;
+    }
+    // Deterministic, collision-free name; kept flat so the frontend can serve it directly.
+    String filename = room + "-" + java.time.Instant.now().toEpochMilli() + ".mp4";
+    String filepath = properties.getRecordingDir().replaceAll("/+$", "") + "/" + filename;
+
+    Map<String, Object> fileOutput = new LinkedHashMap<>();
+    fileOutput.put("file_type", FILETYPE_MP4);
+    fileOutput.put("filepath", filepath);
+
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("room_name", room);
+    body.put("layout", "grid"); // captures every publisher (broadcaster + co-hosts)
+    body.put("file_outputs", List.of(fileOutput));
+
+    try {
+      JsonNode res = post("StartRoomCompositeEgress", body);
+      String egressId = text(res, "egress_id");
+      if (egressId == null || egressId.isBlank()) {
+        log.warn("StartRoomCompositeEgress (file) for room {} returned no egress_id", room);
+        return null;
+      }
+      return new Recording(egressId, filename);
+    } catch (Exception e) {
+      // Recording is best-effort; never block go-live because egress is down.
+      log.warn("Could not start file recording for room {}: {}", room, e.getMessage());
+      return null;
+    }
+  }
+
+  /** Handle for a started file recording: the egress id to stop it, and the output filename. */
+  public record Recording(String egressId, String filename) {}
 
   /** Stop a running egress. Best-effort: never throws (used on cleanup / kill-switch paths). */
   public void stop(String egressId) {
