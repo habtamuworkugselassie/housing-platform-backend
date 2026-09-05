@@ -26,6 +26,9 @@ public interface LiveBroadcastService {
   /** Public wall: currently LIVE broadcasts. */
   List<LiveBroadcastResponse> listLive();
 
+  /** Public replays: recently-ended broadcasts that produced a recording. */
+  List<LiveBroadcastResponse> listReplays();
+
   Page<AdminLiveBroadcastResponse> adminList(String status, Pageable pageable);
 
   /** Provision an RTMP/WHIP ingress for a broadcast so an external encoder (pro camera) can feed it. */

@@ -174,6 +174,16 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
 
   @Override
   @Transactional(readOnly = true)
+  public List<LiveBroadcastResponse> listReplays() {
+    return repository
+        .findTop50ByStatusAndRecordingUrlIsNotNullOrderByUpdatedAtDesc(BroadcastStatus.ENDED)
+        .stream()
+        .map(LiveBroadcastResponse::from)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Page<AdminLiveBroadcastResponse> adminList(String status, Pageable pageable) {
     BroadcastStatus parsed = parseStatus(status);
     Page<LiveBroadcast> page =

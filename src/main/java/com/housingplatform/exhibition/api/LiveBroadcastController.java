@@ -42,6 +42,14 @@ public class LiveBroadcastController {
     return ResponseEntity.ok(service.listLive());
   }
 
+  @GetMapping("/replays")
+  @Operation(
+      summary = "List broadcast replays",
+      description = "Recently-ended broadcasts that produced a recording (watch again).")
+  public ResponseEntity<List<LiveBroadcastResponse>> listReplays() {
+    return ResponseEntity.ok(service.listReplays());
+  }
+
   @GetMapping("/{id}")
   @Operation(summary = "Get a broadcast's public status", description = "Used to poll for approval.")
   public ResponseEntity<LiveBroadcastResponse> get(@PathVariable UUID id) {
