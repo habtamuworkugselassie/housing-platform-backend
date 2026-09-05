@@ -23,6 +23,35 @@ public class LiveKitRoomService {
   private final LiveKitTokenService tokenService;
   private final RestTemplate restTemplate = new RestTemplate();
 
+  /**
+   * Ensure a LiveKit room exists. Rooms are created lazily when the first participant joins, but
+   * egress (recording / composite simulcast) must attach to an existing room — starting egress
+   * before the broadcaster has connected fails with "requested room does not exist". Pre-creating
+   * the room here (idempotent) lets egress attach immediately; it captures the feed as soon as the
+   * broadcaster publishes. empty_timeout closes the room if nobody ever connects. Best-effort.
+   */
+  public void createRoom(String room) {
+    if (!properties.isConfigured() || room == null || room.isBlank()) {
+      return;
+    }
+    try {
+      String adminToken = tokenService.mintServerAdmin(room, true, false, 60);
+      HttpHeaders headers = new HttpHeaders();
+      headers.setContentType(MediaType.APPLICATION_JSON);
+      headers.setBearerAuth(adminToken);
+      Map<String, Object> body = new java.util.LinkedHashMap<>();
+      body.put("name", room);
+      body.put("empty_timeout", 300); // close a room nobody joins after 5 min
+      body.put("departure_timeout", 20); // and shortly after the last participant leaves
+      HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, headers);
+      restTemplate.postForEntity(
+          properties.httpUrl() + "/twirp/livekit.RoomService/CreateRoom", req, String.class);
+    } catch (Exception e) {
+      // Non-fatal: if the broadcaster connects first the room exists anyway; recording is best-effort.
+      log.warn("LiveKit CreateRoom failed for room {}: {}", room, e.getMessage());
+    }
+  }
+
   /** Force-close a room: disconnects the broadcaster and all viewers immediately. */
   public void deleteRoom(String room) {
     if (!properties.isConfigured()) {
