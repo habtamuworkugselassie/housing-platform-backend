@@ -85,6 +85,9 @@ public class LiveKitTokenService {
     }
     if (roomAdmin) {
       video.put("roomAdmin", true);
+      // Server-admin tokens also create rooms (pre-creating a room so egress can attach before
+      // the broadcaster has joined — LiveKit creates rooms lazily otherwise).
+      video.put("roomCreate", true);
     }
     if (ingressAdmin) {
       video.put("ingressAdmin", true);

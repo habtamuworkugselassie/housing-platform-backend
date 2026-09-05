@@ -330,6 +330,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       if (urls.isEmpty()) {
         return;
       }
+      // Pre-create the room so the composite egress can attach before the broadcaster connects.
+      roomService.createRoom(b.getRoom());
       String egressId = egressService.startRtmp(b.getRoom(), urls);
       b.setEgressId(egressId);
       repository.save(b);
@@ -455,7 +457,13 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     if (b.getRecordingEgressId() != null && !b.getRecordingEgressId().isBlank()) {
       return;
     }
+    if (!properties.isRecordingEnabled()) {
+      return;
+    }
     try {
+      // Egress can't attach to a room that doesn't exist yet — at this point the broadcaster has
+      // only been issued a token and hasn't connected, so pre-create the room (idempotent).
+      roomService.createRoom(b.getRoom());
       var rec = egressService.startFileRecording(b.getRoom());
       if (rec != null) {
         b.setRecordingEgressId(rec.egressId());
