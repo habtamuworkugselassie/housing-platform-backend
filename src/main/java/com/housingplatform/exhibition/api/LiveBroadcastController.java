@@ -70,6 +70,20 @@ public class LiveBroadcastController {
     return ResponseEntity.ok(service.viewerToken(id, name));
   }
 
+  @PostMapping("/{id}/recording/start")
+  @Operation(
+      summary = "Start recording (broadcaster)",
+      description =
+          "Records the broadcaster's own audio+video to MP4 (TrackComposite egress). Called by the"
+              + " client once it has published. No-op when recording is disabled or already running.")
+  public ResponseEntity<LiveBroadcastResponse> startRecording(
+      @PathVariable UUID id,
+      @RequestParam(name = "audioTrackId", required = false) String audioTrackId,
+      @RequestParam(name = "videoTrackId", required = false) String videoTrackId,
+      HttpServletRequest http) {
+    return ResponseEntity.ok(service.startRecording(id, audioTrackId, videoTrackId, clientIp(http)));
+  }
+
   @PostMapping("/{id}/end")
   @Operation(
       summary = "Broadcaster ends their stream",

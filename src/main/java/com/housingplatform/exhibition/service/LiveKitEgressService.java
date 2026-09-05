@@ -103,6 +103,50 @@ public class LiveKitEgressService {
     }
   }
 
+  /**
+   * Start a <b>TrackComposite</b> file egress: muxes one audio + one video track into a single MP4
+   * with <i>no</i> headless-Chromium web compositor, so it runs on a modest (1 vCPU) host where the
+   * RoomComposite recorder cannot. It records only the given tracks (the broadcaster) — co-hosts are
+   * not composited in. Keep the published video codec H.264 so this is a remux, not a transcode.
+   *
+   * @return a {@link Recording} handle, or {@code null} when recording is off / no tracks given
+   */
+  public Recording startTrackComposite(String room, String audioTrackId, String videoTrackId) {
+    if (!properties.isConfigured() || !properties.isRecordingEnabled()) {
+      return null;
+    }
+    boolean hasAudio = audioTrackId != null && !audioTrackId.isBlank();
+    boolean hasVideo = videoTrackId != null && !videoTrackId.isBlank();
+    if (!hasAudio && !hasVideo) {
+      return null;
+    }
+    String filename = room + "-" + java.time.Instant.now().toEpochMilli() + ".mp4";
+    String filepath = properties.getRecordingDir().replaceAll("/+$", "") + "/" + filename;
+
+    Map<String, Object> fileOutput = new LinkedHashMap<>();
+    fileOutput.put("file_type", FILETYPE_MP4);
+    fileOutput.put("filepath", filepath);
+
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("room_name", room);
+    if (hasAudio) body.put("audio_track_id", audioTrackId);
+    if (hasVideo) body.put("video_track_id", videoTrackId);
+    body.put("file_outputs", List.of(fileOutput));
+
+    try {
+      JsonNode res = post("StartTrackCompositeEgress", body);
+      String egressId = text(res, "egress_id");
+      if (egressId == null || egressId.isBlank()) {
+        log.warn("StartTrackCompositeEgress for room {} returned no egress_id", room);
+        return null;
+      }
+      return new Recording(egressId, filename);
+    } catch (Exception e) {
+      log.warn("Could not start track-composite recording for room {}: {}", room, e.getMessage());
+      return null;
+    }
+  }
+
   /** Handle for a started file recording: the egress id to stop it, and the output filename. */
   public record Recording(String egressId, String filename) {}
 

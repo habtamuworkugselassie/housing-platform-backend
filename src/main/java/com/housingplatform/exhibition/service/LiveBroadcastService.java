@@ -67,4 +67,12 @@ public interface LiveBroadcastService {
 
   /** Co-host publish token — issued only once the request is APPROVED (viewer polls for it). */
   LiveTokenResponse cohostToken(UUID broadcastId, UUID requestId);
+
+  /**
+   * Start a lightweight (TrackComposite) recording of the broadcaster's own tracks. Called by the
+   * broadcaster's client after it publishes (so the track ids are known). No-op when recording is
+   * disabled, the stream isn't live, or a recording is already running.
+   */
+  LiveBroadcastResponse startRecording(
+      UUID id, String audioTrackId, String videoTrackId, String ip);
 }

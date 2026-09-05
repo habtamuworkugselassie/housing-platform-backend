@@ -127,7 +127,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       b.setStatus(BroadcastStatus.LIVE);
       repository.save(b);
       maybeAutoSimulcast(b);
-      maybeStartRecording(b);
+      // Recording is started separately by the client once it has published (it needs the track
+      // ids) via startRecording(); TrackComposite egress can't attach before any tracks exist.
     }
     String token =
         tokenService.mint(
@@ -449,22 +450,29 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   }
 
   /**
-   * Start a local MP4 recording of the room when it goes live (if recording is enabled). The
-   * public replay URL is derived from the deterministic output filename and stored now; it becomes
-   * playable once the egress finalizes the file on {@link #endInternal}. Best-effort.
+   * Start a lightweight MP4 recording of the broadcaster's own audio + video tracks, invoked by the
+   * broadcaster's client once it has published (so the track ids exist). Uses TrackComposite egress
+   * — no headless Chromium — so it runs on a 1-vCPU host. Best-effort and idempotent; the public
+   * replay URL is derived from the deterministic filename and finalized when the stream ends.
+   *
+   * <p>Note: records the broadcaster only. Compositing co-hosts into one file needs RoomComposite
+   * (~4 vCPU) — see {@link com.housingplatform.exhibition.service.LiveKitEgressService#startTrackComposite}.
    */
-  private void maybeStartRecording(LiveBroadcast b) {
-    if (b.getRecordingEgressId() != null && !b.getRecordingEgressId().isBlank()) {
-      return;
-    }
-    if (!properties.isRecordingEnabled()) {
-      return;
+  @Override
+  @Transactional
+  public LiveBroadcastResponse startRecording(
+      UUID id, String audioTrackId, String videoTrackId, String ip) {
+    LiveBroadcast b = find(id);
+    assertBroadcasterAllowed(b, "You are not allowed to record this stream.");
+    // No-op (not an error) when recording is disabled, the stream isn't live, or one is already
+    // running — the client calls this unconditionally after publishing.
+    if (!properties.isRecordingEnabled()
+        || b.getStatus() != BroadcastStatus.LIVE
+        || (b.getRecordingEgressId() != null && !b.getRecordingEgressId().isBlank())) {
+      return LiveBroadcastResponse.from(b);
     }
     try {
-      // Egress can't attach to a room that doesn't exist yet — at this point the broadcaster has
-      // only been issued a token and hasn't connected, so pre-create the room (idempotent).
-      roomService.createRoom(b.getRoom());
-      var rec = egressService.startFileRecording(b.getRoom());
+      var rec = egressService.startTrackComposite(b.getRoom(), audioTrackId, videoTrackId);
       if (rec != null) {
         b.setRecordingEgressId(rec.egressId());
         b.setRecordingUrl(
@@ -472,8 +480,9 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
         repository.save(b);
       }
     } catch (Exception e) {
-      // Recording is a convenience; never fail the go-live because of it.
+      // Recording is a convenience; never fail the broadcast because of it.
     }
+    return LiveBroadcastResponse.from(b);
   }
 
   private LiveBroadcast find(UUID id) {

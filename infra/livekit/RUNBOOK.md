@@ -41,10 +41,24 @@ Backups of the pre-change compose files are on the server as `*.bak*`.
 
 ## Recording (local MP4)
 
-When a broadcast goes live the backend starts a RoomComposite **file** egress that
-writes one MP4 into the shared uploads volume; the public replay URL is stored on the
-broadcast and served by the frontend. On end (Stop broadcasting, tab close, admin cut,
-reject) the egress is stopped and the file finalized.
+Once the broadcaster has published, its client calls `POST /{id}/recording/start` with the
+published audio+video track ids and the backend starts a **TrackComposite** file egress —
+it muxes just those two tracks into one MP4 with **no headless Chromium**, so it runs on
+the 1-vCPU host. The client publishes **H.264** (`publishDefaults.videoCodec`) so this is a
+remux, not a transcode. The public replay URL is stored on the broadcast and served by the
+frontend; on end (Stop, tab close, admin cut, reject) the egress is stopped and finalized.
+Records the broadcaster only — co-hosts are not composited in (that needs RoomComposite).
+
+### ⚠️ 2026-09-05 incident — recording rebooted the host
+
+`LIVEKIT_RECORDING_ENABLED` was turned on while recording still used **RoomComposite**
+(headless Chromium, ~4 vCPU). Every go-live spawned Chromium, exhausted the 1-vCPU/2 GB/
+**no-swap** droplet and **hard-rebooted the box** (twice that day); the crash killed egress
+before any MP4 finalized, so recordings were empty and DB `recording_url`s dangled.
+Remediation: added a **4 GB swapfile** (`/swapfile`, in `/etc/fstab`, `vm.swappiness=10`),
+switched recording to TrackComposite (this change), and cleared the dangling URLs. Re-enable
+recording only on the TrackComposite build. RoomComposite (`startFileRecording`, dormant) is
+for a future ≥4-vCPU host where co-host compositing is wanted.
 
 - Egress mounts `/var/lib/housing-platform/uploads:/out`; backend writes to
   `/out/live-recordings/<room>-<ts>.mp4` (`livekit.recording-dir`) and stores the URL
@@ -64,17 +78,13 @@ docker compose -f docker-compose.livekit.yml up -d egress
 docker logs livekit-egress-1 --tail 20
 ```
 
-### ⚠️ CPU requirement
+### CPU note
 
-RoomComposite egress runs a headless Chromium compositor and wants **~4 vCPU**. The
-current droplet is **1 vCPU / 2 GB**, and egress logs `not enough cpu for some egress
-types (minimumCpu 4, available 1)`. Recording (and the co-host multi-tile composite)
-will be unreliable or fail until you either:
-- resize the droplet to 4+ vCPU (CPU-Optimized), or
-- run egress on a separate CPU-optimized node pointing at the same redis + livekit, or
-- back recordings with object storage and accept reduced quality.
-
-Until then, `LIVEKIT_RECORDING_ENABLED` may be left `false` in production.
+TrackComposite (the current recorder) is light — no browser, and with H.264 it remuxes
+rather than transcodes — so it runs on the 1-vCPU host. **RoomComposite** (full-room
+compositing, needed to record co-hosts into one file) still wants **~4 vCPU** and will log
+`not enough cpu for some egress types`; only switch back to it after resizing the droplet to
+4+ vCPU (CPU-Optimized) or running egress on its own node.
 
 ## Redeploy (how app code reaches production)
 
