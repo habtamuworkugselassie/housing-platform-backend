@@ -15,6 +15,10 @@ public interface LiveBroadcastRepository extends JpaRepository<LiveBroadcast, UU
 
   Page<LiveBroadcast> findByStatus(BroadcastStatus status, Pageable pageable);
 
+  /** Public replays: the most recent ended broadcasts that produced a recording. */
+  List<LiveBroadcast> findTop50ByStatusAndRecordingUrlIsNotNullOrderByUpdatedAtDesc(
+      BroadcastStatus status);
+
   /** Abuse guard: recent go-live requests from one IP. */
   long countByRequesterIpAndCreatedAtAfter(String requesterIp, LocalDateTime after);
 }
