@@ -192,10 +192,13 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
   private FooterContactResponse toFooterContact(OrganizationResponse org) {
     String address =
         firstNonBlank(org.getAddress(), buildCityCountryLine(org.getCity(), org.getCountry()));
+    List<FooterContactResponse.FooterPhone> phones = toFooterPhones(org.getPhoneNumbers());
+    FooterContactResponse.FooterPhone primary = phones.isEmpty() ? null : phones.get(0);
     return FooterContactResponse.builder()
         .address(address)
-        .phoneDisplay(formatPhoneDisplay(org.getPhoneNumbers()))
-        .phoneTel(formatPhoneTelDigits(org.getPhoneNumbers()))
+        .phoneDisplay(primary != null ? primary.getDisplay() : "")
+        .phoneTel(primary != null ? primary.getTel() : "")
+        .phones(phones)
         .websiteLabel(websiteLabel(org.getWebsite()))
         .websiteUrl(normalizeWebsiteHref(org.getWebsite()))
         .build();
@@ -226,14 +229,28 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
     return c + ", " + co;
   }
 
-  private static String formatPhoneDisplay(List<OrganizationPhoneDto> phones) {
-    if (phones == null || phones.isEmpty()) {
-      return "";
+  /**
+   * The organization's phones already arrive in display order (OrganizationContact orders them by
+   * displayOrder), so an organization that publishes a second contact line gets it in the footer
+   * without any further configuration. This used to take phones.get(0) and drop the rest.
+   */
+  private static List<FooterContactResponse.FooterPhone> toFooterPhones(
+      List<OrganizationPhoneDto> phones) {
+    if (phones == null) {
+      return List.of();
     }
-    OrganizationPhoneDto p = phones.get(0);
-    if (p == null || p.getNumber() == null || p.getNumber().isBlank()) {
-      return "";
-    }
+    return phones.stream()
+        .filter(p -> p != null && p.getNumber() != null && !p.getNumber().isBlank())
+        .map(
+            p ->
+                FooterContactResponse.FooterPhone.builder()
+                    .display(formatPhoneDisplay(p))
+                    .tel(formatPhoneTelDigits(p))
+                    .build())
+        .collect(Collectors.toList());
+  }
+
+  private static String formatPhoneDisplay(OrganizationPhoneDto p) {
     String cc = p.getCountryCode() != null ? p.getCountryCode().trim() : "";
     if (!cc.startsWith("+") && !cc.isEmpty()) {
       cc = "+" + cc.replace("+", "");
@@ -242,14 +259,7 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
     return (cc + " " + num).trim();
   }
 
-  private static String formatPhoneTelDigits(List<OrganizationPhoneDto> phones) {
-    if (phones == null || phones.isEmpty()) {
-      return "";
-    }
-    OrganizationPhoneDto p = phones.get(0);
-    if (p == null) {
-      return "";
-    }
+  private static String formatPhoneTelDigits(OrganizationPhoneDto p) {
     String cc = p.getCountryCode() != null ? p.getCountryCode().replaceAll("[^0-9]", "") : "";
     String num = p.getNumber() != null ? p.getNumber().replaceAll("[^0-9]", "") : "";
     return cc + num;
