@@ -57,6 +57,15 @@ class SitemapControllerTest {
                     "updated_at", Timestamp.valueOf(UPDATED))));
   }
 
+  /** The single {@code <url>} element whose {@code <loc>} is exactly this URL. */
+  private static String urlBlock(String xml, String loc) {
+    Matcher matcher =
+        Pattern.compile("<url>\\s*<loc>" + Pattern.quote(loc) + "</loc>(.*?)</url>", Pattern.DOTALL)
+            .matcher(xml);
+    assertThat(matcher.find()).as("a <url> block for %s", loc).isTrue();
+    return matcher.group(1);
+  }
+
   private static List<String> locations(String xml) {
     Matcher matcher = Pattern.compile("<loc>(.*?)</loc>").matcher(xml);
     return matcher.results().map(result -> result.group(1)).toList();
@@ -116,9 +125,51 @@ class SitemapControllerTest {
             "<loc>https://ethiobuildconnect.et/properties/"
                 + propertyId
                 + "</loc>\n    <lastmod>2026-03-14</lastmod>");
-    // The index pages inherit the high-water mark rather than going undated.
+    // The index pages inherit the high-water mark rather than going undated. Matched on the
+    // <url> block rather than on <loc> being immediately followed by <lastmod>, because the
+    // hreflang alternates now sit between the two.
+    assertThat(urlBlock(xml, "https://ethiobuildconnect.et/"))
+        .contains("<lastmod>2026-03-14</lastmod>");
+    assertThat(urlBlock(xml, "https://ethiobuildconnect.et/am"))
+        .contains("<lastmod>2026-03-14</lastmod>");
+  }
+
+  @Test
+  void listsBothLanguageEditionsWithReciprocalAlternates() {
+    stubEmptyDatabase();
+
+    String xml = controller.getSitemap();
+    List<String> locs = locations(xml);
+
+    assertThat(locs).contains("https://ethiobuildconnect.et/am");
+    assertThat(locs).contains("https://ethiobuildconnect.et/am/real-estate");
+    assertThat(locs).doesNotHaveDuplicates();
+
+    // hreflang is only honoured when every edition names every edition, itself included.
+    String reciprocal =
+        "<xhtml:link rel=\"alternate\" hreflang=\"en\" href=\"https://ethiobuildconnect.et/real-estate\"/>\n"
+            + "    <xhtml:link rel=\"alternate\" hreflang=\"am\" href=\"https://ethiobuildconnect.et/am/real-estate\"/>\n"
+            + "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"https://ethiobuildconnect.et/real-estate\"/>";
     assertThat(xml)
-        .contains("<loc>https://ethiobuildconnect.et/</loc>\n    <lastmod>2026-03-14</lastmod>");
+        .contains("<loc>https://ethiobuildconnect.et/real-estate</loc>\n    " + reciprocal);
+    assertThat(xml)
+        .contains("<loc>https://ethiobuildconnect.et/am/real-estate</loc>\n    " + reciprocal);
+    assertThat(xml).contains("xmlns:xhtml=\"http://www.w3.org/1999/xhtml\"");
+  }
+
+  @Test
+  void omitsTheAmharicEditionOfAnEnglishOnlyPage() {
+    stubEmptyDatabase();
+
+    String xml = controller.getSitemap();
+
+    // The market guide is English by design and its /am route is noindex. Listing it, or
+    // giving it an alternate, would claim a translation that does not exist.
+    assertThat(locations(xml)).contains("https://ethiobuildconnect.et/ethiopia-real-estate-market");
+    assertThat(locations(xml))
+        .doesNotContain("https://ethiobuildconnect.et/am/ethiopia-real-estate-market");
+    assertThat(xml)
+        .doesNotContain("href=\"https://ethiobuildconnect.et/am/ethiopia-real-estate-market\"");
   }
 
   @Test
