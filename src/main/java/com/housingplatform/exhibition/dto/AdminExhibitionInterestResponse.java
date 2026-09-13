@@ -37,6 +37,28 @@ public class AdminExhibitionInterestResponse {
   /** When set, admin has verified the exhibition registrant contact (email/phone). */
   private LocalDateTime contactVerifiedAt;
 
+  /**
+   * Where this lead came from. Surfaced to admins because the point of capturing it is that someone
+   * can look at the list and see which campaign is producing exhibitors rather than only visitors —
+   * a split Analytics cannot show, since it never sees registrants who declined cookies.
+   */
+  private String utmSource;
+
+  private String utmMedium;
+
+  private String utmCampaign;
+
+  private String utmTerm;
+
+  private String utmContent;
+
+  private String referrer;
+
+  private String landingPath;
+
+  /** Set when the registrant opted out of the reminder series. */
+  private LocalDateTime unsubscribedAt;
+
   /** Platform user id when a primary contact user exists for the linked organization. */
   private UUID primaryContactUserId;
 }

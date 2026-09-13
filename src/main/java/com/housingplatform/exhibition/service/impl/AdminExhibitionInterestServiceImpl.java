@@ -59,6 +59,14 @@ public class AdminExhibitionInterestServiceImpl implements AdminExhibitionIntere
         .sponsorshipId(s != null ? s.getId() : null)
         .sponsorshipPackageName(s != null ? s.getName() : null)
         .contactVerifiedAt(e.getContactVerifiedAt())
+        .utmSource(e.getUtmSource())
+        .utmMedium(e.getUtmMedium())
+        .utmCampaign(e.getUtmCampaign())
+        .utmTerm(e.getUtmTerm())
+        .utmContent(e.getUtmContent())
+        .referrer(e.getReferrer())
+        .landingPath(e.getLandingPath())
+        .unsubscribedAt(e.getUnsubscribedAt())
         .primaryContactUserId(primaryId)
         .build();
   }

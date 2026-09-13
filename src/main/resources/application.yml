@@ -177,6 +177,29 @@ app:
     rag-directory-property-candidate-pool: ${SUPPORT_CHAT_RAG_DIRECTORY_PROPERTY_POOL:400}
   password-reset:
     expiry-hours: ${PASSWORD_RESET_EXPIRY_HOURS:1}
+
+  # The expo itself. These must match what the site shows — src/features/exhibition/eventDetails.js
+  # and exhibition.hero.dateVenue in the frontend locale files — because the mail below quotes them
+  # and the page's event markup is held to agreeing with the visible page. Move the dates in all
+  # three or none.
+  expo:
+    name: ${EXPO_NAME:Ethio Build Connect Expo}
+    start-date: ${EXPO_START_DATE:2026-11-16}
+    end-date: ${EXPO_END_DATE:2026-11-18}
+    venue: ${EXPO_VENUE:Addis Convention Center}
+    city: ${EXPO_CITY:Addis Ababa}
+    timezone: ${EXPO_TIMEZONE:Africa/Addis_Ababa}
+    # Confirmation on registration, then reminders at 30, 7 and 1 days out. The offsets are in
+    # ExhibitionEmailKind, not here, so a reminder's name and its timing cannot drift apart.
+    lifecycle-emails:
+      enabled: ${EXPO_LIFECYCLE_EMAILS_ENABLED:true}
+      # Daily, in the expo timezone above. The send log makes a rerun harmless.
+      cron: ${EXPO_LIFECYCLE_EMAILS_CRON:0 0 9 * * *}
+      # Ceiling per run, to stay inside the SMTP account's daily quota. Whoever is left over is
+      # picked up by the next run.
+      max-per-run: ${EXPO_LIFECYCLE_EMAILS_MAX_PER_RUN:400}
+      reply-to: ${EXPO_LIFECYCLE_EMAILS_REPLY_TO:}
+
   # Directory for storing uploaded media (property/org images). Only URLs are stored in DB.
   upload-dir: ${UPLOAD_DIR:./uploads}
 

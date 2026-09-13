@@ -52,4 +52,28 @@ public class ExhibitionInterestRequest {
 
   /** Required for exhibitors; optional for partners that already know a suitable package. */
   private UUID sponsorshipId;
+
+  /**
+   * Campaign attribution, read by the browser from the URL the visitor first arrived on.
+   *
+   * <p>Optional and untrusted — anyone can post anything here, so these are stored as opaque
+   * labels, clipped to the column width, and never interpreted as anything but reporting
+   * dimensions. They exist because Google Analytics only sees visitors who accepted cookies, while
+   * this copy is recorded for every registration.
+   */
+  private String utmSource;
+
+  private String utmMedium;
+
+  private String utmCampaign;
+
+  private String utmTerm;
+
+  private String utmContent;
+
+  /** Referring URL of the first page in the visit, when the browser supplied one. */
+  private String referrer;
+
+  /** Path of the first page in the visit — which page actually earned the registration. */
+  private String landingPath;
 }

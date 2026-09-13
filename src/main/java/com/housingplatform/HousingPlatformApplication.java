@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoCo
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(
     exclude = {RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class
@@ -16,6 +17,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableJpaAuditing
 @EnableAsync
 @EnableCaching
+// Expo reminder mail runs on a daily cron; see ExhibitionReminderScheduler.
+@EnableScheduling
 public class HousingPlatformApplication {
 
   public static void main(String[] args) {
