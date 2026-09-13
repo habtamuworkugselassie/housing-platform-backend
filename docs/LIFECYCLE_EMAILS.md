@@ -55,13 +55,41 @@ password-reset mail has, so local and staging work without a mail server.
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | Gmail SMTP, blank credentials | Nothing sends until the username is set |
+| `MAIL_FROM` | same as `MAIL_USERNAME` | The address readers see. Set it whenever the SMTP login is not an address anyone should reply to — every relay provider. A display name is allowed: `Ethio Build Connect Expo <expo@ethiobuildconnect.et>` |
 | `EXPO_START_DATE`, `EXPO_END_DATE` | 2026-11-16 / 2026-11-18 | Must match the site — see below |
 | `EXPO_VENUE`, `EXPO_CITY` | Addis Convention Center, Addis Ababa | Same |
 | `EXPO_TIMEZONE` | `Africa/Addis_Ababa` | The zone "how many days until" is decided in |
 | `EXPO_LIFECYCLE_EMAILS_ENABLED` | `true` | Master switch; off means nothing is sent or logged |
-| `EXPO_LIFECYCLE_EMAILS_CRON` | `0 0 9 * * *` | Daily reminder run, in the expo timezone |
-| `EXPO_LIFECYCLE_EMAILS_MAX_PER_RUN` | `400` | Stay inside the SMTP account's quota |
+| `EXPO_LIFECYCLE_EMAILS_CRON` | `0 0 * * * *` | Hourly reminder run, in the expo timezone |
+| `EXPO_LIFECYCLE_EMAILS_DAILY_QUOTA` | `300` | Mails per calendar day, counted from the send log — set to the relay's cap |
 | `EXPO_LIFECYCLE_EMAILS_REPLY_TO` | empty | Set it; "reply to this email" should reach a person |
+
+### Sending for free until there is a budget
+
+Two different things are needed, and no free product does both well:
+
+**An inbox at the domain** — so `expo@ethiobuildconnect.et` exists, replies land somewhere, and a
+relay can verify the sender. Forwarding-only services do this for nothing:
+
+- **Cloudflare Email Routing** — free, unlimited addresses, forwards to any Gmail. Requires the
+  domain's nameservers to be on Cloudflare (the free plan is enough). Receive only.
+- **ImprovMX** — free for one domain and 25 aliases, up to 500 forwards a day. Any DNS host.
+  Receive only; sending is a paid add-on.
+
+**A relay to send through** — this is what `MAIL_*` points at. Free tiers that include SMTP and a
+verified custom domain with DKIM:
+
+| Relay | Free cap | Fits |
+| --- | --- | --- |
+| **Brevo** | 300/day, no card, no expiry | Best fit. Set `EXPO_LIFECYCLE_EMAILS_DAILY_QUOTA=270` to leave headroom for confirmations |
+| Mailjet | 200/day (6,000/month) | Queues overflow for up to three days — which for the day-before reminder means sending it on opening day. Quota `180` |
+| Resend | 100/day (3,000/month), one domain | Fine while the lead list is small. Quota `90` |
+| Gmail (personal) | ~500 recipients/day | Works with zero changes, but From is a `@gmail.com` address, and Google is winding down the "send mail as" route to a custom domain. Stopgap only |
+
+Whichever relay: add its SPF include and DKIM records to the domain's DNS before the first send,
+and set `MAIL_FROM` to the verified address. A relay will refuse, or silently drop, mail from an
+address it has not verified — and verification means receiving a mail at that address, which is
+why the inbox comes first.
 
 **The dates must match the site.** `src/features/exhibition/eventDetails.js` and
 `exhibition.hero.dateVenue` in the frontend locale files carry the same dates and venue, and the
@@ -83,6 +111,10 @@ cron fire or an operator triggering a catch-up by hand all land on the same row.
 - `FAILED` stays retryable, so a mail server having a bad afternoon is picked up by the next run.
 - Each send gets its own transaction, so a bounce on the fortieth lead does not roll back the log
   of the thirty-nine already mailed.
+- The daily quota is measured from the log too — `SENT` rows since midnight, confirmations
+  included, because the relay's cap does not know one from the other. The job runs hourly so a
+  reminder the quota cut short is finished later the same day; one it cannot finish by midnight is
+  not sent late.
 
 A day that is missed entirely stays missed. "One week to go", sent four days late, tells the
 reader we are not paying attention and gives them the wrong date to plan around.

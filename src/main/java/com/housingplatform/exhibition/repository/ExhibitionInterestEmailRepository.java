@@ -2,6 +2,7 @@ package com.housingplatform.exhibition.repository;
 
 import com.housingplatform.exhibition.domain.ExhibitionEmailKind;
 import com.housingplatform.exhibition.domain.ExhibitionInterestEmail;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -16,6 +17,10 @@ public interface ExhibitionInterestEmailRepository
 
   Optional<ExhibitionInterestEmail> findByInterestIdAndKind(
       UUID interestId, ExhibitionEmailKind kind);
+
+  /** Mails actually handed to the relay since {@code since} — what has been spent of the quota. */
+  long countByStatusAndSentAtGreaterThanEqual(
+      ExhibitionInterestEmail.Status status, LocalDateTime since);
 
   /**
    * Ids of everyone this mail is already settled for — sent, or suppressed and not to be retried.

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.housingplatform.exhibition.config.ExpoProperties;
 import com.housingplatform.exhibition.domain.ExhibitionEmailKind;
+import com.housingplatform.exhibition.domain.ExhibitionInterestEmail;
 import com.housingplatform.exhibition.email.ExhibitionEmailDispatcher;
 import com.housingplatform.exhibition.repository.ExhibitionInterestEmailRepository;
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
@@ -54,6 +55,7 @@ class ExhibitionLifecycleEmailServiceTest {
             interestRepository, emailRepository, dispatcher, expo);
 
     when(emailRepository.findSettledInterestIds(any())).thenReturn(Set.of());
+    when(emailRepository.countByStatusAndSentAtGreaterThanEqual(any(), any())).thenReturn(0L);
     when(interestRepository.findReminderCandidateIds()).thenReturn(List.of());
     when(dispatcher.dispatch(any(), any())).thenReturn(true);
   }
@@ -115,20 +117,45 @@ class ExhibitionLifecycleEmailServiceTest {
   }
 
   @Test
-  void theRunStopsAtTheQuotaAndLeavesTheRestForTomorrow() {
+  void theRunStopsAtTheDailyQuota() {
     candidates(10);
-    expo.getLifecycleEmails().setMaxPerRun(3);
+    expo.getLifecycleEmails().setDailyQuota(3);
 
     assertThat(service.sendDueReminders(LocalDate.of(2026, 10, 17))).isEqualTo(3);
     verify(dispatcher, times(3)).dispatch(any(), eq(ExhibitionEmailKind.REMINDER_T30));
   }
 
   @Test
+  void confirmationsSentEarlierTodayCountAgainstTheSameQuota() {
+    // The relay's cap is per account per day; it does not know a confirmation from a reminder.
+    // A run that ignored the morning's confirmations would push the account over on the day the
+    // reminder mattered most.
+    candidates(10);
+    expo.getLifecycleEmails().setDailyQuota(5);
+    when(emailRepository.countByStatusAndSentAtGreaterThanEqual(
+            eq(ExhibitionInterestEmail.Status.SENT), any()))
+        .thenReturn(4L);
+
+    assertThat(service.sendDueReminders(LocalDate.of(2026, 10, 17))).isEqualTo(1);
+    verify(dispatcher, times(1)).dispatch(any(), eq(ExhibitionEmailKind.REMINDER_T30));
+  }
+
+  @Test
+  void anExhaustedQuotaSendsNothingButDoesNotFail() {
+    candidates(3);
+    expo.getLifecycleEmails().setDailyQuota(100);
+    when(emailRepository.countByStatusAndSentAtGreaterThanEqual(any(), any())).thenReturn(250L);
+
+    assertThat(service.sendDueReminders(LocalDate.of(2026, 10, 17))).isZero();
+    verify(dispatcher, never()).dispatch(any(), any());
+  }
+
+  @Test
   void aSuppressedOrFailedSendDoesNotEatSomeoneElsesQuota() {
-    // The ceiling exists to protect an SMTP quota, and a mail that was never handed to the server
+    // The quota exists to protect the relay's cap, and a mail that was never handed to the relay
     // consumed none of it. Counting it would silently shrink the run.
     candidates(4);
-    expo.getLifecycleEmails().setMaxPerRun(2);
+    expo.getLifecycleEmails().setDailyQuota(2);
     when(dispatcher.dispatch(any(), any())).thenReturn(false, false, true, true);
 
     assertThat(service.sendDueReminders(LocalDate.of(2026, 10, 17))).isEqualTo(2);

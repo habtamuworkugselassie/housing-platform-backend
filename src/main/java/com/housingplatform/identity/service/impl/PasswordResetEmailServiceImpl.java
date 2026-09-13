@@ -21,6 +21,10 @@ public class PasswordResetEmailServiceImpl implements PasswordResetEmailService 
   @Value("${spring.mail.username:}")
   private String fromEmail;
 
+  /** The visible From. Defaults to the login; see {@code app.mail.from} in application.yml. */
+  @Value("${app.mail.from:${spring.mail.username:}}")
+  private String fromAddress;
+
   @Override
   public void sendPasswordResetEmail(String toEmail, String resetToken) {
     String resetUrl = frontendBaseUrl.replaceAll("/$", "") + "/reset-password?token=" + resetToken;
@@ -35,7 +39,7 @@ public class PasswordResetEmailServiceImpl implements PasswordResetEmailService 
 
     try {
       SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
+      message.setFrom(fromAddress == null || fromAddress.isBlank() ? fromEmail : fromAddress);
       message.setTo(toEmail);
       message.setSubject("Reset your password - Ethio Build Connect");
       message.setText(
@@ -70,7 +74,7 @@ public class PasswordResetEmailServiceImpl implements PasswordResetEmailService 
 
     try {
       SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
+      message.setFrom(fromAddress == null || fromAddress.isBlank() ? fromEmail : fromAddress);
       message.setTo(toEmail);
       message.setSubject("Your Ethio Build Connect account");
       message.setText(

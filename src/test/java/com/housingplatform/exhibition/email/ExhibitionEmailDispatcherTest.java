@@ -58,7 +58,9 @@ class ExhibitionEmailDispatcherTest {
     dispatcher =
         new ExhibitionEmailDispatcher(
             interestRepository, emailRepository, composer, mailSender, expo);
-    ReflectionTestUtils.setField(dispatcher, "fromEmail", "expo@ethiobuildconnect.et");
+    ReflectionTestUtils.setField(dispatcher, "smtpUsername", "brevo-login@example.com");
+    ReflectionTestUtils.setField(
+        dispatcher, "fromAddress", "Ethio Build Connect Expo <expo@ethiobuildconnect.et>");
 
     interest =
         ExhibitionInterest.builder()
@@ -89,6 +91,10 @@ class ExhibitionEmailDispatcherTest {
     verify(mailSender).send(mail.capture());
     assertThat(mail.getValue().getTo()).containsExactly("lead@example.com");
     assertThat(mail.getValue().getSubject()).isNotBlank();
+    // The relay login is not what the reader sees. Brevo's is an account email, Resend's is the
+    // word "resend"; neither is an address anyone should be shown or reply to.
+    assertThat(mail.getValue().getFrom())
+        .isEqualTo("Ethio Build Connect Expo <expo@ethiobuildconnect.et>");
 
     ExhibitionInterestEmail record = savedRecord();
     assertThat(record.getStatus()).isEqualTo(ExhibitionInterestEmail.Status.SENT);
@@ -180,7 +186,7 @@ class ExhibitionEmailDispatcherTest {
 
   @Test
   void withNoSmtpAccountNothingIsSentAndTheReasonIsRecorded() {
-    ReflectionTestUtils.setField(dispatcher, "fromEmail", "");
+    ReflectionTestUtils.setField(dispatcher, "smtpUsername", "");
 
     boolean sent = dispatcher.dispatch(interestId, ExhibitionEmailKind.CONFIRMATION);
 
@@ -196,6 +202,18 @@ class ExhibitionEmailDispatcherTest {
     assertThat(dispatcher.dispatch(interestId, ExhibitionEmailKind.CONFIRMATION)).isFalse();
     verify(mailSender, never()).send(any(SimpleMailMessage.class));
     verify(emailRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void withNoSeparateFromAddressTheLoginIsUsed() {
+    // A plain Gmail setup, where the login is the address — nothing extra to configure.
+    ReflectionTestUtils.setField(dispatcher, "fromAddress", "");
+
+    dispatcher.dispatch(interestId, ExhibitionEmailKind.CONFIRMATION);
+
+    ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+    verify(mailSender).send(mail.capture());
+    assertThat(mail.getValue().getFrom()).isEqualTo("brevo-login@example.com");
   }
 
   @Test

@@ -41,8 +41,18 @@ public class ExhibitionEmailDispatcher {
   private final JavaMailSender mailSender;
   private final ExpoProperties expo;
 
+  /** The SMTP login. Blank means no relay is configured and nothing is sent. */
   @Value("${spring.mail.username:}")
-  private String fromEmail;
+  private String smtpUsername;
+
+  /**
+   * The address a registrant sees. Separate from the login because a relay's SMTP username is an
+   * account email or an API key, not an address anyone should reply to. Falls back to the login so
+   * a plain Gmail setup needs nothing extra. May carry a display name: {@code Ethio Build Connect
+   * Expo <expo@ethiobuildconnect.et>}.
+   */
+  @Value("${app.mail.from:${spring.mail.username:}}")
+  private String fromAddress;
 
   /**
    * @return true when a mail actually went out, false when it was already settled, suppressed or
@@ -82,7 +92,7 @@ public class ExhibitionEmailDispatcher {
 
     ExhibitionEmailContent content = composer.compose(interest, kind);
 
-    if (fromEmail == null || fromEmail.isBlank()) {
+    if (smtpUsername == null || smtpUsername.isBlank()) {
       // Same fail-soft contract the password-reset mail has: on a machine with no SMTP account
       // the mail is logged instead of sent, so local and staging work without a mail server.
       log.warn(
@@ -96,7 +106,7 @@ public class ExhibitionEmailDispatcher {
 
     try {
       SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
+      message.setFrom(fromAddress == null || fromAddress.isBlank() ? smtpUsername : fromAddress);
       message.setTo(interest.getEmail());
       String replyTo = expo.getLifecycleEmails().getReplyTo();
       if (replyTo != null && !replyTo.isBlank()) {

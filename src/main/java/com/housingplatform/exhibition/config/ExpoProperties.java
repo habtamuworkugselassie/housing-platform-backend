@@ -47,19 +47,22 @@ public class ExpoProperties {
     private boolean enabled = true;
 
     /**
-     * Ceiling on how many registrants one run of the daily job will mail. A shared SMTP account has
-     * a sending quota, and blowing through it gets the domain rate-limited on exactly the day the
-     * mail mattered. Anyone not reached is left unrecorded, so the next run picks them up.
+     * How many lifecycle mails may go out per calendar day, counted from the send log. Free SMTP
+     * relays cap daily sends (Brevo 300, Mailjet 200, Resend 100) and blowing through the cap gets
+     * the rest silently dropped or the account paused — on exactly the day the mail mattered. Set
+     * this to the provider's cap, less a little headroom for confirmations.
      */
-    private int maxPerRun = 400;
+    private int dailyQuota = 300;
 
     /** Reply-to address printed in the mail body so a registrant can reach a person. */
     private String replyTo = "";
 
     /**
-     * When the daily reminder run happens, in {@link ExpoProperties#getTimezone()}. Read by the
-     * scheduler straight from the property; declared here so the key is documented in one place.
+     * How often the reminder job runs, in {@link ExpoProperties#getTimezone()}. Hourly rather than
+     * daily so that a reminder the quota cut short in one run is finished within the same day by
+     * the next; the send log makes every extra run harmless. Read by the scheduler straight from
+     * the property; declared here so the key is documented in one place.
      */
-    private String cron = "0 0 9 * * *";
+    private String cron = "0 0 * * * *";
   }
 }

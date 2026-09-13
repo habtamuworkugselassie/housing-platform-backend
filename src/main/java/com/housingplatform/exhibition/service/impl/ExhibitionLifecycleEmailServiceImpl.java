@@ -2,11 +2,13 @@ package com.housingplatform.exhibition.service.impl;
 
 import com.housingplatform.exhibition.config.ExpoProperties;
 import com.housingplatform.exhibition.domain.ExhibitionEmailKind;
+import com.housingplatform.exhibition.domain.ExhibitionInterestEmail;
 import com.housingplatform.exhibition.email.ExhibitionEmailDispatcher;
 import com.housingplatform.exhibition.repository.ExhibitionInterestEmailRepository;
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.exhibition.service.ExhibitionLifecycleEmailService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -64,7 +66,15 @@ public class ExhibitionLifecycleEmailServiceImpl implements ExhibitionLifecycleE
     Set<UUID> settled = emailRepository.findSettledInterestIds(kind);
     List<UUID> candidates = interestRepository.findReminderCandidateIds();
 
-    int ceiling = expo.getLifecycleEmails().getMaxPerRun();
+    // The quota is what the relay allows per day, and it is shared with the confirmations sent
+    // that day, so it is measured from the log rather than counted per run. Start-of-day is taken
+    // in the same clock the dispatcher stamps sentAt with, so the two always agree.
+    LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+    long spent =
+        emailRepository.countByStatusAndSentAtGreaterThanEqual(
+            ExhibitionInterestEmail.Status.SENT, startOfToday);
+    long remaining = Math.max(0, expo.getLifecycleEmails().getDailyQuota() - spent);
+
     int sent = 0;
     int outstanding = 0;
     for (UUID interestId : candidates) {
@@ -72,21 +82,23 @@ public class ExhibitionLifecycleEmailServiceImpl implements ExhibitionLifecycleE
         continue;
       }
       outstanding++;
-      // Past the ceiling we keep counting but stop sending, so the log can say how much is left
+      // Past the quota we keep counting but stop sending, so the log can say how much is left
       // rather than only that we stopped.
-      if (sent < ceiling && dispatcher.dispatch(interestId, kind)) {
+      if (sent < remaining && dispatcher.dispatch(interestId, kind)) {
         sent++;
       }
     }
 
     if (outstanding > sent) {
-      log.info(
-          "Lifecycle reminder {}: sent {} of {} outstanding (per-run ceiling {}); the remainder is"
-              + " picked up by the next run",
+      log.warn(
+          "Lifecycle reminder {}: sent {} of {} outstanding; daily quota {} with {} already spent"
+              + " today. The rest go out on the next hourly run if quota remains — a reminder"
+              + " not finished by midnight is not sent late.",
           kind,
           sent,
           outstanding,
-          ceiling);
+          expo.getLifecycleEmails().getDailyQuota(),
+          spent);
     } else if (sent > 0) {
       log.info("Lifecycle reminder {}: sent {}", kind, sent);
     }

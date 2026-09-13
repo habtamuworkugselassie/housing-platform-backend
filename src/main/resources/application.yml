@@ -149,6 +149,13 @@ logging:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  mail:
+    # The From address on every mail the platform sends. Kept apart from spring.mail.username
+    # because relay providers (Brevo, Mailjet, Resend) log in with an account email or an API
+    # key, not with the address anyone should see or reply to. Defaults to the login so a plain
+    # Gmail setup works unchanged. A display name is allowed:
+    #   MAIL_FROM="Ethio Build Connect Expo <expo@ethiobuildconnect.et>"
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
   support-chat:
     enabled: ${SUPPORT_CHAT_ENABLED:true}
     # OpenAI-compatible HTTP API: OpenAI, Groq (free tier), OpenRouter, Together, local Ollama proxy, etc.
@@ -193,11 +200,12 @@ app:
     # ExhibitionEmailKind, not here, so a reminder's name and its timing cannot drift apart.
     lifecycle-emails:
       enabled: ${EXPO_LIFECYCLE_EMAILS_ENABLED:true}
-      # Daily, in the expo timezone above. The send log makes a rerun harmless.
-      cron: ${EXPO_LIFECYCLE_EMAILS_CRON:0 0 9 * * *}
-      # Ceiling per run, to stay inside the SMTP account's daily quota. Whoever is left over is
-      # picked up by the next run.
-      max-per-run: ${EXPO_LIFECYCLE_EMAILS_MAX_PER_RUN:400}
+      # Hourly, in the expo timezone above, so a reminder the quota cut short is finished by a
+      # later run the same day. The send log makes every extra run harmless.
+      cron: ${EXPO_LIFECYCLE_EMAILS_CRON:0 0 * * * *}
+      # Mails per calendar day, counted from the send log and shared with confirmations. Set it to
+      # the relay's free-tier cap less some headroom: Brevo 300, Mailjet 200, Resend 100.
+      daily-quota: ${EXPO_LIFECYCLE_EMAILS_DAILY_QUOTA:300}
       reply-to: ${EXPO_LIFECYCLE_EMAILS_REPLY_TO:}
 
   # Directory for storing uploaded media (property/org images). Only URLs are stored in DB.
