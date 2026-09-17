@@ -1,7 +1,8 @@
 # Property Purchase Orders with Optional Bank Financing
 
-> **Status: implemented** in `com.housingplatform.purchase` (migration `V59`). Unit tests cover
-> the financing resolver, the phone normaliser and the order service. Not yet built: an SMS/email
+> **Status: implemented** in `com.housingplatform.purchase` (migrations `V59`, `V60`). Unit tests
+> cover the financing resolver, the phone normaliser, the order service, the agreement service and
+> the template renderer. The seeded agreement texts are drafts for legal review (§8). Not yet built: an SMS/email
 > gateway (the `PurchaseOrderContactNotifier` default only logs) and HTTP-level integration tests.
 
 Design for a new `purchase` module that lets a buyer place a purchase order on a
@@ -144,6 +145,10 @@ Lets the client render the right form (cash vs financed) before submitting.
 }
 ```
 
+The preview also carries `agreementsToSign`: the agreements the buyer must sign inside the
+create call (today the Promise to Purchase), rendered for this buyer and property with the order
+number shown as "to be assigned" (§8).
+
 `purchaseType` is `CASH` and `financingOffers` is `[]` when nothing eligible is
 linked. `minFinanceableAmount` and `maxFinanceableAmount` define the range a
 partial-financing slider may offer; `partialFinancingAllowed` is `false` only
@@ -169,6 +174,11 @@ when the two are equal.
     "financedAmount": 4250000.00,            // optional; PARTIAL financing: loan principal wanted, within [minFinanceable, maxFinanceable]
     "downPaymentAmount": null,               // optional alternative to financedAmount: cash the buyer will pay; the two are mutually exclusive
     "requestedTenureMonths": 180             // optional; within product min/max
+  },
+  "promiseToPurchase": {                     // REQUIRED, see §8
+    "templateId": "a1000000-0000-4000-8000-000000000001",  // from the preview's agreementsToSign
+    "accepted": true,
+    "signatoryFullName": "Abebe Kebede"
   }
 }
 ```
@@ -243,6 +253,17 @@ Validation:
   "buyerMessage": "Can I view it on Saturday?",
   "expiresAt": "2026-10-01T10:15:00",
   "warnings": [],
+  "agreements": [
+    {
+      "id": "c3a1…", "type": "PROMISE_TO_PURCHASE", "templateVersion": 1, "sequence": 1,
+      "title": "Promise to Purchase Agreement", "status": "FULLY_SIGNED", "blocksCompletion": true,
+      "contentHash": "9f2c…", "issuedAt": "2026-09-17T10:15:00",
+      "buyerSignatoryName": "Abebe Kebede", "buyerSignedAt": "2026-09-17T10:15:00",
+      "providerName": "Dream Team PLC", "providerSignatoryName": "Authorized Signatory",
+      "providerSignedAt": "2026-09-17T10:15:00"
+    }
+  ],
+  "pendingSignatures": 0,
   "createdAt": "2026-09-17T10:15:00",
   "updatedAt": "2026-09-17T10:15:00",
   "statusHistory": [
@@ -257,8 +278,8 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 
 | HTTP | `error` | When |
 | --- | --- | --- |
-| 400 | `Validation Failed` | missing phone, bad email, tenure outside product range, down payment below minimum |
-| 400 | `Bad Request` (`BusinessException`) | property not `AVAILABLE`, not `FOR_SALE`, not `VERIFIED`; no price in requested currency; `useFinancing=true` with no eligible offer; `financingOfferId` not linked to this property or inactive |
+| 400 | `Validation Failed` | missing phone, bad email, missing or unaccepted `promiseToPurchase`, tenure outside product range, down payment below minimum |
+| 400 | `Bad Request` (`BusinessException`) | property not `AVAILABLE`, not `FOR_SALE`, not `VERIFIED`; no price in requested currency; `useFinancing=true` with no eligible offer; `financingOfferId` not linked to this property or inactive; `promiseToPurchase.templateId` is not the current Promise to Purchase version |
 | 403 | `Forbidden` (**new** `ForbiddenOperationException`) | caller is the property's own agent / company; seller action by someone who can see but not manage the order |
 | 404 | `Not Found` | unknown `propertyId` / `financingOfferId` |
 | 409 | `Conflict` (**new** `DuplicateResourceException`) | buyer already has an open order for the property |
@@ -283,7 +304,7 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 | `PUT /purchase-orders/{id}/financing` | `BUYER_SECURED` | `{ "financedAmount"? \| "downPaymentAmount"?, "requestedTenureMonths"? }` | Change the financing split. From `PENDING_SELLER_REVIEW`: updates the `SUBMITTED` loan application in place. From `FINANCING_REJECTED`: withdraws the old application, opens a new one with the smaller amount, `→ AWAITING_FINANCING`. Re-runs the §3.3 bounds |
 | `POST /purchase-orders/{id}/accept-partial-approval` | `BUYER_SECURED` | `{}` | only from `FINANCING_PARTIALLY_APPROVED`; buyer agrees to cover the shortfall in cash. `financed_amount := approved_amount`, `cash_portion_amount` recomputed, `financing_mode = PARTIAL`, `→ FINANCING_APPROVED → AWAITING_PAYMENT` |
 | `POST /purchase-orders/{id}/convert-to-cash` | `BUYER_SECURED` | `{}` | from `FINANCING_REJECTED` or `FINANCING_PARTIALLY_APPROVED`; withdraws the loan application, sets `purchase_type = CASH`, `→ AWAITING_PAYMENT` |
-| `POST /purchase-orders/{id}/complete` | `REALTOR_SECURED`, `purchase-orders.complete` | `{ "paymentReference"?: string }` | `AWAITING_PAYMENT → COMPLETED`; property `status → SOLD`; every other open order on the property `→ REJECTED` with reason `PROPERTY_SOLD` |
+| `POST /purchase-orders/{id}/complete` | `REALTOR_SECURED`, `purchase-orders.complete` | `{ "paymentReference"?: string }` | refused with 400 while any blocking agreement is unsigned (§8); `AWAITING_PAYMENT → COMPLETED`; property `status → SOLD`; every other open order on the property `→ REJECTED` with reason `PROPERTY_SOLD` |
 
 All transitions append a `PurchaseOrderStatusHistory` row and are guarded by a
 single `transition(order, to, actor, notes)` method that validates the allowed
@@ -315,7 +336,13 @@ com.housingplatform.purchase
 ├── service/PurchaseOrderNotificationListener.java   in-app notifications + contact notifier
 ├── service/PurchaseOrderContactNotifier.java        SMS/email seam (default impl logs)
 ├── service/PurchaseOrderExpiryJob.java              @Scheduled expiry
-└── service/impl/PurchaseOrderServiceImpl.java, LoggingPurchaseOrderContactNotifier.java
+├── service/PurchaseAgreementService.java, PurchaseAgreementMapper.java, PurchaseOrderAccess.java
+├── service/AgreementTemplateRenderer.java           {{placeholders}} + conditional blocks + SHA-256
+├── api/PurchaseAgreementController.java            /api/v1/purchase-orders/{id}/agreements/**
+├── api/AdminAgreementController.java               templates, countersign, manual issue
+├── config/PurchaseProviderProperties.java          purchase.provider.* (Dream Team PLC)
+└── service/impl/PurchaseOrderServiceImpl.java, PurchaseAgreementServiceImpl.java,
+        LoggingPurchaseOrderContactNotifier.java
 ```
 
 Shared additions: `DuplicateResourceException` (409) and `ForbiddenOperationException` (403) with
@@ -357,14 +384,18 @@ PurchaseOrderResponse createPurchaseOrder(UUID buyerId, CreatePurchaseOrderReque
                                → status SUBMITTED, visible to the bank immediately
                             b) attach PurchaseOrderFinancing with the snapshot terms
                                and loanApplicationId; financing_status = APPLICATION_SUBMITTED
- 9. History                 append (null → PENDING_SELLER_REVIEW, changedBy = buyerId)
-10. Persist                 repo.save(order)
-11. Publish                 eventPublisher.publishEvent(new PurchaseOrderCreatedEvent(orderId))
+ 9. Agreements              agreementService.signPromiseToPurchaseAtCreation(order, req.promiseToPurchase, evidence)
+                            issues every active ORDER_CREATION agreement and applies the buyer's
+                            signature (+ the provider's, when auto-countersign is on). A stale
+                            templateId or a missing active template → 400, nothing is saved.
+10. History                 append (null → PENDING_SELLER_REVIEW, changedBy = buyerId)
+11. Persist                 repo.save(order)
+12. Publish                 eventPublisher.publishEvent(new PurchaseOrderCreatedEvent(orderId))
                             (listeners run AFTER_COMMIT — see §3.5)
-12. Return                  mapper.toResponse(order) enriched with bank / product names
+13. Return                  mapper.toResponse(order) enriched with bank / product names
 ```
 
-Steps 1–10 are one transaction, so a failure creating the loan application
+Steps 1–11 are one transaction, so a failure creating the loan application
 rolls back the order and the buyer never sees a half-created financed order.
 
 ### 3.3 `PropertyFinancingResolver.resolve(property, currency, request)`
@@ -667,3 +698,74 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
 | Building-level offers | count as "linked to the property" | property-level offers only |
 | Multiple eligible offers with no choice | pick lowest effective rate | reject with 400 and force a choice |
 | Reservation | property `RESERVED` on seller accept | reserve on order creation |
+
+---
+
+## 8. Agreements between the buyer and the provider
+
+Every purchase order carries a chain of agreements between the **buyer** and the **provider**, the
+company operating the platform (Dream Team PLC by default, configured under `purchase.provider.*`).
+The listing company is not a party: its sale contract with the buyer is concluded off-platform and
+merely acknowledged here.
+
+### 8.1 Model
+
+| Entity | Table | Purpose |
+| --- | --- | --- |
+| `AgreementTemplate` | `agreement_templates` | Versioned Markdown text with `{{placeholders}}`. Versions are immutable; one version per `type` is active. Carries `issueTrigger` (when it is issued), `appliesTo` (`ALL` / `CASH_ONLY` / `FINANCED_ONLY`), `sequence`, `blocksCompletion`. |
+| `PurchaseAgreement` | `purchase_agreements` | One agreement on one order: the rendered `content`, its SHA-256 `contentHash`, status, and both signatures with evidence (typed name, time, IP, user agent for the buyer; signatory name/title, time and countersigning admin for the provider). |
+
+Agreement statuses: `PENDING_BUYER_SIGNATURE → PENDING_PROVIDER_SIGNATURE → FULLY_SIGNED`, or
+`VOID`. With `purchase.provider.auto-countersign=true` (default) the provider's signature is
+applied the moment the buyer signs, so standard-form agreements go straight to `FULLY_SIGNED`;
+with it off an admin countersigns.
+
+### 8.2 The chain
+
+| # | Type | Issued | Seeded as | Applies to |
+| --- | --- | --- | --- | --- |
+| 1 | `PROMISE_TO_PURCHASE` | inside `POST /purchase-orders`; the order is not created without the buyer's signature | **active** v1 | all orders |
+| 2 | `SALE_AGREEMENT` (acknowledgement) | on seller acceptance | inactive draft v1 | all orders |
+| 3 | `FINANCING_ACKNOWLEDGEMENT` | when the bank approves (full or partial-accepted) | inactive draft v1 | financed orders |
+| … | `HANDOVER_AGREEMENT`, `OTHER` | `MANUAL` (admin issues) or any trigger | none | — |
+
+Follow-ups are issued automatically by `issueForTrigger` when the order reaches the trigger, once
+per template, and the buyer is notified. Closing an order (`CANCELLED`, `REJECTED`, `EXPIRED`)
+voids every agreement not yet fully signed; converting to cash voids `FINANCED_ONLY` ones. The
+seller cannot **complete** the sale while any `blocksCompletion` agreement is unsigned.
+
+The seeded texts are **drafts**: the Promise to Purchase is active because orders need it, the
+other two are inactive until legal review and an admin activates them (or publishes a new
+version).
+
+### 8.3 Endpoints
+
+| Method & path | Policy | Purpose |
+| --- | --- | --- |
+| `GET /properties/{id}/purchase-preview` | `AUTHENTICATED` | includes `agreementsToSign[]` with `templateId`, `version`, rendered `content` |
+| `POST /purchase-orders` | `BUYER_SECURED` | body carries `promiseToPurchase { templateId, accepted, signatoryFullName }` |
+| `GET /purchase-orders/{id}/agreements` | `AUTHENTICATED` (buyer, seller, bank, admin) | list without content |
+| `GET /purchase-orders/{id}/agreements/{agreementId}` | same | signed text, hash, signatures |
+| `POST /purchase-orders/{id}/agreements/{agreementId}/sign` | `BUYER_SECURED` | buyer signs a follow-up agreement |
+| `GET/POST /admin/agreement-templates` | `ADMIN_SECURED` | list versions / create a new version (`activate: true` makes it current) |
+| `POST /admin/agreement-templates/{id}/activate|deactivate` | `ADMIN_SECURED` | switch the active version |
+| `POST /admin/purchase-agreements/{id}/countersign` | `ADMIN_SECURED` | provider signature when auto-countersign is off |
+| `POST /admin/purchase-orders/{id}/agreements?templateId=` | `ADMIN_SECURED` | issue an active template manually |
+
+### 8.4 Template placeholders
+
+`order.number`, `date.today`, `provider.name|registrationNumber|address|email|phone|signatoryName|signatoryTitle`,
+`buyer.fullName|phone|email`, `property.title|address|city|unitNumber`, `seller.companyName`,
+`price.amount|currency`, and on financed orders `financing` (flag) plus
+`financing.financedAmount|cashPortion|bankName|interestRate|tenureMonths|approvedAmount`.
+`{{#key}}…{{/key}}` keeps a block when the key has a value, `{{^key}}…{{/key}}` when it does not.
+Amounts render with thousands separators (`8,500,000.00`).
+
+### 8.5 Evidence
+
+What the buyer saw is exactly what is stored: the template is rendered once at issue time, hashed,
+and never re-rendered. A signature references the template id, so a buyer who read version 1 in
+the preview cannot accidentally sign version 2 published in between (400 with the current
+version). Signature method is `TYPED_NAME` today; the column exists so OTP or digital signatures
+can be added without a schema change.
+

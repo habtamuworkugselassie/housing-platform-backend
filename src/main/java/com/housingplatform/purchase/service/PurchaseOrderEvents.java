@@ -11,4 +11,7 @@ public final class PurchaseOrderEvents {
 
   public record PurchaseOrderStatusChangedEvent(
       UUID purchaseOrderId, PurchaseOrderStatus fromStatus, PurchaseOrderStatus toStatus) {}
+
+  /** A follow-up agreement was issued and awaits the buyer's signature. */
+  public record PurchaseAgreementIssuedEvent(UUID purchaseOrderId, UUID agreementId) {}
 }

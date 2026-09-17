@@ -17,6 +17,7 @@ import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.service.LoanApplicationService;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.repository.PropertyRepository;
+import com.housingplatform.purchase.domain.AgreementTemplate.IssueTrigger;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseType;
@@ -24,6 +25,7 @@ import com.housingplatform.purchase.domain.PurchaseOrderFinancing;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.FinancingMode;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.FinancingStatus;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.OfferLevel;
+import com.housingplatform.purchase.dto.AgreementSignatureRequest;
 import com.housingplatform.purchase.dto.CreatePurchaseOrderRequest;
 import com.housingplatform.purchase.dto.UpdatePurchaseFinancingRequest;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
@@ -32,9 +34,11 @@ import com.housingplatform.purchase.service.PropertyFinancingResolver.EligibleOf
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingResolution;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.NotAppliedReason;
+import com.housingplatform.purchase.service.PurchaseAgreementService;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderMapper;
+import com.housingplatform.purchase.service.SignatureEvidence;
 import com.housingplatform.shared.domain.Currency;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.DuplicateResourceException;
@@ -69,6 +73,7 @@ class PurchaseOrderServiceImplTest {
   @Mock private PropertyFinancingResolver financingResolver;
   @Mock private LoanApplicationService loanApplicationService;
   @Mock private PurchaseOrderMapper mapper;
+  @Mock private PurchaseAgreementService agreementService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private CacheManager cacheManager;
   @Mock private Cache propertyCache;
@@ -112,8 +117,16 @@ class PurchaseOrderServiceImplTest {
     CreatePurchaseOrderRequest r = new CreatePurchaseOrderRequest();
     r.setPropertyId(property.getId());
     r.setContactPhone("0911223344");
+    AgreementSignatureRequest promise = new AgreementSignatureRequest();
+    promise.setTemplateId(PROMISE_TEMPLATE_ID);
+    promise.setAccepted(true);
+    promise.setSignatoryFullName("Abebe Kebede");
+    r.setPromiseToPurchase(promise);
     return r;
   }
+
+  private static final UUID PROMISE_TEMPLATE_ID = UUID.randomUUID();
+  private static final SignatureEvidence EVIDENCE = new SignatureEvidence("10.0.0.1", "JUnit");
 
   private FinancingTerms terms(String financed, FinancingMode mode) {
     CreditProduct product =
@@ -224,7 +237,7 @@ class PurchaseOrderServiceImplTest {
     CreatePurchaseOrderRequest r = request();
     r.setContactEmail("  Buyer@Example.com ");
     r.setBuyerMessage("Can I view it on Saturday?");
-    service.createPurchaseOrder(buyer, r);
+    service.createPurchaseOrder(buyer, r, EVIDENCE);
 
     PropertyPurchaseOrder saved = savedOrder();
     assertThat(saved.getPurchaseType()).isEqualTo(PurchaseType.CASH);
@@ -247,7 +260,7 @@ class PurchaseOrderServiceImplTest {
 
   @Test
   void emailIsOptional() {
-    service.createPurchaseOrder(buyer, request());
+    service.createPurchaseOrder(buyer, request(), EVIDENCE);
     assertThat(savedOrder().getContactEmail()).isNull();
   }
 
@@ -256,7 +269,7 @@ class PurchaseOrderServiceImplTest {
     CreatePurchaseOrderRequest r = request();
     r.setFinancing(new CreatePurchaseOrderRequest.FinancingSelection());
     r.getFinancing().setFinancedAmount(new BigDecimal("1000000"));
-    service.createPurchaseOrder(buyer, r);
+    service.createPurchaseOrder(buyer, r, EVIDENCE);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<String>> warnings = ArgumentCaptor.forClass(List.class);
@@ -274,7 +287,7 @@ class PurchaseOrderServiceImplTest {
         .thenReturn(new FinancingResolution(t, null));
     UUID loanId = stubLoanCreation();
 
-    service.createPurchaseOrder(buyer, request());
+    service.createPurchaseOrder(buyer, request(), EVIDENCE);
 
     PropertyPurchaseOrder saved = savedOrder();
     assertThat(saved.getPurchaseType()).isEqualTo(PurchaseType.BANK_FINANCED);
@@ -302,19 +315,19 @@ class PurchaseOrderServiceImplTest {
   @Test
   void rejectsPropertiesThatAreNotPurchasable() {
     property.setStatus(Property.PropertyStatus.RESERVED);
-    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request()))
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("not available");
 
     property.setStatus(Property.PropertyStatus.AVAILABLE);
     property.setCategory(Property.PropertyCategory.FOR_RENTAL);
-    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request()))
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("not listed for sale");
 
     property.setCategory(Property.PropertyCategory.FOR_SALE);
     property.setVerificationStatus(Property.VerificationStatus.PENDING);
-    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request()))
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("not been verified");
   }
@@ -324,13 +337,13 @@ class PurchaseOrderServiceImplTest {
     when(orderRepository.existsByBuyerIdAndPropertyIdAndStatusIn(
             eq(buyerId), eq(property.getId()), any()))
         .thenReturn(true);
-    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request()))
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
         .isInstanceOf(DuplicateResourceException.class);
   }
 
   @Test
   void sellerCannotOrderTheirOwnListing() {
-    assertThatThrownBy(() -> service.createPurchaseOrder(seller, request()))
+    assertThatThrownBy(() -> service.createPurchaseOrder(seller, request(), EVIDENCE))
         .isInstanceOf(ForbiddenOperationException.class);
   }
 
@@ -338,7 +351,7 @@ class PurchaseOrderServiceImplTest {
   void requiresAPriceInTheRequestedCurrency() {
     CreatePurchaseOrderRequest r = request();
     r.setCurrency(Currency.USD);
-    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, r))
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, r, EVIDENCE))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("USD");
   }
@@ -347,7 +360,7 @@ class PurchaseOrderServiceImplTest {
   void unknownPropertyIs404() {
     CreatePurchaseOrderRequest r = request();
     r.setPropertyId(UUID.randomUUID());
-    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, r))
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, r, EVIDENCE))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
@@ -649,5 +662,72 @@ class PurchaseOrderServiceImplTest {
         .hasMessageContaining("already closed");
     assertThatThrownBy(() -> service.complete(seller, order.getId(), null))
         .isInstanceOf(BusinessException.class);
+  }
+
+  // ------------------------------------------------------------------ agreements
+
+  @Test
+  void creationSignsThePromiseToPurchaseInTheSameTransaction() {
+    CreatePurchaseOrderRequest r = request();
+    service.createPurchaseOrder(buyer, r, EVIDENCE);
+    ArgumentCaptor<PropertyPurchaseOrder> order =
+        ArgumentCaptor.forClass(PropertyPurchaseOrder.class);
+    verify(agreementService)
+        .signPromiseToPurchaseAtCreation(
+            order.capture(), eq(r.getPromiseToPurchase()), eq(EVIDENCE));
+    assertThat(order.getValue().getOrderNumber()).startsWith("PPO-");
+    verify(orderRepository).save(order.getValue());
+  }
+
+  @Test
+  void aFailedPromiseSignatureAbortsTheOrder() {
+    org.mockito.Mockito.doThrow(new BusinessException("template changed"))
+        .when(agreementService)
+        .signPromiseToPurchaseAtCreation(any(), any(), any());
+    assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
+        .isInstanceOf(BusinessException.class);
+    verify(orderRepository, never()).save(any());
+  }
+
+  @Test
+  void sellerAcceptanceIssuesTheFollowUpAgreements() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
+    service.accept(seller, order.getId(), null);
+    verify(agreementService).issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
+  }
+
+  @Test
+  void financingApprovalIssuesTheFinancingAgreements() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.AWAITING_FINANCING, "6800000.00");
+    approvedLoan(order, "6800000.00");
+    service.applyLoanApplicationStatus(
+        order.getFinancing().getLoanApplicationId(),
+        LoanApplication.LoanApplicationStatus.APPROVED);
+    verify(agreementService).issueForTrigger(order, IssueTrigger.FINANCING_APPROVAL);
+  }
+
+  @Test
+  void completionIsBlockedWhileAgreementsAreUnsigned() {
+    PropertyPurchaseOrder order = financedOrder(PurchaseOrderStatus.AWAITING_PAYMENT, "6800000.00");
+    when(agreementService.hasUnsignedBlockingAgreements(order)).thenReturn(true);
+    assertThatThrownBy(() -> service.complete(seller, order.getId(), null))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("not signed");
+    assertThat(order.getStatus()).isEqualTo(PurchaseOrderStatus.AWAITING_PAYMENT);
+  }
+
+  @Test
+  void closingAnOrderVoidsItsOpenAgreementsAndConvertingVoidsFinancingOnes() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.FINANCING_REJECTED, "6800000.00");
+    service.convertToCash(buyer, order.getId());
+    verify(agreementService).voidFinancingAgreements(eq(order), anyString());
+
+    PropertyPurchaseOrder other =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
+    service.cancel(buyer, other.getId(), "no");
+    verify(agreementService).voidOpenAgreements(eq(other), anyString());
   }
 }

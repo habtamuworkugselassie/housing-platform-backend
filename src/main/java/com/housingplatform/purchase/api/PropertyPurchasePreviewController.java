@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PropertyPurchasePreviewController {
 
   private final PurchaseOrderService purchaseOrderService;
+  private final PurchaseOrderActorResolver actors;
 
   @GetMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
@@ -29,9 +30,10 @@ public class PropertyPurchasePreviewController {
       summary = "Preview a purchase order",
       description =
           "Shows whether an order on this property would be cash or bank financed, and the"
-              + " financing range for each eligible offer. No side effects.")
+              + " financing range for each eligible offer, plus the agreements the buyer must sign"
+              + " to create the order. No side effects.")
   public ResponseEntity<PurchasePreviewResponse> preview(
       @PathVariable UUID propertyId, @RequestParam(required = false) Currency currency) {
-    return ResponseEntity.ok(purchaseOrderService.preview(propertyId, currency));
+    return ResponseEntity.ok(purchaseOrderService.preview(actors.current(), propertyId, currency));
   }
 }

@@ -8,6 +8,7 @@ import com.housingplatform.notification.repository.NotificationRepository;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
+import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseAgreementIssuedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderStatusChangedEvent;
 import java.util.LinkedHashSet;
@@ -94,6 +95,34 @@ public class PurchaseOrderNotificationListener {
                 notify(bankUsers(order), title, body, order);
               }
             });
+  }
+
+  @Async
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void onAgreementIssued(PurchaseAgreementIssuedEvent event) {
+    orderRepository
+        .findById(event.purchaseOrderId())
+        .ifPresent(
+            order ->
+                order.getAgreements().stream()
+                    .filter(a -> a.getId().equals(event.agreementId()))
+                    .findFirst()
+                    .ifPresent(
+                        agreement -> {
+                          String title =
+                              "Agreement to sign: "
+                                  + agreement.getTitle()
+                                  + " ("
+                                  + order.getOrderNumber()
+                                  + ")";
+                          String body =
+                              "A new agreement with "
+                                  + agreement.getProviderName()
+                                  + " awaits your signature.";
+                          notify(Set.of(order.getBuyerId()), title, body, order);
+                          contactNotifier.notifyBuyer(order, title, body);
+                        }));
   }
 
   private Set<UUID> sellerUsers(PropertyPurchaseOrder order) {

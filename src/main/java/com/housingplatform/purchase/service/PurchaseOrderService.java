@@ -14,10 +14,11 @@ import org.springframework.data.domain.Pageable;
 
 public interface PurchaseOrderService {
 
-  PurchasePreviewResponse preview(UUID propertyId, Currency currency);
+  PurchasePreviewResponse preview(PurchaseOrderActor buyer, UUID propertyId, Currency currency);
 
+  /** Creates the order and signs the Promise to Purchase in one transaction. */
   PurchaseOrderResponse createPurchaseOrder(
-      PurchaseOrderActor buyer, CreatePurchaseOrderRequest request);
+      PurchaseOrderActor buyer, CreatePurchaseOrderRequest request, SignatureEvidence evidence);
 
   PurchaseOrderResponse getPurchaseOrder(PurchaseOrderActor actor, UUID orderId);
 

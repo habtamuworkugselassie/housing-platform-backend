@@ -89,6 +89,11 @@ public class PropertyPurchaseOrder extends BaseAuditEntity {
   @Builder.Default
   private List<PurchaseOrderStatusHistory> statusHistory = new ArrayList<>();
 
+  @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OrderBy("sequence ASC, issuedAt ASC")
+  @Builder.Default
+  private List<PurchaseAgreement> agreements = new ArrayList<>();
+
   public boolean isFinanced() {
     return purchaseType == PurchaseType.BANK_FINANCED && financing != null;
   }

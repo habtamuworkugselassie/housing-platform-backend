@@ -34,6 +34,13 @@ public class PurchaseOrderResponse {
   private String rejectionReason;
   private String paymentReference;
   private List<String> warnings;
+
+  /** Agreements between buyer and provider, without content; fetch one by id for the text. */
+  private List<PurchaseAgreementResponse> agreements;
+
+  /** Agreements still waiting for the buyer's signature. */
+  private Integer pendingSignatures;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
   private List<StatusHistoryEntry> statusHistory;

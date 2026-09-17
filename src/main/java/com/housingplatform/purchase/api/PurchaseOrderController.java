@@ -11,6 +11,7 @@ import com.housingplatform.shared.security.annotation.AuthActionScope;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -41,11 +42,13 @@ public class PurchaseOrderController {
           "Places an order on a property. Phone is mandatory, email optional. When the property has"
               + " an active financing product the order is bank financed and a loan application is"
               + " opened; otherwise it is a cash order. Partial financing is expressed through"
-              + " financing.financedAmount or financing.downPaymentAmount.")
+              + " financing.financedAmount or financing.downPaymentAmount. The buyer's signature on"
+              + " the Promise to Purchase agreement (promiseToPurchase) is mandatory.")
   public ResponseEntity<PurchaseOrderResponse> create(
-      @Valid @RequestBody CreatePurchaseOrderRequest request) {
+      @Valid @RequestBody CreatePurchaseOrderRequest request, HttpServletRequest http) {
     PurchaseOrderResponse created =
-        purchaseOrderService.createPurchaseOrder(actors.current(), request);
+        purchaseOrderService.createPurchaseOrder(
+            actors.current(), request, SignatureEvidenceExtractor.from(http));
     return ResponseEntity.created(URI.create("/api/v1/purchase-orders/" + created.getId()))
         .body(created);
   }

@@ -6,6 +6,7 @@ import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.service.LoanApplicationService;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.repository.PropertyRepository;
+import com.housingplatform.purchase.domain.AgreementTemplate.IssueTrigger;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseType;
@@ -23,11 +24,14 @@ import com.housingplatform.purchase.service.PropertyFinancingResolver;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingChoice;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingResolution;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
+import com.housingplatform.purchase.service.PurchaseAgreementService;
+import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderStatusChangedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderMapper;
 import com.housingplatform.purchase.service.PurchaseOrderService;
+import com.housingplatform.purchase.service.SignatureEvidence;
 import com.housingplatform.shared.domain.Currency;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.DuplicateResourceException;
@@ -109,6 +113,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   private final PropertyFinancingResolver financingResolver;
   private final LoanApplicationService loanApplicationService;
   private final PurchaseOrderMapper mapper;
+  private final PurchaseAgreementService agreementService;
   private final ApplicationEventPublisher eventPublisher;
   private final CacheManager cacheManager;
 
@@ -116,17 +121,29 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
   @Override
   @Transactional(readOnly = true)
-  public PurchasePreviewResponse preview(UUID propertyId, Currency currency) {
+  public PurchasePreviewResponse preview(
+      PurchaseOrderActor buyer, UUID propertyId, Currency currency) {
     Property property = loadProperty(propertyId);
     Currency effective = currency != null ? currency : Currency.ETB;
     BigDecimal price = resolvePrice(property, effective);
-    return mapper.toPreview(
-        property, effective, price, financingResolver.listEligible(property, effective, price));
+    PurchasePreviewResponse preview =
+        mapper.toPreview(
+            property, effective, price, financingResolver.listEligible(property, effective, price));
+    FinancingTerms defaultTerms =
+        preview.isFinancingAvailable()
+            ? financingResolver
+                .resolve(property, effective, price, null, FinancingChoice.none())
+                .terms()
+            : null;
+    preview.setAgreementsToSign(
+        agreementService.previewOrderCreationAgreements(
+            property, buyer.userId(), effective, price, defaultTerms));
+    return preview;
   }
 
   @Override
   public PurchaseOrderResponse createPurchaseOrder(
-      PurchaseOrderActor buyer, CreatePurchaseOrderRequest request) {
+      PurchaseOrderActor buyer, CreatePurchaseOrderRequest request, SignatureEvidence evidence) {
     Property property = loadProperty(request.getPropertyId());
     guardPurchasable(property);
     guardNotOwnListing(buyer, property);
@@ -178,6 +195,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       order.setFinancing(newFinancing(order, terms, loan.getId()));
     }
 
+    // The Promise to Purchase between buyer and provider is part of the same transaction: no
+    // order exists without it.
+    agreementService.signPromiseToPurchaseAtCreation(
+        order, request.getPromiseToPurchase(), evidence);
+
     order
         .getStatusHistory()
         .add(history(order, null, order.getStatus(), buyer.userId(), null, now));
@@ -192,7 +214,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   @Transactional(readOnly = true)
   public PurchaseOrderResponse getPurchaseOrder(PurchaseOrderActor actor, UUID orderId) {
     PropertyPurchaseOrder order = loadOrder(orderId);
-    if (!canView(actor, order)) {
+    if (!PurchaseOrderAccess.canView(actor, order)) {
       // Existence of somebody else's order is itself information: answer as if it were absent.
       throw new ResourceNotFoundException("PurchaseOrder", orderId);
     }
@@ -217,8 +239,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       PurchaseOrderActor seller, UUID propertyId, PurchaseOrderStatus status) {
     Property property = loadProperty(propertyId);
     if (!seller.admin()
-        && !sameOrganization(seller, property.getRealEstateCompanyId())
-        && !sameAgent(seller, property.getAgentId())) {
+        && !PurchaseOrderAccess.sameOrganization(seller, property.getRealEstateCompanyId())
+        && !PurchaseOrderAccess.sameAgent(seller, property.getAgentId())) {
       throw new ForbiddenOperationException("You do not manage this property");
     }
     List<PropertyPurchaseOrder> orders =
@@ -363,6 +385,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         PurchaseOrderStatus.FINANCING_APPROVED,
         actor,
         "Buyer accepted partial approval of " + approved.toPlainString());
+    agreementService.issueForTrigger(order, IssueTrigger.FINANCING_APPROVAL);
     transition(order, PurchaseOrderStatus.AWAITING_PAYMENT, actor, null);
     return mapper.toResponse(orderRepository.save(order));
   }
@@ -379,6 +402,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     withdrawLoanQuietly(f, "Buyer converted purchase order " + order.getOrderNumber() + " to cash");
     f.setFinancingStatus(FinancingStatus.WITHDRAWN);
     order.setPurchaseType(PurchaseType.CASH);
+    agreementService.voidFinancingAgreements(order, "Order converted to cash purchase");
     transition(
         order,
         PurchaseOrderStatus.AWAITING_PAYMENT,
@@ -399,6 +423,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             : PurchaseOrderStatus.AWAITING_PAYMENT;
     order.setExpiresAt(null);
     transition(order, next, seller.userId().toString(), blankToNull(notes));
+    agreementService.issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
     reserveProperty(order.getPropertyId());
     return mapper.toResponse(orderRepository.save(order));
   }
@@ -419,6 +444,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       PurchaseOrderActor seller, UUID orderId, String paymentReference) {
     PropertyPurchaseOrder order = loadManagedOrder(seller, orderId);
     requireStatus(order, PurchaseOrderStatus.AWAITING_PAYMENT);
+    if (agreementService.hasUnsignedBlockingAgreements(order)) {
+      throw new BusinessException(
+          "Order "
+              + order.getOrderNumber()
+              + " has agreements the buyer has not signed yet; the sale cannot be completed");
+    }
     order.setPaymentReference(blankToNull(paymentReference));
     String actor = seller.userId().toString();
     transition(order, PurchaseOrderStatus.COMPLETED, actor, blankToNull(paymentReference));
@@ -488,6 +519,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             f.setFinancingStatus(FinancingStatus.APPROVED);
             transition(
                 order, PurchaseOrderStatus.FINANCING_APPROVED, SYSTEM_ACTOR, "Bank approved");
+            agreementService.issueForTrigger(order, IssueTrigger.FINANCING_APPROVAL);
             transition(order, PurchaseOrderStatus.AWAITING_PAYMENT, SYSTEM_ACTOR, null);
           }
         } else {
@@ -526,6 +558,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       }
     }
     transition(order, terminal, actor, blankToNull(notes));
+    agreementService.voidOpenAgreements(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
     if (hadReservation) {
       releaseReservationIfUnused(order.getPropertyId(), order.getId());
     }
@@ -648,39 +681,13 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
   private PropertyPurchaseOrder loadManagedOrder(PurchaseOrderActor seller, UUID orderId) {
     PropertyPurchaseOrder order = loadOrder(orderId);
-    if (!canSell(seller, order)) {
-      if (canView(seller, order)) {
+    if (!PurchaseOrderAccess.canSell(seller, order)) {
+      if (PurchaseOrderAccess.canView(seller, order)) {
         throw new ForbiddenOperationException("Only the listing's agent or company can do this");
       }
       throw new ResourceNotFoundException("PurchaseOrder", orderId);
     }
     return order;
-  }
-
-  private static boolean canView(PurchaseOrderActor actor, PropertyPurchaseOrder order) {
-    if (actor.admin() || order.getBuyerId().equals(actor.userId())) {
-      return true;
-    }
-    if (canSell(actor, order)) {
-      return true;
-    }
-    return order.getFinancing() != null
-        && actor.organizationId() != null
-        && actor.organizationId().equals(order.getFinancing().getBankId());
-  }
-
-  private static boolean canSell(PurchaseOrderActor actor, PropertyPurchaseOrder order) {
-    return actor.admin()
-        || sameOrganization(actor, order.getRealEstateCompanyId())
-        || sameAgent(actor, order.getAgentId());
-  }
-
-  private static boolean sameOrganization(PurchaseOrderActor actor, UUID organizationId) {
-    return actor.organizationId() != null && actor.organizationId().equals(organizationId);
-  }
-
-  private static boolean sameAgent(PurchaseOrderActor actor, UUID agentId) {
-    return actor.agentId() != null && actor.agentId().equals(agentId);
   }
 
   private static void guardPurchasable(Property property) {
@@ -697,8 +704,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   }
 
   private static void guardNotOwnListing(PurchaseOrderActor buyer, Property property) {
-    if (sameAgent(buyer, property.getAgentId())
-        || sameOrganization(buyer, property.getRealEstateCompanyId())) {
+    if (PurchaseOrderAccess.sameAgent(buyer, property.getAgentId())
+        || PurchaseOrderAccess.sameOrganization(buyer, property.getRealEstateCompanyId())) {
       throw new ForbiddenOperationException(
           "You cannot place a purchase order on your own listing");
     }

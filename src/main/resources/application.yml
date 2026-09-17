@@ -217,3 +217,17 @@ twilio:
   account-sid: ${TWILIO_ACCOUNT_SID:}
   auth-token: ${TWILIO_AUTH_TOKEN:}
   whatsapp-from-number: ${TWILIO_WHATSAPP_FROM_NUMBER:}
+
+# Property purchase orders. The provider is the legal counterparty to every buyer agreement.
+purchase:
+  orders:
+    expiry-cron: "0 */15 * * * *"
+  provider:
+    name: ${PURCHASE_PROVIDER_NAME:Dream Team PLC}
+    registration-number: ${PURCHASE_PROVIDER_REGISTRATION_NUMBER:}
+    address: ${PURCHASE_PROVIDER_ADDRESS:Addis Ababa, Ethiopia}
+    email: ${PURCHASE_PROVIDER_EMAIL:}
+    phone: ${PURCHASE_PROVIDER_PHONE:}
+    signatory-name: ${PURCHASE_PROVIDER_SIGNATORY_NAME:Authorized Signatory}
+    signatory-title: ${PURCHASE_PROVIDER_SIGNATORY_TITLE:General Manager}
+    auto-countersign: ${PURCHASE_PROVIDER_AUTO_COUNTERSIGN:true}

@@ -1,5 +1,6 @@
 package com.housingplatform.purchase.dto;
 
+import com.housingplatform.purchase.domain.AgreementTemplate;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing;
 import com.housingplatform.shared.domain.Currency;
@@ -26,6 +27,25 @@ public class PurchasePreviewResponse {
 
   private boolean financingAvailable;
   private List<FinancingOption> financingOffers;
+
+  /**
+   * Agreements the buyer must sign inside the create call, rendered for this buyer and property.
+   */
+  private List<AgreementPreview> agreementsToSign;
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class AgreementPreview {
+    private UUID templateId;
+    private AgreementTemplate.AgreementType type;
+    private Integer version;
+    private String title;
+
+    /** Rendered Markdown. The order number reads "to be assigned" until the order exists. */
+    private String content;
+  }
 
   @Data
   @Builder

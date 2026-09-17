@@ -41,6 +41,14 @@ public class CreatePurchaseOrderRequest {
   /** Only consulted when the order ends up bank financed. */
   @Valid private FinancingSelection financing;
 
+  /**
+   * The buyer's signature on the Promise to Purchase Agreement with the provider. Mandatory: an
+   * order cannot be created without it. Use the preview endpoint to obtain the template and text.
+   */
+  @NotNull(message = "The Promise to Purchase agreement must be signed")
+  @Valid
+  private AgreementSignatureRequest promiseToPurchase;
+
   @Data
   public static class FinancingSelection {
     /**

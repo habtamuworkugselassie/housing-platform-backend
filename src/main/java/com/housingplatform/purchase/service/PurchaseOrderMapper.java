@@ -29,6 +29,7 @@ public class PurchaseOrderMapper {
   private final OrganizationRepository organizationRepository;
   private final UserRepository userRepository;
   private final CreditProductRepository creditProductRepository;
+  private final PurchaseAgreementMapper agreementMapper;
 
   public PurchaseOrderResponse toResponse(PropertyPurchaseOrder order) {
     return toResponse(order, List.of());
@@ -70,6 +71,17 @@ public class PurchaseOrderMapper {
         .rejectionReason(order.getRejectionReason())
         .paymentReference(order.getPaymentReference())
         .warnings(warnings != null ? warnings : List.of())
+        .agreements(
+            order.getAgreements().stream().map(a -> agreementMapper.toResponse(a, false)).toList())
+        .pendingSignatures(
+            (int)
+                order.getAgreements().stream()
+                    .filter(
+                        a ->
+                            a.getStatus()
+                                == com.housingplatform.purchase.domain.PurchaseAgreement
+                                    .AgreementStatus.PENDING_BUYER_SIGNATURE)
+                    .count())
         .createdAt(order.getCreatedAt())
         .updatedAt(order.getUpdatedAt())
         .statusHistory(
