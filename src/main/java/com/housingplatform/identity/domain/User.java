@@ -15,7 +15,8 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 public class User extends BaseAuditEntity {
 
-  @Column(nullable = false, unique = true)
+  /** Optional since quick registration: buyers may sign up with a phone number only. */
+  @Column(unique = true)
   private String email;
 
   @Column(nullable = false)

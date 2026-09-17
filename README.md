@@ -16,6 +16,7 @@ The backend is implemented as a **modular monolith** using Spring Boot, followin
 - **property**: Property listings and verification
 - **banking**: Credit products and financing offers
 - **loan**: Loan applications and processing
+- **purchase**: Property purchase orders with optional (partial) bank financing — see [docs/PROPERTY_PURCHASE_ORDERS.md](docs/PROPERTY_PURCHASE_ORDERS.md)
 - **construction**: Materials and Bill of Quantities (BoQ)
 - **payment**: Payment processing and disbursements
 - **notification**: User notifications

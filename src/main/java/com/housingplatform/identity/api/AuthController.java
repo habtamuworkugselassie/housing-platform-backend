@@ -2,7 +2,9 @@ package com.housingplatform.identity.api;
 
 import com.housingplatform.identity.dto.AuthResponse;
 import com.housingplatform.identity.dto.ForgotPasswordRequest;
+import com.housingplatform.identity.dto.GoogleLoginRequest;
 import com.housingplatform.identity.dto.LoginRequest;
+import com.housingplatform.identity.dto.QuickRegistrationRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
 import com.housingplatform.identity.dto.ResetPasswordRequest;
 import com.housingplatform.identity.dto.SendOtpRequest;
@@ -36,6 +38,30 @@ public class AuthController {
   public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegistrationRequest request) {
     AuthResponse response = authenticationService.register(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @PostMapping("/quick-register")
+  @Operation(
+      summary = "Quick buyer registration",
+      description =
+          "Opens a BUYER account from a full name and phone number; email and password are"
+              + " optional. Returns tokens immediately so the buyer can continue (for example to"
+              + " place a purchase order) and sends a WhatsApp code to confirm the phone later.")
+  public ResponseEntity<AuthResponse> quickRegister(
+      @Valid @RequestBody QuickRegistrationRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(authenticationService.quickRegister(request));
+  }
+
+  @PostMapping("/google")
+  @Operation(
+      summary = "Sign in with Google",
+      description =
+          "Verifies a Google ID token and signs the user in. A new verified Google email opens a"
+              + " BUYER account immediately.")
+  public ResponseEntity<AuthResponse> loginWithGoogle(
+      @Valid @RequestBody GoogleLoginRequest request) {
+    return ResponseEntity.ok(authenticationService.loginWithGoogle(request));
   }
 
   @PostMapping("/login")

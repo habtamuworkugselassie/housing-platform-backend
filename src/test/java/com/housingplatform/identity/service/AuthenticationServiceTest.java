@@ -1,19 +1,28 @@
 package com.housingplatform.identity.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AuthResponse;
+import com.housingplatform.identity.dto.GoogleLoginRequest;
 import com.housingplatform.identity.dto.LoginRequest;
+import com.housingplatform.identity.dto.QuickRegistrationRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.PasswordResetTokenRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.impl.AuthenticationServiceImpl;
 import com.housingplatform.shared.exception.BusinessException;
+import com.housingplatform.shared.exception.DuplicateResourceException;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.service.TokenBlacklistService;
 import java.util.HashSet;
@@ -23,6 +32,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +58,7 @@ class AuthenticationServiceTest {
   @Mock private PasswordResetEmailService passwordResetEmailService;
 
   @Mock private VerificationService verificationService;
+  @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
 
   @Mock private TokenBlacklistService tokenBlacklistService;
 
@@ -284,5 +295,174 @@ class AuthenticationServiceTest {
         "Admin role cannot be self-assigned. Please contact system administrator.",
         exception.getMessage());
     verify(userRepository, never()).save(any(User.class));
+  }
+
+  // ---------------------------------------------------------------- quick registration
+
+  private QuickRegistrationRequest quickRequest() {
+    QuickRegistrationRequest request = new QuickRegistrationRequest();
+    request.setFullName("  Abebe   Kebede Alemu ");
+    request.setPhoneNumber("0911223344");
+    return request;
+  }
+
+  @Test
+  void quickRegister_createsPasswordlessBuyerFromNameAndPhone() {
+    when(userRepository.existsByPhoneNumber("+251911223344")).thenReturn(false);
+    when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$random");
+    when(userRepository.save(any(User.class)))
+        .thenAnswer(
+            inv -> {
+              User u = inv.getArgument(0);
+              u.setId(UUID.randomUUID());
+              return u;
+            });
+    when(jwtTokenProvider.generateToken(any(), any(), any(), any(), any())).thenReturn("access");
+    when(jwtTokenProvider.generateRefreshToken(any())).thenReturn("refresh");
+
+    AuthResponse response = authenticationService.quickRegister(quickRequest());
+
+    ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(saved.capture());
+    User user = saved.getValue();
+    assertThat(user.getPhoneNumber()).isEqualTo("+251911223344");
+    assertThat(user.getEmail()).isNull();
+    assertThat(user.getFirstName()).isEqualTo("Abebe");
+    assertThat(user.getLastName()).isEqualTo("Kebede Alemu");
+    assertThat(user.getRoles()).containsExactly(User.UserRole.BUYER);
+    assertThat(user.getStatus()).isEqualTo(User.UserStatus.PENDING_VERIFICATION);
+    assertThat(user.getPhoneVerified()).isFalse();
+    assertThat(response.getAccessToken()).isEqualTo("access");
+    assertThat(response.getRoles()).containsExactly("BUYER");
+    verify(verificationService).sendWhatsAppOtp("+251911223344");
+  }
+
+  @Test
+  void quickRegister_storesOptionalEmailLowercasedAndUsesGivenPassword() {
+    QuickRegistrationRequest request = quickRequest();
+    request.setEmail(" Abebe@Example.com ");
+    request.setPassword("Secret123");
+    when(userRepository.existsByEmail("abebe@example.com")).thenReturn(false);
+    when(passwordEncoder.encode("Secret123")).thenReturn("$2a$10$given");
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    authenticationService.quickRegister(request);
+
+    ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(saved.capture());
+    assertThat(saved.getValue().getEmail()).isEqualTo("abebe@example.com");
+    assertThat(saved.getValue().getPasswordHash()).isEqualTo("$2a$10$given");
+  }
+
+  @Test
+  void quickRegister_rejectsKnownPhoneAndKnownEmailWith409() {
+    when(userRepository.existsByPhoneNumber("+251911223344")).thenReturn(true);
+    assertThatThrownBy(() -> authenticationService.quickRegister(quickRequest()))
+        .isInstanceOf(DuplicateResourceException.class)
+        .hasMessageContaining("WhatsApp code");
+
+    when(userRepository.existsByPhoneNumber("+251911223344")).thenReturn(false);
+    when(userRepository.existsByEmail("abebe@example.com")).thenReturn(true);
+    QuickRegistrationRequest withEmail = quickRequest();
+    withEmail.setEmail("abebe@example.com");
+    assertThatThrownBy(() -> authenticationService.quickRegister(withEmail))
+        .isInstanceOf(DuplicateResourceException.class);
+    verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void quickRegister_rejectsMalformedPhone() {
+    QuickRegistrationRequest request = quickRequest();
+    request.setPhoneNumber("12345");
+    assertThatThrownBy(() -> authenticationService.quickRegister(request))
+        .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void quickRegister_stillSucceedsWhenTheVerificationCodeCannotBeSent() {
+    when(passwordEncoder.encode(anyString())).thenReturn("hash");
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    doThrow(new BusinessException("Twilio down")).when(verificationService).sendWhatsAppOtp(any());
+
+    AuthResponse response = authenticationService.quickRegister(quickRequest());
+    assertThat(response).isNotNull();
+  }
+
+  @Test
+  void splitFullName_handlesSingleAndMultipleNames() {
+    assertThat(AuthenticationServiceImpl.splitFullName("Abebe")).containsExactly("Abebe", "");
+    assertThat(AuthenticationServiceImpl.splitFullName(" Abebe  Kebede Alemu "))
+        .containsExactly("Abebe", "Kebede Alemu");
+  }
+
+  // ---------------------------------------------------------------- google
+
+  private GoogleLoginRequest googleRequest() {
+    GoogleLoginRequest request = new GoogleLoginRequest();
+    request.setIdToken("id-token");
+    return request;
+  }
+
+  @Test
+  void loginWithGoogle_opensAnActiveBuyerAccountForANewVerifiedEmail() {
+    when(googleIdTokenVerifier.verify("id-token"))
+        .thenReturn(
+            new GoogleIdTokenVerifier.GoogleIdentity(
+                "sub", "New.Buyer@Gmail.com", true, "New", "Buyer", "New Buyer", null));
+    when(userRepository.findByEmail("new.buyer@gmail.com")).thenReturn(Optional.empty());
+    when(passwordEncoder.encode(anyString())).thenReturn("hash");
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(jwtTokenProvider.generateToken(any(), any(), any(), any(), any())).thenReturn("access");
+
+    AuthResponse response = authenticationService.loginWithGoogle(googleRequest());
+
+    ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(saved.capture());
+    assertThat(saved.getValue().getEmail()).isEqualTo("new.buyer@gmail.com");
+    assertThat(saved.getValue().getFirstName()).isEqualTo("New");
+    assertThat(saved.getValue().getLastName()).isEqualTo("Buyer");
+    assertThat(saved.getValue().getStatus()).isEqualTo(User.UserStatus.ACTIVE);
+    assertThat(saved.getValue().getEmailVerified()).isTrue();
+    assertThat(saved.getValue().getRoles()).containsExactly(User.UserRole.BUYER);
+    assertThat(response.getAccessToken()).isEqualTo("access");
+  }
+
+  @Test
+  void loginWithGoogle_signsIntoAnExistingAccountAndActivatesIt() {
+    testUser.setStatus(User.UserStatus.PENDING_VERIFICATION);
+    testUser.setEmailVerified(false);
+    when(googleIdTokenVerifier.verify("id-token"))
+        .thenReturn(
+            new GoogleIdTokenVerifier.GoogleIdentity(
+                "sub", "test@example.com", true, "Test", "User", "Test User", null));
+    when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    authenticationService.loginWithGoogle(googleRequest());
+
+    assertThat(testUser.getStatus()).isEqualTo(User.UserStatus.ACTIVE);
+    assertThat(testUser.getEmailVerified()).isTrue();
+    verify(passwordEncoder, never()).encode(anyString());
+  }
+
+  @Test
+  void loginWithGoogle_refusesUnverifiedEmailsAndDisabledAccounts() {
+    when(googleIdTokenVerifier.verify("id-token"))
+        .thenReturn(
+            new GoogleIdTokenVerifier.GoogleIdentity(
+                "sub", "x@y.com", false, null, null, null, null));
+    assertThatThrownBy(() -> authenticationService.loginWithGoogle(googleRequest()))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("verified email");
+
+    testUser.setStatus(User.UserStatus.SUSPENDED);
+    when(googleIdTokenVerifier.verify("id-token"))
+        .thenReturn(
+            new GoogleIdTokenVerifier.GoogleIdentity(
+                "sub", "test@example.com", true, null, null, null, null));
+    when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+    assertThatThrownBy(() -> authenticationService.loginWithGoogle(googleRequest()))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("disabled");
   }
 }

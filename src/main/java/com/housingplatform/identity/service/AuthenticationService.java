@@ -2,7 +2,9 @@ package com.housingplatform.identity.service;
 
 import com.housingplatform.identity.dto.AuthResponse;
 import com.housingplatform.identity.dto.ForgotPasswordRequest;
+import com.housingplatform.identity.dto.GoogleLoginRequest;
 import com.housingplatform.identity.dto.LoginRequest;
+import com.housingplatform.identity.dto.QuickRegistrationRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
 import com.housingplatform.identity.dto.ResetPasswordRequest;
 
@@ -13,6 +15,18 @@ public interface AuthenticationService {
   AuthResponse refreshToken(String refreshToken);
 
   AuthResponse register(RegistrationRequest request);
+
+  /**
+   * Opens a BUYER account from a full name and a phone number (email and password optional), signs
+   * the user in, and sends a WhatsApp verification code so the phone can be confirmed later.
+   */
+  AuthResponse quickRegister(QuickRegistrationRequest request);
+
+  /**
+   * Signs in with a verified Google ID token. An unknown, verified Google email opens a BUYER
+   * account on the spot; a known email signs into the existing account.
+   */
+  AuthResponse loginWithGoogle(GoogleLoginRequest request);
 
   /**
    * Invalidates the given access token by adding it to the in-memory blacklist for the remainder of

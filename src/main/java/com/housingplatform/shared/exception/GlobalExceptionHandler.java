@@ -58,6 +58,34 @@ public class GlobalExceptionHandler {
     return json(error, HttpStatus.NOT_FOUND);
   }
 
+  @ExceptionHandler(DuplicateResourceException.class)
+  public ResponseEntity<ErrorResponse> handleDuplicateResourceException(
+      DuplicateResourceException ex, WebRequest request) {
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.CONFLICT.value())
+            .error("Conflict")
+            .message(ex.getMessage())
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+    return json(error, HttpStatus.CONFLICT);
+  }
+
+  @ExceptionHandler(ForbiddenOperationException.class)
+  public ResponseEntity<ErrorResponse> handleForbiddenOperationException(
+      ForbiddenOperationException ex, WebRequest request) {
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.FORBIDDEN.value())
+            .error("Forbidden")
+            .message(ex.getMessage())
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+    return json(error, HttpStatus.FORBIDDEN);
+  }
+
   @ExceptionHandler(BusinessException.class)
   public ResponseEntity<ErrorResponse> handleBusinessException(
       BusinessException ex, WebRequest request) {

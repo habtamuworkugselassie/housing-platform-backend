@@ -45,6 +45,7 @@ public class Notification extends BaseEntity {
     LOAN_STATUS_UPDATE,
     PROPERTY_VERIFICATION,
     PAYMENT_RECEIVED,
+    PURCHASE_ORDER_UPDATE,
     SYSTEM_ALERT
   }
 
