@@ -9,6 +9,7 @@ import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseAgreementIssuedEvent;
+import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseDepositPaidEvent;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderStatusChangedEvent;
 import java.util.LinkedHashSet;
@@ -123,6 +124,26 @@ public class PurchaseOrderNotificationListener {
                           notify(Set.of(order.getBuyerId()), title, body, order);
                           contactNotifier.notifyBuyer(order, title, body);
                         }));
+  }
+
+  @Async
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void onDepositPaid(PurchaseDepositPaidEvent event) {
+    orderRepository
+        .findById(event.purchaseOrderId())
+        .ifPresent(
+            order -> {
+              String title = "Reservation deposit received for " + order.getOrderNumber();
+              String thanks = "Thank you, your reservation deposit was received.";
+              notify(Set.of(order.getBuyerId()), title, thanks, order);
+              contactNotifier.notifyBuyer(order, title, thanks);
+              notify(
+                  sellerUsers(order),
+                  title,
+                  "The buyer's reservation deposit has been paid.",
+                  order);
+            });
   }
 
   private Set<UUID> sellerUsers(PropertyPurchaseOrder order) {

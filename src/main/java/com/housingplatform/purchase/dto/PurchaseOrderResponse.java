@@ -41,6 +41,9 @@ public class PurchaseOrderResponse {
   /** Agreements still waiting for the buyer's signature. */
   private Integer pendingSignatures;
 
+  /** Reservation deposit owed to the provider; null before seller acceptance or when disabled. */
+  private PurchaseDepositResponse deposit;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
   private List<StatusHistoryEntry> statusHistory;

@@ -25,6 +25,7 @@ import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingC
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingResolution;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
 import com.housingplatform.purchase.service.PurchaseAgreementService;
+import com.housingplatform.purchase.service.PurchaseDepositService;
 import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
@@ -116,6 +117,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   private final LoanApplicationService loanApplicationService;
   private final PurchaseOrderMapper mapper;
   private final PurchaseAgreementService agreementService;
+  private final PurchaseDepositService depositService;
   private final ApplicationEventPublisher eventPublisher;
   private final CacheManager cacheManager;
 
@@ -426,6 +428,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             : PurchaseOrderStatus.AWAITING_PAYMENT;
     order.setExpiresAt(null);
     transition(order, next, seller.userId().toString(), blankToNull(notes));
+    // The deposit is issued first so the deposit-terms agreement can quote its amount and due date.
+    depositService.issueForOrder(order);
     agreementService.issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
     reserveProperty(order.getPropertyId());
     return mapper.toResponse(orderRepository.save(order));
@@ -452,6 +456,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
           "Order "
               + order.getOrderNumber()
               + " has agreements the buyer has not signed yet; the sale cannot be completed");
+    }
+    if (depositService.blocksCompletion(order)) {
+      throw new BusinessException(
+          "Order "
+              + order.getOrderNumber()
+              + " still has an unpaid reservation deposit; the sale cannot be completed");
     }
     order.setPaymentReference(blankToNull(paymentReference));
     String actor = seller.userId().toString();
@@ -562,6 +572,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
     transition(order, terminal, actor, blankToNull(notes));
     agreementService.voidOpenAgreements(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
+    depositService.onOrderClosed(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
     if (hadReservation) {
       releaseReservationIfUnused(order.getPropertyId(), order.getId());
     }

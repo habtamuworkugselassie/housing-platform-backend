@@ -224,7 +224,23 @@ twilio:
   whatsapp-from-number: ${TWILIO_WHATSAPP_FROM_NUMBER:}
 
 # Property purchase orders. The provider is the legal counterparty to every buyer agreement.
+# Chapa hosted checkout for reservation deposits (card data never touches this server).
+chapa:
+  secret-key: ${CHAPA_SECRET_KEY:}
+  webhook-secret: ${CHAPA_WEBHOOK_SECRET:}
+  base-url: ${CHAPA_BASE_URL:https://api.chapa.co/v1}
+  # Public URL of this API so Chapa can call /api/v1/payments/chapa/webhook (else configure it in the dashboard).
+  public-api-base-url: ${PUBLIC_API_BASE_URL:}
+
 purchase:
+  deposit:
+    enabled: ${PURCHASE_DEPOSIT_ENABLED:true}
+    percent: ${PURCHASE_DEPOSIT_PERCENT:1}
+    min-etb: ${PURCHASE_DEPOSIT_MIN_ETB:5000}
+    max-etb: ${PURCHASE_DEPOSIT_MAX_ETB:250000}
+    min-usd: ${PURCHASE_DEPOSIT_MIN_USD:100}
+    max-usd: ${PURCHASE_DEPOSIT_MAX_USD:2500}
+    due-days: ${PURCHASE_DEPOSIT_DUE_DAYS:3}
   orders:
     expiry-cron: "0 */15 * * * *"
   provider:

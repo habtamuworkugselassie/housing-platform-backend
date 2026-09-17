@@ -30,6 +30,7 @@ public class PurchaseOrderMapper {
   private final UserRepository userRepository;
   private final CreditProductRepository creditProductRepository;
   private final PurchaseAgreementMapper agreementMapper;
+  private final PurchaseDepositService depositService;
 
   public PurchaseOrderResponse toResponse(PropertyPurchaseOrder order) {
     return toResponse(order, List.of());
@@ -82,6 +83,7 @@ public class PurchaseOrderMapper {
                                 == com.housingplatform.purchase.domain.PurchaseAgreement
                                     .AgreementStatus.PENDING_BUYER_SIGNATURE)
                     .count())
+        .deposit(depositService.toResponse(order))
         .createdAt(order.getCreatedAt())
         .updatedAt(order.getUpdatedAt())
         .statusHistory(

@@ -414,6 +414,16 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
     values.put("seller.companyName", organizationName(order.getRealEstateCompanyId()));
     values.put("price.amount", money(order.getListedPrice()));
     values.put("price.currency", order.getCurrency().getCode());
+    if (order.getDeposit() != null) {
+      values.put("deposit", "true");
+      values.put("deposit.amount", money(order.getDeposit().getAmount()));
+      values.put("deposit.currency", order.getDeposit().getCurrency().getCode());
+      values.put(
+          "deposit.dueDate",
+          order.getDeposit().getDueAt() != null
+              ? order.getDeposit().getDueAt().toLocalDate().toString()
+              : "");
+    }
     PurchaseOrderFinancing f = order.getFinancing();
     if (order.getPurchaseType() == PurchaseType.BANK_FINANCED && f != null) {
       values.put("financing", "true");

@@ -37,6 +37,7 @@ import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingR
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.NotAppliedReason;
 import com.housingplatform.purchase.service.PurchaseAgreementService;
+import com.housingplatform.purchase.service.PurchaseDepositService;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderMapper;
@@ -77,6 +78,7 @@ class PurchaseOrderServiceImplTest {
   @Mock private LoanApplicationService loanApplicationService;
   @Mock private PurchaseOrderMapper mapper;
   @Mock private PurchaseAgreementService agreementService;
+  @Mock private PurchaseDepositService depositService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private CacheManager cacheManager;
   @Mock private Cache propertyCache;
@@ -766,5 +768,35 @@ class PurchaseOrderServiceImplTest {
     service.createPurchaseOrder(buyer, request(), EVIDENCE);
     assertThat(noPhone.getPhoneNumber()).isNull();
     verify(userRepository, never()).save(any());
+  }
+
+  // ------------------------------------------------------------------ reservation deposit
+
+  @Test
+  void sellerAcceptanceIssuesTheDepositBeforeTheFollowUpAgreements() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
+    service.accept(seller, order.getId(), null);
+    org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(depositService, agreementService);
+    inOrder.verify(depositService).issueForOrder(order);
+    inOrder.verify(agreementService).issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
+  }
+
+  @Test
+  void completionIsBlockedWhileTheDepositIsUnpaid() {
+    PropertyPurchaseOrder order = financedOrder(PurchaseOrderStatus.AWAITING_PAYMENT, "6800000.00");
+    when(depositService.blocksCompletion(order)).thenReturn(true);
+    assertThatThrownBy(() -> service.complete(seller, order.getId(), null))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("unpaid reservation deposit");
+    assertThat(order.getStatus()).isEqualTo(PurchaseOrderStatus.AWAITING_PAYMENT);
+  }
+
+  @Test
+  void closingAnOrderTellsTheDepositService() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.AWAITING_FINANCING, "6800000.00");
+    service.cancel(buyer, order.getId(), "no");
+    verify(depositService).onOrderClosed(eq(order), anyString());
   }
 }

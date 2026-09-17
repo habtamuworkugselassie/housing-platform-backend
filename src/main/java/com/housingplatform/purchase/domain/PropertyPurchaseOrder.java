@@ -84,6 +84,13 @@ public class PropertyPurchaseOrder extends BaseAuditEntity {
   @OneToOne(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   private PurchaseOrderFinancing financing;
 
+  /**
+   * Reservation deposit owed to the provider after seller acceptance; null until then or when
+   * disabled.
+   */
+  @OneToOne(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+  private PurchaseDeposit deposit;
+
   @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("changedAt ASC")
   @Builder.Default

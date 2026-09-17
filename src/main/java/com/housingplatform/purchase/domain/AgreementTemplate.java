@@ -61,6 +61,7 @@ public class AgreementTemplate extends BaseAuditEntity {
     PROMISE_TO_PURCHASE,
     SALE_AGREEMENT,
     FINANCING_ACKNOWLEDGEMENT,
+    RESERVATION_DEPOSIT_TERMS,
     HANDOVER_AGREEMENT,
     OTHER
   }

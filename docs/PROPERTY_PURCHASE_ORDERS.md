@@ -1,6 +1,6 @@
 # Property Purchase Orders with Optional Bank Financing
 
-> **Status: implemented** in `com.housingplatform.purchase` (migrations `V59`, `V60`, `V61`). Unit tests
+> **Status: implemented** in `com.housingplatform.purchase` (migrations `V59`–`V62`). Unit tests
 > cover the financing resolver, the phone normaliser, the order service, the agreement service and
 > the template renderer. The seeded agreement texts are drafts for legal review (§8). Not yet built: an SMS/email
 > gateway (the `PurchaseOrderContactNotifier` default only logs) and HTTP-level integration tests.
@@ -796,4 +796,59 @@ the existing `register` behaviour, so a Twilio outage never blocks a purchase; t
 so verification can be enforced later by product decision. Google accounts are linked by
 verified email rather than by Google subject id, which is the usual trade-off when no separate
 identity table exists.
+
+---
+
+## 10. Reservation deposit through Chapa
+
+When the seller accepts, the buyer owes the **provider** a reservation deposit, paid through
+Chapa's hosted checkout. Card and wallet details are entered on Chapa; this platform stores only
+Chapa's transaction reference and the outcome. Chapa does not expose card tokenisation, so there is
+no card-on-file: every payment goes through the hosted page.
+
+### 10.1 Amount and lifecycle
+
+`DepositPolicy`: `percent` of the listed price (default 1 %), clamped per currency (ETB 5,000 –
+250,000; USD 100 – 2,500), never above the price, due `dueDays` (3) after acceptance. All under
+`purchase.deposit.*`; `enabled=false` skips deposits entirely.
+
+```
+seller accepts ─► DUE ─(buyer starts checkout)─► PENDING ─(verify: success)─► PAID
+                                                    └──(verify: failed)──► FAILED ─(retry)─► PENDING
+order closes while DUE/PENDING/FAILED ─► CANCELLED         order closes while PAID ─► REFUND_PENDING ─(admin)─► REFUNDED
+admin ─► WAIVED
+```
+
+The seller cannot **complete** the sale while the deposit is neither `PAID` nor `WAIVED`. The
+**Reservation Deposit Terms** agreement (`RESERVATION_DEPOSIT_TERMS`, seeded active by `V62`,
+issued on seller acceptance, blocks completion) must be signed before checkout can start; its
+text quotes `{{deposit.amount}}`, `{{deposit.currency}}` and `{{deposit.dueDate}}`, so the deposit
+is issued before the acceptance agreements.
+
+### 10.2 Endpoints
+
+| Method & path | Policy | Purpose |
+| --- | --- | --- |
+| `GET /purchase-orders/{id}/deposit` | `AUTHENTICATED` (viewers of the order) | amount, status, due date, `termsPending`, `checkoutAvailable`, resume URL while pending |
+| `POST /purchase-orders/{id}/deposit/checkout` | `BUYER_SECURED` | `POST /transaction/initialize` at Chapa with `tx_ref = <orderNumber>-DEP<n>-<random>`, the buyer's phone/email, `return_url = <frontend>/purchase-orders/{id}?deposit=return`, `callback_url` = our webhook; returns `checkoutUrl`. A pending checkout is resumed (after a verify) rather than duplicated; a failed one gets a new `tx_ref`. |
+| `POST /purchase-orders/{id}/deposit/confirm` | `BUYER_SECURED` | when the buyer returns: `GET /transaction/verify/{tx_ref}` and record PAID / FAILED (pending stays pending). Idempotent. |
+| `POST /payments/chapa/webhook` | `UNSECURED` | checks the `Chapa-Signature` / `x-chapa-signature` HMAC-SHA256 against `chapa.webhook-secret` (both known variants), then **verifies through the API** — the webhook body is never trusted for the outcome. Repeats are ignored. |
+| `POST /admin/purchase-orders/{id}/deposit/waive` | `ADMIN_SECURED` | no deposit needed for this order |
+| `POST /admin/purchase-orders/{id}/deposit/refunded` | `ADMIN_SECURED` | records the reference of a refund executed in the Chapa dashboard |
+
+An underpayment reported by verify (amount below the deposit) is recorded as `FAILED` with the
+reason, never as paid. `PurchaseDepositPaidEvent` notifies the buyer and the seller.
+
+### 10.3 Configuration
+
+| Key | Env | Meaning |
+| --- | --- | --- |
+| `chapa.secret-key` | `CHAPA_SECRET_KEY` | `CHASECK_TEST-…` (sandbox) or `CHASECK-…` (live). Empty → checkout endpoints answer "not configured" and the clients show a hint instead of the pay button. |
+| `chapa.webhook-secret` | `CHAPA_WEBHOOK_SECRET` | from the Chapa dashboard → Webhooks |
+| `chapa.public-api-base-url` | `PUBLIC_API_BASE_URL` | e.g. `https://ethiobuildconnect.et`; builds the `callback_url`. Alternatively set `https://<api>/api/v1/payments/chapa/webhook` as the webhook URL in the dashboard. |
+| `app.frontend-base-url` | `FRONTEND_BASE_URL` | where Chapa sends the buyer back |
+| `purchase.deposit.*` | `PURCHASE_DEPOSIT_*` | policy, see 10.1 |
+
+Test with Chapa's sandbox key and test cards before switching to the live key; both keys work
+against the same `base-url`.
 
