@@ -1,5 +1,9 @@
 # Property Purchase Orders with Optional Bank Financing
 
+> **Status: implemented** in `com.housingplatform.purchase` (migration `V59`). Unit tests cover
+> the financing resolver, the phone normaliser and the order service. Not yet built: an SMS/email
+> gateway (the `PurchaseOrderContactNotifier` default only logs) and HTTP-level integration tests.
+
 Design for a new `purchase` module that lets a buyer place a purchase order on a
 property. At creation time the service inspects the property's product catalog
 (the `financing_offers` linked to the property) and, when an **active** offer
@@ -27,7 +31,7 @@ Everything below is grounded in what already exists in this code base:
 | Column | Type | Rules |
 | --- | --- | --- |
 | `id` | UUID PK | from `BaseAuditEntity` |
-| `order_number` | VARCHAR(32) UNIQUE | `PPO-YYYY-NNNNNN`, generated from a DB sequence |
+| `order_number` | VARCHAR(32) UNIQUE | `PPO-YYYY-XXXXXXXX`, year plus 8 random hex characters; the unique index guards collisions |
 | `property_id` | UUID FK `properties` | required |
 | `buyer_id` | UUID FK `users` | the authenticated caller |
 | `real_estate_company_id`, `agent_id` | UUID | **snapshot** from the property at creation, so seller-side listing does not depend on later property edits |
@@ -40,13 +44,15 @@ Everything below is grounded in what already exists in this code base:
 | `buyer_message` | TEXT | optional free text |
 | `expires_at` | TIMESTAMP | `created_at + 14 days` while in `PENDING_SELLER_REVIEW` |
 | `cancellation_reason`, `rejection_reason` | TEXT | set on terminal transitions |
+| `payment_reference` | VARCHAR(255) | set by the seller on completion |
 | `created_at`, `updated_at`, `created_by`, `updated_by`, `version` | | base entity |
 
 ### 1.2 `PurchaseOrderFinancing` (1:1, only when `purchase_type = BANK_FINANCED`) — table `purchase_order_financing`
 
 | Column | Rules |
 | --- | --- |
-| `purchase_order_id` | UUID PK / FK, `ON DELETE CASCADE` |
+| `id` | UUID PK (own identity, `BaseEntity`) |
+| `purchase_order_id` | UUID FK UNIQUE, `ON DELETE CASCADE` |
 | `financing_offer_id`, `bank_id`, `credit_product_id` | which catalog entry was applied |
 | `offer_level` | `PROPERTY` or `BUILDING` (where the offer was found) |
 | `applied_interest_rate` | `offer.specialInterestRate ?? product.interestRate` (snapshot) |
@@ -253,7 +259,7 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 | --- | --- | --- |
 | 400 | `Validation Failed` | missing phone, bad email, tenure outside product range, down payment below minimum |
 | 400 | `Bad Request` (`BusinessException`) | property not `AVAILABLE`, not `FOR_SALE`, not `VERIFIED`; no price in requested currency; `useFinancing=true` with no eligible offer; `financingOfferId` not linked to this property or inactive |
-| 403 | `Forbidden` | caller is the property's own agent / company |
+| 403 | `Forbidden` (**new** `ForbiddenOperationException`) | caller is the property's own agent / company; seller action by someone who can see but not manage the order |
 | 404 | `Not Found` | unknown `propertyId` / `financingOfferId` |
 | 409 | `Conflict` (**new** `DuplicateResourceException`) | buyer already has an open order for the property |
 
@@ -263,7 +269,7 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 | --- | --- | --- |
 | `GET /api/v1/purchase-orders/{id}` | `AUTHENTICATED` | Buyer, seller (agent / company), the financing bank, or admin. Others get `404` (not `403`) to avoid leaking order existence |
 | `GET /api/v1/purchase-orders/me?status=&page=&size=` | `BUYER_SECURED` | Buyer's own orders, `Page<PurchaseOrderResponse>` |
-| `GET /api/v1/properties/{propertyId}/purchase-orders?status=` | `REALTOR_SECURED` | Seller view for one listing |
+| `GET /api/v1/purchase-orders/by-property/{propertyId}?status=` | `REALTOR_SECURED` | Seller view for one listing |
 | `GET /api/v1/purchase-orders/received?status=&page=&size=` | `REALTOR_SECURED` | All orders on the caller's company's listings |
 | `GET /api/v1/purchase-orders/financed?status=` | `BANKER_SECURED` | Orders financed by the caller's bank |
 
@@ -272,8 +278,8 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 | Method & path | Policy / action scope | Body | Effect |
 | --- | --- | --- | --- |
 | `POST /purchase-orders/{id}/accept` | `REALTOR_SECURED`, `purchase-orders.review` | `{ "notes"?: string }` | `PENDING_SELLER_REVIEW → AWAITING_PAYMENT` (cash) or `→ AWAITING_FINANCING` (financed). Property `status → RESERVED` |
-| `POST /purchase-orders/{id}/reject` | `REALTOR_SECURED`, `purchase-orders.review` | `{ "reason": string }` (`@NotBlank`) | `→ REJECTED`; withdraws the loan application if one exists |
-| `POST /purchase-orders/{id}/cancel` | `BUYER_SECURED`, `purchase-orders.cancel` | `{ "reason"?: string }` | `→ CANCELLED` from any non-terminal state; releases `RESERVED`; withdraws loan application |
+| `POST /purchase-orders/{id}/reject` | `REALTOR_SECURED`, `purchase-orders.review` | `{ "reason": string }` (`@NotBlank`) | `→ REJECTED` from any open state; withdraws the loan application if one exists; releases `RESERVED` |
+| `POST /purchase-orders/{id}/cancel` | `BUYER_SECURED`, `purchase-orders.cancel` | `{ "notes"?: string }` | `→ CANCELLED` from any non-terminal state; releases `RESERVED`; withdraws loan application |
 | `PUT /purchase-orders/{id}/financing` | `BUYER_SECURED` | `{ "financedAmount"? \| "downPaymentAmount"?, "requestedTenureMonths"? }` | Change the financing split. From `PENDING_SELLER_REVIEW`: updates the `SUBMITTED` loan application in place. From `FINANCING_REJECTED`: withdraws the old application, opens a new one with the smaller amount, `→ AWAITING_FINANCING`. Re-runs the §3.3 bounds |
 | `POST /purchase-orders/{id}/accept-partial-approval` | `BUYER_SECURED` | `{}` | only from `FINANCING_PARTIALLY_APPROVED`; buyer agrees to cover the shortfall in cash. `financed_amount := approved_amount`, `cash_portion_amount` recomputed, `financing_mode = PARTIAL`, `→ FINANCING_APPROVED → AWAITING_PAYMENT` |
 | `POST /purchase-orders/{id}/convert-to-cash` | `BUYER_SECURED` | `{}` | from `FINANCING_REJECTED` or `FINANCING_PARTIALLY_APPROVED`; withdraws the loan application, sets `purchase_type = CASH`, `→ AWAITING_PAYMENT` |
@@ -291,18 +297,29 @@ edges from §1.4.
 
 ```
 com.housingplatform.purchase
-├── api/PurchaseOrderController.java
-├── api/PropertyPurchasePreviewController.java     (or add to PropertyController)
-├── domain/PropertyPurchaseOrder.java
-├── domain/PurchaseOrderFinancing.java
-├── domain/PurchaseOrderStatusHistory.java
-├── dto/CreatePurchaseOrderRequest.java, PurchaseOrderResponse.java, PurchasePreviewResponse.java, …
+├── api/PurchaseOrderController.java                 /api/v1/purchase-orders/**
+├── api/PropertyPurchasePreviewController.java       /api/v1/properties/{id}/purchase-preview
+├── api/PurchaseOrderActorResolver.java              security context → PurchaseOrderActor
+├── config/PurchaseSchedulingConfig.java             @EnableScheduling for the expiry job
+├── domain/PropertyPurchaseOrder.java, PurchaseOrderFinancing.java, PurchaseOrderStatusHistory.java
+├── dto/CreatePurchaseOrderRequest.java, UpdatePurchaseFinancingRequest.java,
+│       PurchaseOrderDecisionRequest.java, RejectPurchaseOrderRequest.java,
+│       PurchaseOrderResponse.java, PurchasePreviewResponse.java
 ├── repository/PropertyPurchaseOrderRepository.java
-├── service/PurchaseOrderService.java, PurchaseOrderMapper.java (MapStruct)
-├── service/PropertyFinancingResolver.java          ← the catalog lookup, reusable
-├── service/PurchaseOrderEvents.java                ← Spring `record` events
-└── service/impl/PurchaseOrderServiceImpl.java
+├── service/PurchaseOrderService.java, PurchaseOrderActor.java
+├── service/PropertyFinancingResolver.java           ← the catalog lookup, shared by preview + create
+├── service/PhoneNumberNormalizer.java               ← E.164 normalisation of the mandatory phone
+├── service/PurchaseOrderMapper.java                 hand-written (joins property, users, bank, product)
+├── service/PurchaseOrderEvents.java                 Spring `record` events
+├── service/PurchaseOrderLoanListener.java           loan status → order status
+├── service/PurchaseOrderNotificationListener.java   in-app notifications + contact notifier
+├── service/PurchaseOrderContactNotifier.java        SMS/email seam (default impl logs)
+├── service/PurchaseOrderExpiryJob.java              @Scheduled expiry
+└── service/impl/PurchaseOrderServiceImpl.java, LoggingPurchaseOrderContactNotifier.java
 ```
+
+Shared additions: `DuplicateResourceException` (409) and `ForbiddenOperationException` (403) with
+handlers in `GlobalExceptionHandler`; `Notification.NotificationType.PURCHASE_ORDER_UPDATE`.
 
 Cross-module access goes through the existing service / repository interfaces
 (`PropertyRepository`, `FinancingOfferRepository`, `CreditProductRepository`,
@@ -412,11 +429,10 @@ active product with consistent numbers.
 ### 3.4 Keeping the order in sync with the loan
 
 `LoanApplicationServiceImpl` already owns the `SUBMITTED → UNDER_REVIEW →
-APPROVED / REJECTED → DISBURSED` transitions. Add one line to each transition:
-
-```java
-eventPublisher.publishEvent(new LoanApplicationStatusChangedEvent(id, from, to));
-```
+APPROVED / REJECTED → DISBURSED` transitions. Each one now publishes
+`LoanApplicationEvents.LoanApplicationStatusChangedEvent(id, from, to)`. Two methods were added to
+`LoanApplicationService`: `updateRequestedTerms(id, amount, tenure)` (only while `SUBMITTED`) and
+`withdrawLoanApplication(id, reason)` (`SUBMITTED | UNDER_REVIEW → CLOSED`, no-op otherwise).
 
 `PurchaseOrderLoanListener` (`@TransactionalEventListener`, `AFTER_COMMIT`)
 maps it onto the order:
@@ -429,9 +445,10 @@ maps it onto the order:
 | `REJECTED` | `REJECTED` | `AWAITING_FINANCING → FINANCING_REJECTED` (buyer may re-apply for a smaller amount via `PUT …/financing`, `convert-to-cash` or `cancel`) |
 | `DISBURSED` | `DISBURSED` | none (payment module completes the order) |
 
-Conversely, buyer cancel / seller reject before a decision calls
-`loanApplicationService.withdraw(...)` (new small method: `SUBMITTED |
-UNDER_REVIEW → CLOSED` with a note) so the bank's queue is cleaned up.
+Conversely, buyer cancel / seller reject / expiry before a decision calls
+`loanApplicationService.withdrawLoanApplication(...)` so the bank's queue is cleaned up. A
+`CLOSED` loan event marks the order's financing `WITHDRAWN` unless it was already rejected or
+disbursed.
 
 ### 3.5 Events and notifications
 
@@ -440,8 +457,9 @@ UNDER_REVIEW → CLOSED` with a note) so the bank's queue is cleaned up.
 * `PurchaseOrderCreatedEvent(orderId)` → notification listener:
   * in-app notification to the listing agent / company users
   * SMS confirmation to `contact_phone` (mandatory channel, which is why the
-    phone is required)
-  * email confirmation to `contact_email` if present
+    phone is required) and email to `contact_email` if present, both through
+    `PurchaseOrderContactNotifier`; the platform has no SMS gateway yet, so the
+    default bean logs and a provider is plugged in by replacing that bean
   * if financed: in-app notification to the bank's users that a loan
     application was submitted through a purchase order
 * `PurchaseOrderStatusChangedEvent(orderId, from, to)` → buyer (SMS + email
@@ -462,12 +480,18 @@ Listeners are `@TransactionalEventListener(phase = AFTER_COMMIT)` and
   `financing.bank_id`.
 * Admins (`UserContext.isAdmin()`) can read everything.
 
-New action scopes to register: `purchase-orders.create`,
-`purchase-orders.cancel`, `purchase-orders.review`, `purchase-orders.complete`.
+Action scopes on the endpoints: `purchase-orders.create`, `purchase-orders.cancel`,
+`purchase-orders.review`, `purchase-orders.complete`. As with every other module, the policy
+(`BUYER_SECURED` etc.) is the gate; `ScopeAuthorizationFilter` treats action scopes as
+documentation until they are minted into tokens.
+
+The controller builds a `PurchaseOrderActor` (user, organisation, agent, admin flag) from
+`UserContext` and the agent repository; the service does all ownership checks against it and never
+touches the security context, which keeps it unit-testable.
 
 ### 3.7 Expiry job
 
-`@Scheduled(cron = "0 */15 * * * *")` in `PurchaseOrderExpiryJob`: move
+`PurchaseOrderExpiryJob`, cron from `purchase.orders.expiry-cron` (default every 15 minutes): move
 `PENDING_SELLER_REVIEW` orders with `expires_at < now()` to `EXPIRED`
 (`changedBy = "system"`), withdraw any linked loan application, emit the
 status event.
@@ -477,68 +501,72 @@ status event.
 ## 4. Database migration — `V59__Create_property_purchase_orders.sql`
 
 ```sql
-CREATE SEQUENCE property_purchase_order_seq START 1;
+-- Property purchase orders with optional (and optionally partial) bank financing.
 
 CREATE TABLE property_purchase_orders (
     id                      UUID PRIMARY KEY,
-    order_number            VARCHAR(32)  NOT NULL UNIQUE,
-    property_id             UUID         NOT NULL REFERENCES properties(id),
-    buyer_id                UUID         NOT NULL REFERENCES users(id),
+    order_number            VARCHAR(32)   NOT NULL UNIQUE,
+    property_id             UUID          NOT NULL REFERENCES properties(id),
+    buyer_id                UUID          NOT NULL REFERENCES users(id),
     real_estate_company_id  UUID,
     agent_id                UUID,
-    contact_phone           VARCHAR(20)  NOT NULL,
+    contact_phone           VARCHAR(20)   NOT NULL,
     contact_email           VARCHAR(255),
-    purchase_type           VARCHAR(20)  NOT NULL,
-    status                  VARCHAR(32)  NOT NULL,
+    purchase_type           VARCHAR(20)   NOT NULL,
+    status                  VARCHAR(32)   NOT NULL,
     listed_price            NUMERIC(19,2) NOT NULL,
-    currency                VARCHAR(3)   NOT NULL,
+    currency                VARCHAR(3)    NOT NULL,
     buyer_message           TEXT,
     expires_at              TIMESTAMP,
     cancellation_reason     TEXT,
     rejection_reason        TEXT,
-    created_at              TIMESTAMP    NOT NULL,
-    updated_at              TIMESTAMP    NOT NULL,
+    payment_reference       VARCHAR(255),
+    created_at              TIMESTAMP     NOT NULL,
+    updated_at              TIMESTAMP     NOT NULL,
     created_by              VARCHAR(255),
     updated_by              VARCHAR(255),
     version                 BIGINT,
     CONSTRAINT chk_ppo_purchase_type CHECK (purchase_type IN ('CASH', 'BANK_FINANCED'))
 );
 
--- one open order per buyer per property (race-safe version of the 409 check)
+-- One open order per buyer per property: the race-safe twin of the service's 409 check.
 CREATE UNIQUE INDEX uq_ppo_open_buyer_property
     ON property_purchase_orders (buyer_id, property_id)
     WHERE status NOT IN ('COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED');
 
-CREATE INDEX idx_ppo_buyer_created    ON property_purchase_orders (buyer_id, created_at DESC);
-CREATE INDEX idx_ppo_property_status  ON property_purchase_orders (property_id, status);
-CREATE INDEX idx_ppo_company_status   ON property_purchase_orders (real_estate_company_id, status);
-CREATE INDEX idx_ppo_pending_expiry   ON property_purchase_orders (expires_at)
+CREATE INDEX idx_ppo_buyer_created   ON property_purchase_orders (buyer_id, created_at DESC);
+CREATE INDEX idx_ppo_property_status ON property_purchase_orders (property_id, status);
+CREATE INDEX idx_ppo_company_created ON property_purchase_orders (real_estate_company_id, created_at DESC);
+CREATE INDEX idx_ppo_pending_expiry  ON property_purchase_orders (expires_at)
     WHERE status = 'PENDING_SELLER_REVIEW';
 
 CREATE TABLE purchase_order_financing (
-    purchase_order_id             UUID PRIMARY KEY REFERENCES property_purchase_orders(id) ON DELETE CASCADE,
-    financing_offer_id            UUID NOT NULL REFERENCES financing_offers(id),
-    bank_id                       UUID NOT NULL,
-    credit_product_id             UUID NOT NULL REFERENCES credit_products(id),
-    offer_level                   VARCHAR(16)  NOT NULL,
-    applied_interest_rate         NUMERIC(5,2) NOT NULL,
-    applied_ltv_ratio             NUMERIC(5,2) NOT NULL,
+    id                            UUID PRIMARY KEY,
+    purchase_order_id             UUID          NOT NULL UNIQUE REFERENCES property_purchase_orders(id) ON DELETE CASCADE,
+    financing_offer_id            UUID          NOT NULL REFERENCES financing_offers(id),
+    bank_id                       UUID          NOT NULL,
+    credit_product_id             UUID          NOT NULL REFERENCES credit_products(id),
+    offer_level                   VARCHAR(16)   NOT NULL,
+    applied_interest_rate         NUMERIC(5,2)  NOT NULL,
+    applied_ltv_ratio             NUMERIC(5,2)  NOT NULL,
     min_financeable_amount        NUMERIC(19,2) NOT NULL,
     max_financeable_amount        NUMERIC(19,2) NOT NULL,
-    financing_mode                VARCHAR(16)  NOT NULL,
+    financing_mode                VARCHAR(16)   NOT NULL,
     financed_amount               NUMERIC(19,2) NOT NULL,
     cash_portion_amount           NUMERIC(19,2) NOT NULL,
     financing_coverage_ratio      NUMERIC(5,4)  NOT NULL,
-    tenure_months                 INTEGER      NOT NULL,
+    tenure_months                 INTEGER       NOT NULL,
     estimated_monthly_installment NUMERIC(19,2),
-    loan_application_id           UUID REFERENCES loan_applications(id),
-    financing_status              VARCHAR(32)  NOT NULL,
+    loan_application_id           UUID          REFERENCES loan_applications(id),
+    financing_status              VARCHAR(32)   NOT NULL,
     approved_amount               NUMERIC(19,2),
     approved_interest_rate        NUMERIC(5,2),
     approved_tenure_months        INTEGER,
-    CONSTRAINT chk_pof_mode   CHECK (financing_mode IN ('MAXIMUM', 'PARTIAL')),
-    CONSTRAINT chk_pof_bounds CHECK (financed_amount BETWEEN min_financeable_amount AND max_financeable_amount),
-    CONSTRAINT chk_pof_split  CHECK (financed_amount > 0 AND cash_portion_amount >= 0)
+    created_at                    TIMESTAMP     NOT NULL,
+    updated_at                    TIMESTAMP     NOT NULL,
+    version                       BIGINT,
+    CONSTRAINT chk_pof_mode  CHECK (financing_mode IN ('MAXIMUM', 'PARTIAL')),
+    CONSTRAINT chk_pof_split CHECK (financed_amount > 0 AND cash_portion_amount >= 0)
 );
 
 CREATE INDEX idx_pof_bank_status ON purchase_order_financing (bank_id, financing_status);
@@ -546,7 +574,7 @@ CREATE INDEX idx_pof_loan        ON purchase_order_financing (loan_application_i
 
 CREATE TABLE purchase_order_status_history (
     id                UUID PRIMARY KEY,
-    purchase_order_id UUID NOT NULL REFERENCES property_purchase_orders(id) ON DELETE CASCADE,
+    purchase_order_id UUID        NOT NULL REFERENCES property_purchase_orders(id) ON DELETE CASCADE,
     from_status       VARCHAR(32),
     to_status         VARCHAR(32) NOT NULL,
     changed_by        VARCHAR(255),
@@ -605,7 +633,7 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
 
 ---
 
-## 6. Test plan (JUnit 5 + Mockito, matching the existing service tests)
+## 6. Tests (JUnit 5 + Mockito, under `src/test/java/com/housingplatform/purchase`)
 
 * `PropertyFinancingResolverTest`: no offers → cash; active offer + inactive
   product → cash; building-level offer picked when property-level absent;
@@ -623,10 +651,10 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
   rolls back the order; phone normalisation; email optional; status machine
   rejects illegal transitions; accept sets property `RESERVED`; complete sets
   `SOLD` and rejects sibling orders.
-* `PurchaseOrderControllerIT` (`@SpringBootTest` + Testcontainers Postgres):
-  201 with `Location` header, 400 field errors for missing phone, scope
-  enforcement (`BUYER_SECURED` vs realtor token), partial unique index under
-  concurrent creates.
+* `PhoneNumberNormalizerTest`: Ethiopian local and international forms, rejects malformed input.
+* Not yet written: `PurchaseOrderControllerIT` (`@SpringBootTest`): 201 with `Location`
+  header, 400 field errors for missing phone, scope enforcement (`BUYER_SECURED` vs realtor
+  token), partial unique index under concurrent creates (needs PostgreSQL, not H2).
 
 ## 7. Open decisions (defaults chosen here, easy to flip)
 

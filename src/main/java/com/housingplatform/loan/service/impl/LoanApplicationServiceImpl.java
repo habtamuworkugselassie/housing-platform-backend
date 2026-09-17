@@ -7,15 +7,18 @@ import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.dto.LoanApprovalRequest;
 import com.housingplatform.loan.dto.LoanRejectionRequest;
 import com.housingplatform.loan.repository.LoanApplicationRepository;
+import com.housingplatform.loan.service.LoanApplicationEvents.LoanApplicationStatusChangedEvent;
 import com.housingplatform.loan.service.LoanApplicationMapper;
 import com.housingplatform.loan.service.LoanApplicationService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
 
   private final LoanApplicationRepository loanApplicationRepository;
   private final LoanApplicationMapper loanApplicationMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public LoanApplicationResponse createLoanApplication(
@@ -46,6 +50,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     application.getStatusHistory().add(history);
 
     LoanApplication saved = loanApplicationRepository.save(application);
+    publishStatusChange(saved, history);
     return loanApplicationMapper.toResponse(saved);
   }
 
@@ -106,6 +111,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     application.getStatusHistory().add(history);
 
     LoanApplication saved = loanApplicationRepository.save(application);
+    publishStatusChange(saved, history);
     return loanApplicationMapper.toResponse(saved);
   }
 
@@ -148,6 +154,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     application.getStatusHistory().add(history);
 
     LoanApplication saved = loanApplicationRepository.save(application);
+    publishStatusChange(saved, history);
     return loanApplicationMapper.toResponse(saved);
   }
 
@@ -183,6 +190,70 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     application.getStatusHistory().add(history);
 
     LoanApplication saved = loanApplicationRepository.save(application);
+    publishStatusChange(saved, history);
     return loanApplicationMapper.toResponse(saved);
+  }
+
+  @Override
+  public LoanApplicationResponse updateRequestedTerms(
+      UUID applicationId, BigDecimal requestedAmount, Integer requestedTenureMonths) {
+    LoanApplication application =
+        loanApplicationRepository
+            .findById(applicationId)
+            .orElseThrow(() -> new ResourceNotFoundException("LoanApplication", applicationId));
+
+    if (application.getStatus() != LoanApplication.LoanApplicationStatus.SUBMITTED) {
+      throw new BusinessException(
+          "Loan application terms can only be changed while the application is SUBMITTED");
+    }
+    if (requestedAmount != null) {
+      if (requestedAmount.signum() <= 0) {
+        throw new BusinessException("Requested amount must be greater than 0");
+      }
+      application.setRequestedAmount(requestedAmount);
+    }
+    if (requestedTenureMonths != null) {
+      if (requestedTenureMonths < 1) {
+        throw new BusinessException("Requested tenure must be at least 1 month");
+      }
+      application.setRequestedTenureMonths(requestedTenureMonths);
+    }
+    return loanApplicationMapper.toResponse(loanApplicationRepository.save(application));
+  }
+
+  @Override
+  public LoanApplicationResponse withdrawLoanApplication(UUID applicationId, String reason) {
+    LoanApplication application =
+        loanApplicationRepository
+            .findById(applicationId)
+            .orElseThrow(() -> new ResourceNotFoundException("LoanApplication", applicationId));
+
+    LoanApplication.LoanApplicationStatus from = application.getStatus();
+    if (from != LoanApplication.LoanApplicationStatus.SUBMITTED
+        && from != LoanApplication.LoanApplicationStatus.UNDER_REVIEW) {
+      return loanApplicationMapper.toResponse(application);
+    }
+
+    application.setStatus(LoanApplication.LoanApplicationStatus.CLOSED);
+    LoanApplicationStatusHistory history =
+        LoanApplicationStatusHistory.builder()
+            .loanApplication(application)
+            .fromStatus(from)
+            .toStatus(LoanApplication.LoanApplicationStatus.CLOSED)
+            .changedBy(application.getBuyerId().toString())
+            .changedAt(LocalDateTime.now())
+            .notes(reason != null ? reason : "Withdrawn by applicant")
+            .build();
+    application.getStatusHistory().add(history);
+
+    LoanApplication saved = loanApplicationRepository.save(application);
+    publishStatusChange(saved, history);
+    return loanApplicationMapper.toResponse(saved);
+  }
+
+  private void publishStatusChange(LoanApplication saved, LoanApplicationStatusHistory history) {
+    eventPublisher.publishEvent(
+        new LoanApplicationStatusChangedEvent(
+            saved.getId(), history.getFromStatus(), history.getToStatus()));
   }
 }
