@@ -25,15 +25,17 @@ public class PropertyPurchasePreviewController {
   private final PurchaseOrderActorResolver actors;
 
   @GetMapping
-  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(
       summary = "Preview a purchase order",
       description =
           "Shows whether an order on this property would be cash or bank financed, and the"
               + " financing range for each eligible offer, plus the agreements the buyer must sign"
-              + " to create the order. No side effects.")
+              + " to create the order. Public: visitors see it before signing up; a signed-in"
+              + " buyer gets the agreement rendered with their name. No side effects.")
   public ResponseEntity<PurchasePreviewResponse> preview(
       @PathVariable UUID propertyId, @RequestParam(required = false) Currency currency) {
-    return ResponseEntity.ok(purchaseOrderService.preview(actors.current(), propertyId, currency));
+    return ResponseEntity.ok(
+        purchaseOrderService.preview(actors.currentOrAnonymous(), propertyId, currency));
   }
 }

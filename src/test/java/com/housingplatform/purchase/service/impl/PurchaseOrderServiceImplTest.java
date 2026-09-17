@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import com.housingplatform.banking.domain.CreditProduct;
 import com.housingplatform.banking.domain.FinancingOffer;
+import com.housingplatform.identity.domain.User;
+import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.loan.domain.LoanApplication;
 import com.housingplatform.loan.dto.LoanApplicationRequest;
 import com.housingplatform.loan.dto.LoanApplicationResponse;
@@ -70,6 +72,7 @@ class PurchaseOrderServiceImplTest {
 
   @Mock private PropertyPurchaseOrderRepository orderRepository;
   @Mock private PropertyRepository propertyRepository;
+  @Mock private UserRepository userRepository;
   @Mock private PropertyFinancingResolver financingResolver;
   @Mock private LoanApplicationService loanApplicationService;
   @Mock private PurchaseOrderMapper mapper;
@@ -729,5 +732,39 @@ class PurchaseOrderServiceImplTest {
         financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
     service.cancel(buyer, other.getId(), "no");
     verify(agreementService).voidOpenAgreements(eq(other), anyString());
+  }
+
+  // ------------------------------------------------------------------ profile phone
+
+  @Test
+  void theOrderPhoneIsRememberedOnAProfileThatHasNone() {
+    User googleBuyer = new User();
+    googleBuyer.setId(buyerId);
+    googleBuyer.setEmail("buyer@gmail.com");
+    when(userRepository.findById(buyerId)).thenReturn(Optional.of(googleBuyer));
+    when(userRepository.existsByPhoneNumber("+251911223344")).thenReturn(false);
+
+    service.createPurchaseOrder(buyer, request(), EVIDENCE);
+
+    assertThat(googleBuyer.getPhoneNumber()).isEqualTo("+251911223344");
+    verify(userRepository).save(googleBuyer);
+  }
+
+  @Test
+  void anExistingProfilePhoneOrATakenNumberIsLeftAlone() {
+    User withPhone = new User();
+    withPhone.setId(buyerId);
+    withPhone.setPhoneNumber("+251700000000");
+    when(userRepository.findById(buyerId)).thenReturn(Optional.of(withPhone));
+    service.createPurchaseOrder(buyer, request(), EVIDENCE);
+    assertThat(withPhone.getPhoneNumber()).isEqualTo("+251700000000");
+
+    User noPhone = new User();
+    noPhone.setId(buyerId);
+    when(userRepository.findById(buyerId)).thenReturn(Optional.of(noPhone));
+    when(userRepository.existsByPhoneNumber("+251911223344")).thenReturn(true);
+    service.createPurchaseOrder(buyer, request(), EVIDENCE);
+    assertThat(noPhone.getPhoneNumber()).isNull();
+    verify(userRepository, never()).save(any());
   }
 }

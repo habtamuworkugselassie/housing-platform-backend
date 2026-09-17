@@ -6,7 +6,9 @@ import com.housingplatform.identity.domain.RealEstateAgent;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.dto.AuthResponse;
 import com.housingplatform.identity.dto.ForgotPasswordRequest;
+import com.housingplatform.identity.dto.GoogleLoginRequest;
 import com.housingplatform.identity.dto.LoginRequest;
+import com.housingplatform.identity.dto.QuickRegistrationRequest;
 import com.housingplatform.identity.dto.RegistrationRequest;
 import com.housingplatform.identity.dto.ResetPasswordRequest;
 import com.housingplatform.identity.repository.OrganizationRepository;
@@ -14,24 +16,29 @@ import com.housingplatform.identity.repository.PasswordResetTokenRepository;
 import com.housingplatform.identity.repository.RealEstateAgentRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.AuthenticationService;
+import com.housingplatform.identity.service.GoogleIdTokenVerifier;
 import com.housingplatform.identity.service.PasswordResetEmailService;
 import com.housingplatform.identity.service.VerificationService;
 import com.housingplatform.shared.exception.BusinessException;
+import com.housingplatform.shared.exception.DuplicateResourceException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import com.housingplatform.shared.security.JwtTokenProvider;
 import com.housingplatform.shared.security.PortalScope;
 import com.housingplatform.shared.service.TokenBlacklistService;
+import com.housingplatform.shared.util.PhoneNumberNormalizer;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -47,6 +54,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   private final JwtTokenProvider jwtTokenProvider;
   private final PasswordResetEmailService passwordResetEmailService;
   private final VerificationService verificationService;
+  private final GoogleIdTokenVerifier googleIdTokenVerifier;
   private final TokenBlacklistService tokenBlacklistService;
 
   @Value("${app.password-reset.expiry-hours:" + RESET_TOKEN_EXPIRY_HOURS + "}")
@@ -257,6 +265,148 @@ public class AuthenticationServiceImpl implements AuthenticationService {
           "Invalid refresh token: "
               + (e.getMessage() != null ? e.getMessage() : "Token validation failed"));
     }
+  }
+
+  @Override
+  public AuthResponse quickRegister(QuickRegistrationRequest request) {
+    String phone = PhoneNumberNormalizer.toE164(request.getPhoneNumber());
+    if (userRepository.existsByPhoneNumber(phone)) {
+      throw new DuplicateResourceException(
+          "This phone number already has an account. Sign in with a WhatsApp code instead.");
+    }
+    String email = null;
+    if (request.getEmail() != null && !request.getEmail().isBlank()) {
+      email = request.getEmail().trim().toLowerCase();
+      if (userRepository.existsByEmail(email)) {
+        throw new DuplicateResourceException("This email already has an account. Please sign in.");
+      }
+    }
+
+    String[] names = splitFullName(request.getFullName());
+    boolean hasPassword = request.getPassword() != null && !request.getPassword().isBlank();
+    // A passwordless account still needs a hash the column accepts; a random secret nobody
+    // knows keeps password login impossible until the user sets one through password reset.
+    String passwordHash =
+        passwordEncoder.encode(hasPassword ? request.getPassword() : generateSecureToken());
+
+    Set<User.UserRole> roles = new HashSet<>();
+    roles.add(User.UserRole.BUYER);
+    User user =
+        User.builder()
+            .email(email)
+            .passwordHash(passwordHash)
+            .firstName(names[0])
+            .lastName(names[1])
+            .phoneNumber(phone)
+            .status(User.UserStatus.PENDING_VERIFICATION)
+            .emailVerified(false)
+            .phoneVerified(false)
+            .roles(roles)
+            .build();
+    User savedUser = userRepository.save(user);
+
+    // Best effort: the code lets the buyer confirm the phone later; a delivery problem must not
+    // block the purchase they came to make.
+    try {
+      verificationService.sendWhatsAppOtp(phone);
+    } catch (RuntimeException e) {
+      log.warn("Could not send verification code to {} after quick registration", phone, e);
+    }
+
+    return issueTokens(savedUser);
+  }
+
+  @Override
+  public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
+    GoogleIdTokenVerifier.GoogleIdentity identity =
+        googleIdTokenVerifier.verify(request.getIdToken());
+    if (identity.email() == null || identity.email().isBlank() || !identity.emailVerified()) {
+      throw new BusinessException(
+          "Your Google account has no verified email address, which we need to create an account");
+    }
+    String email = identity.email().trim().toLowerCase();
+
+    User user =
+        userRepository
+            .findByEmail(email)
+            .map(this::activateGoogleUser)
+            .orElseGet(() -> createGoogleUser(identity, email));
+    return issueTokens(user);
+  }
+
+  private User activateGoogleUser(User user) {
+    if (user.getStatus() == User.UserStatus.SUSPENDED
+        || user.getStatus() == User.UserStatus.INACTIVE) {
+      throw new BusinessException("User account is disabled");
+    }
+    boolean changed = false;
+    if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+      user.setEmailVerified(true); // Google vouches for the address
+      changed = true;
+    }
+    if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
+      user.setStatus(User.UserStatus.ACTIVE);
+      changed = true;
+    }
+    return changed ? userRepository.save(user) : user;
+  }
+
+  private User createGoogleUser(GoogleIdTokenVerifier.GoogleIdentity identity, String email) {
+    String first = identity.givenName();
+    String last = identity.familyName();
+    if (first == null || first.isBlank()) {
+      String[] names = splitFullName(identity.fullName() != null ? identity.fullName() : email);
+      first = names[0];
+      last = last != null && !last.isBlank() ? last : names[1];
+    }
+    Set<User.UserRole> roles = new HashSet<>();
+    roles.add(User.UserRole.BUYER);
+    User user =
+        User.builder()
+            .email(email)
+            .passwordHash(passwordEncoder.encode(generateSecureToken()))
+            .firstName(first)
+            .lastName(last != null ? last : "")
+            .status(User.UserStatus.ACTIVE)
+            .emailVerified(true)
+            .phoneVerified(false)
+            .roles(roles)
+            .build();
+    return userRepository.save(user);
+  }
+
+  /**
+   * "Abebe Kebede Alemu" → first "Abebe", last "Kebede Alemu"; a single name has an empty last
+   * name.
+   */
+  public static String[] splitFullName(String fullName) {
+    String trimmed = fullName.trim().replaceAll("\\s+", " ");
+    int space = trimmed.indexOf(' ');
+    if (space < 0) {
+      return new String[] {trimmed, ""};
+    }
+    return new String[] {trimmed.substring(0, space), trimmed.substring(space + 1)};
+  }
+
+  private AuthResponse issueTokens(User user) {
+    List<String> scopes = mapRolesToScopes(user.getRoles());
+    List<String> roles = user.getRoles().stream().map(Enum::name).collect(Collectors.toList());
+    UUID organizationId = resolveOrganizationIdForToken(user);
+    String accessToken =
+        jwtTokenProvider.generateToken(
+            user.getId(), user.getEmail(), scopes, roles, organizationId);
+    return AuthResponse.builder()
+        .accessToken(accessToken)
+        .tokenType("Bearer")
+        .expiresIn(3600L)
+        .refreshToken(jwtTokenProvider.generateRefreshToken(user.getId()))
+        .userId(user.getId())
+        .email(user.getEmail())
+        .firstName(user.getFirstName())
+        .lastName(user.getLastName())
+        .scopes(scopes)
+        .roles(roles)
+        .build();
   }
 
   @Override

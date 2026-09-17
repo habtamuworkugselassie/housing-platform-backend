@@ -1,4 +1,4 @@
-package com.housingplatform.purchase.service;
+package com.housingplatform.shared.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

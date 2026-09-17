@@ -1,6 +1,6 @@
 # Property Purchase Orders with Optional Bank Financing
 
-> **Status: implemented** in `com.housingplatform.purchase` (migrations `V59`, `V60`). Unit tests
+> **Status: implemented** in `com.housingplatform.purchase` (migrations `V59`, `V60`, `V61`). Unit tests
 > cover the financing resolver, the phone normaliser, the order service, the agreement service and
 > the template renderer. The seeded agreement texts are drafts for legal review (§8). Not yet built: an SMS/email
 > gateway (the `PurchaseOrderContactNotifier` default only logs) and HTTP-level integration tests.
@@ -112,7 +112,7 @@ existing `ErrorResponse` envelope.
 
 ### 2.1 Preview (no side effects)
 
-`GET /api/v1/properties/{propertyId}/purchase-preview` — `AUTHENTICATED`
+`GET /api/v1/properties/{propertyId}/purchase-preview` — `UNSECURED` (a signed-in buyer gets the agreement rendered with their name; a visitor sees "the Buyer")
 
 Lets the client render the right form (cash vs financed) before submitting.
 
@@ -768,4 +768,32 @@ and never re-rendered. A signature references the template id, so a buyer who re
 the preview cannot accidentally sign version 2 published in between (400 with the current
 version). Signature method is `TYPED_NAME` today; the column exists so OTP or digital signatures
 can be added without a schema change.
+
+---
+
+## 9. Getting visitors to an account: quick registration and Google
+
+Placing an order needs a BUYER account (the signature, the follow-up agreements and the loan
+application all hang off a user id), but a visitor should not have to leave the property page to
+get one. Two additions to the `identity` module make that possible; the existing WhatsApp-code
+login (`/auth/login/otp/*`) is the third door.
+
+| Endpoint | Policy | Behaviour |
+| --- | --- | --- |
+| `POST /api/v1/auth/quick-register` | `UNSECURED` | `{ fullName, phoneNumber, email?, password? }`. Phone is normalised to E.164 (`PhoneNumberNormalizer`, now in `shared.util`); the name is split into first/last. Creates a `BUYER` in `PENDING_VERIFICATION`, sends a WhatsApp code best-effort so the phone can be confirmed later, and returns tokens immediately (201). Without a password the account is passwordless: a random unusable hash is stored and sign-in is by WhatsApp code. Known phone or email → 409. |
+| `POST /api/v1/auth/google` | `UNSECURED` | `{ idToken }` from the Google Identity Services button. `GoogleIdTokenVerifier` checks signature (Google JWKS), issuer, audience (`google.oauth.client-id`) and expiry. A verified email that is unknown opens an `ACTIVE` `BUYER` account; a known email signs into that account and marks it verified. Unverified Google emails and disabled accounts are refused. Disabled when `GOOGLE_OAUTH_CLIENT_ID` is empty. |
+
+Schema: `V61` makes `users.email` nullable (phone-only buyers); the unique constraint stays,
+PostgreSQL treats NULLs as distinct.
+
+Purchase-order tie-in: when a buyer whose profile has no phone (a Google sign-up, an old
+email-only account) places an order, the order's contact phone is stored on the profile unless
+another account already owns that number. That is what later lets them sign in with a WhatsApp
+code.
+
+Deliberate choices: quick registration signs the user in before the phone is verified, mirroring
+the existing `register` behaviour, so a Twilio outage never blocks a purchase; the code is sent
+so verification can be enforced later by product decision. Google accounts are linked by
+verified email rather than by Google subject id, which is the usual trade-off when no separate
+identity table exists.
 

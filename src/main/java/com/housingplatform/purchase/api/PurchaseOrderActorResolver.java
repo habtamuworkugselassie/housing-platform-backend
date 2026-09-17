@@ -14,6 +14,15 @@ public class PurchaseOrderActorResolver {
 
   private final RealEstateAgentRepository agentRepository;
 
+  /** The signed-in caller, or an anonymous actor (null user id) for public endpoints. */
+  public PurchaseOrderActor currentOrAnonymous() {
+    UUID userId = UserContext.getCurrentUserIdOrNull();
+    if (userId == null) {
+      return new PurchaseOrderActor(null, null, null, false);
+    }
+    return current();
+  }
+
   public PurchaseOrderActor current() {
     UUID userId = UserContext.getCurrentUserId();
     UUID organizationId = UserContext.getCurrentUserOrganizationId().orElse(null);

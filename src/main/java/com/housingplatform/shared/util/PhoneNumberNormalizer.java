@@ -1,11 +1,11 @@
-package com.housingplatform.purchase.service;
+package com.housingplatform.shared.util;
 
 import com.housingplatform.shared.exception.BusinessException;
 import java.util.regex.Pattern;
 
 /**
- * Normalises the contact phone captured on a purchase order to E.164. Ethiopian local forms ({@code
- * 09…}, {@code 07…}, {@code 2519…}) are expanded to {@code +251…}; any other well-formed
+ * Normalises a phone number to E.164 (purchase orders, quick registration). Ethiopian local forms
+ * ({@code 09…}, {@code 07…}, {@code 2519…}) are expanded to {@code +251…}; any other well-formed
  * international number is accepted as given.
  */
 public final class PhoneNumberNormalizer {

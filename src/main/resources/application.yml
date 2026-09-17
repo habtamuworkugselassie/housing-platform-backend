@@ -213,6 +213,11 @@ rate:
       max-requests: ${RATE_LIMIT_AUTH_MAX_REQUESTS:5}
       window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
 
+# "Sign in with Google": the web client id the frontend button uses (VITE_GOOGLE_CLIENT_ID).
+google:
+  oauth:
+    client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+
 twilio:
   account-sid: ${TWILIO_ACCOUNT_SID:}
   auth-token: ${TWILIO_AUTH_TOKEN:}

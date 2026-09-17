@@ -1,5 +1,6 @@
 package com.housingplatform.purchase.service.impl;
 
+import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.loan.domain.LoanApplication;
 import com.housingplatform.loan.dto.LoanApplicationRequest;
 import com.housingplatform.loan.dto.LoanApplicationResponse;
@@ -19,7 +20,6 @@ import com.housingplatform.purchase.dto.PurchaseOrderResponse;
 import com.housingplatform.purchase.dto.PurchasePreviewResponse;
 import com.housingplatform.purchase.dto.UpdatePurchaseFinancingRequest;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
-import com.housingplatform.purchase.service.PhoneNumberNormalizer;
 import com.housingplatform.purchase.service.PropertyFinancingResolver;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingChoice;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingResolution;
@@ -37,6 +37,7 @@ import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.DuplicateResourceException;
 import com.housingplatform.shared.exception.ForbiddenOperationException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import com.housingplatform.shared.util.PhoneNumberNormalizer;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -110,6 +111,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
   private final PropertyPurchaseOrderRepository orderRepository;
   private final PropertyRepository propertyRepository;
+  private final UserRepository userRepository;
   private final PropertyFinancingResolver financingResolver;
   private final LoanApplicationService loanApplicationService;
   private final PurchaseOrderMapper mapper;
@@ -205,6 +207,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         .add(history(order, null, order.getStatus(), buyer.userId(), null, now));
     PropertyPurchaseOrder saved = orderRepository.save(order);
     eventPublisher.publishEvent(new PurchaseOrderCreatedEvent(saved.getId()));
+    rememberBuyerPhone(buyer.userId(), phone);
     return mapper.toResponse(saved, warnings);
   }
 
@@ -769,6 +772,22 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     if (cache != null) {
       cache.evict(property.getId());
     }
+  }
+
+  /**
+   * Buyers who joined through Google (or an old email-only profile) have no phone on file. The
+   * number they just gave for the order becomes theirs, which also unlocks WhatsApp-code sign-in.
+   */
+  private void rememberBuyerPhone(UUID buyerId, String phone) {
+    userRepository
+        .findById(buyerId)
+        .filter(u -> u.getPhoneNumber() == null || u.getPhoneNumber().isBlank())
+        .filter(u -> !userRepository.existsByPhoneNumber(phone))
+        .ifPresent(
+            u -> {
+              u.setPhoneNumber(phone);
+              userRepository.save(u);
+            });
   }
 
   static String newOrderNumber() {

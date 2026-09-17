@@ -440,6 +440,12 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
   }
 
   private void putBuyer(Map<String, String> values, UUID buyerId, String phone, String email) {
+    if (buyerId == null) {
+      values.put("buyer.fullName", "the Buyer");
+      values.put("buyer.phone", nz(phone));
+      values.put("buyer.email", nz(email));
+      return;
+    }
     userRepository
         .findById(buyerId)
         .ifPresentOrElse(
