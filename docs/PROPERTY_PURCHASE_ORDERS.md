@@ -52,12 +52,15 @@ Everything below is grounded in what already exists in this code base:
 | `applied_interest_rate` | `offer.specialInterestRate ?? product.interestRate` (snapshot) |
 | `applied_ltv_ratio` | `offer.specialLTVRatio ?? product.maxLoanToValueRatio` (snapshot) |
 | `max_financeable_amount` | `min(listed_price × applied_ltv_ratio, product.maxLoanAmount)` |
-| `down_payment_amount` | `listed_price − financed_amount` |
-| `financed_amount` | requested loan principal (see rules in §3.3) |
+| `min_financeable_amount` | `product.minLoanAmount` (snapshot) |
+| `financing_mode` | `MAXIMUM` (financed amount = max financeable) or `PARTIAL` (buyer chose to finance less and pay more cash) |
+| `financed_amount` | requested loan principal, anywhere in `[min_financeable_amount, max_financeable_amount]` (see rules in §3.3) |
+| `cash_portion_amount` | `listed_price − financed_amount`; the buyer's own contribution (down payment). Equals the minimum down payment in `MAXIMUM` mode, larger in `PARTIAL` mode |
+| `financing_coverage_ratio` | `financed_amount ÷ listed_price`, scale 4, informational (e.g. `0.5000` for 50 % financed) |
 | `tenure_months` | requested or default tenure |
 | `estimated_monthly_installment` | standard amortised instalment, informational only |
 | `loan_application_id` | FK `loan_applications`, the workflow handle |
-| `financing_status` | `APPLICATION_SUBMITTED`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `DISBURSED`, `WITHDRAWN` |
+| `financing_status` | `APPLICATION_SUBMITTED`, `UNDER_REVIEW`, `APPROVED`, `PARTIALLY_APPROVED`, `REJECTED`, `DISBURSED`, `WITHDRAWN` |
 
 Snapshotting the rate / LTV is deliberate: banks can edit or deactivate a
 product later and the buyer must keep the terms they were shown.
@@ -82,9 +85,13 @@ Same shape as `LoanApplicationStatusHistory`: `from_status`, `to_status`,
                         │ purchase_type = BANK_FINANCED│
                         └──────────────┬───────────────┘
                                        ▼
-                             AWAITING_FINANCING ──(loan APPROVED)──► FINANCING_APPROVED ──► AWAITING_PAYMENT ──► COMPLETED
+                             AWAITING_FINANCING ──(loan APPROVED in full)──► FINANCING_APPROVED ──► AWAITING_PAYMENT ──► COMPLETED
+                                       │
+                                       ├──(loan APPROVED for less)──► FINANCING_PARTIALLY_APPROVED ──(buyer accepts larger cash portion)──► FINANCING_APPROVED
+                                       │                                        └──(buyer declines)──► CANCELLED
                                        │
                                        └──(loan REJECTED)──► FINANCING_REJECTED ──(buyer converts to CASH)──► AWAITING_PAYMENT
+                                                                    └──(buyer re-applies with a smaller amount)──► AWAITING_FINANCING
 ```
 
 Terminal states: `COMPLETED`, `CANCELLED`, `REJECTED`, `EXPIRED`.
@@ -121,8 +128,10 @@ Lets the client render the right form (cash vs financed) before submitting.
       "ltvRatio": 0.80,
       "minTenureMonths": 12,
       "maxTenureMonths": 240,
+      "minFinanceableAmount": 500000.00,
       "maxFinanceableAmount": 6800000.00,
       "minimumDownPayment": 1700000.00,
+      "partialFinancingAllowed": true,
       "recommended": true
     }
   ]
@@ -130,7 +139,9 @@ Lets the client render the right form (cash vs financed) before submitting.
 ```
 
 `purchaseType` is `CASH` and `financingOffers` is `[]` when nothing eligible is
-linked.
+linked. `minFinanceableAmount` and `maxFinanceableAmount` define the range a
+partial-financing slider may offer; `partialFinancingAllowed` is `false` only
+when the two are equal.
 
 ### 2.2 Create purchase order
 
@@ -149,7 +160,8 @@ linked.
   "useFinancing": null,                      // optional tri-state, see below
   "financing": {                             // optional; only read when financing is applied
     "financingOfferId": "9a1c…",             // optional; required only if >1 eligible offer and no default wanted
-    "downPaymentAmount": 2000000.00,         // optional; >= minimumDownPayment
+    "financedAmount": 4250000.00,            // optional; PARTIAL financing: loan principal wanted, within [minFinanceable, maxFinanceable]
+    "downPaymentAmount": null,               // optional alternative to financedAmount: cash the buyer will pay; the two are mutually exclusive
     "requestedTenureMonths": 180             // optional; within product min/max
   }
 }
@@ -171,6 +183,12 @@ Validation:
 * `contactEmail` is optional; when present it must satisfy `@Email`.
 * Any field under `financing` is ignored (with a `warnings[]` entry in the
   response) when the resulting order is `CASH`.
+* **Partial financing.** The buyer may finance any amount between the
+  product's minimum loan and the LTV-capped maximum, and pay the rest in cash.
+  They express it either as `financedAmount` or as `downPaymentAmount`
+  (`listedPrice − financedAmount`); sending both is a `400`. Omitting both
+  gives `MAXIMUM` mode (finance as much as the offer allows). Choosing less
+  than the maximum gives `PARTIAL` mode.
 
 **Response** `201 Created`, `Location: /api/v1/purchase-orders/{id}`
 (`PurchaseOrderResponse`)
@@ -202,11 +220,14 @@ Validation:
     "creditProductName": "Home Purchase Loan",
     "appliedInterestRate": 14.50,
     "appliedLtvRatio": 0.80,
+    "minFinanceableAmount": 500000.00,
     "maxFinanceableAmount": 6800000.00,
-    "financedAmount": 6500000.00,
-    "downPaymentAmount": 2000000.00,
+    "financingMode": "PARTIAL",
+    "financedAmount": 4250000.00,
+    "cashPortionAmount": 4250000.00,
+    "financingCoverageRatio": 0.5000,
     "tenureMonths": 180,
-    "estimatedMonthlyInstallment": 88757.56,
+    "estimatedMonthlyInstallment": 58033.79,
     "loanApplicationId": "e51a…",
     "nextSteps": [
       "Upload income documents to the loan application",
@@ -253,7 +274,9 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 | `POST /purchase-orders/{id}/accept` | `REALTOR_SECURED`, `purchase-orders.review` | `{ "notes"?: string }` | `PENDING_SELLER_REVIEW → AWAITING_PAYMENT` (cash) or `→ AWAITING_FINANCING` (financed). Property `status → RESERVED` |
 | `POST /purchase-orders/{id}/reject` | `REALTOR_SECURED`, `purchase-orders.review` | `{ "reason": string }` (`@NotBlank`) | `→ REJECTED`; withdraws the loan application if one exists |
 | `POST /purchase-orders/{id}/cancel` | `BUYER_SECURED`, `purchase-orders.cancel` | `{ "reason"?: string }` | `→ CANCELLED` from any non-terminal state; releases `RESERVED`; withdraws loan application |
-| `POST /purchase-orders/{id}/convert-to-cash` | `BUYER_SECURED` | `{}` | only from `FINANCING_REJECTED`; sets `purchase_type = CASH`, `→ AWAITING_PAYMENT` |
+| `PUT /purchase-orders/{id}/financing` | `BUYER_SECURED` | `{ "financedAmount"? \| "downPaymentAmount"?, "requestedTenureMonths"? }` | Change the financing split. From `PENDING_SELLER_REVIEW`: updates the `SUBMITTED` loan application in place. From `FINANCING_REJECTED`: withdraws the old application, opens a new one with the smaller amount, `→ AWAITING_FINANCING`. Re-runs the §3.3 bounds |
+| `POST /purchase-orders/{id}/accept-partial-approval` | `BUYER_SECURED` | `{}` | only from `FINANCING_PARTIALLY_APPROVED`; buyer agrees to cover the shortfall in cash. `financed_amount := approved_amount`, `cash_portion_amount` recomputed, `financing_mode = PARTIAL`, `→ FINANCING_APPROVED → AWAITING_PAYMENT` |
+| `POST /purchase-orders/{id}/convert-to-cash` | `BUYER_SECURED` | `{}` | from `FINANCING_REJECTED` or `FINANCING_PARTIALLY_APPROVED`; withdraws the loan application, sets `purchase_type = CASH`, `→ AWAITING_PAYMENT` |
 | `POST /purchase-orders/{id}/complete` | `REALTOR_SECURED`, `purchase-orders.complete` | `{ "paymentReference"?: string }` | `AWAITING_PAYMENT → COMPLETED`; property `status → SOLD`; every other open order on the property `→ REJECTED` with reason `PROPERTY_SOLD` |
 
 All transitions append a `PurchaseOrderStatusHistory` row and are guarded by a
@@ -363,17 +386,23 @@ preview endpoint and the create endpoint cannot drift apart.
    rate            = offer.specialInterestRate ?? product.interestRate
    ltv             = offer.specialLTVRatio ?? product.maxLoanToValueRatio
    maxFinanceable  = min(listedPrice × ltv, product.maxLoanAmount)     (scale 2, HALF_UP)
+   minFinanceable  = product.minLoanAmount
    minDownPayment  = listedPrice − maxFinanceable
-   downPayment     = request.financing.downPaymentAmount ?? minDownPayment
-                     must be ≥ minDownPayment and < listedPrice          → 400 otherwise
-   financedAmount  = listedPrice − downPayment
-                     must be ≥ product.minLoanAmount                     → 400 otherwise
+   if both financedAmount and downPaymentAmount given                     → 400
+   financedAmount  = request.financing.financedAmount
+                     ?? (listedPrice − request.financing.downPaymentAmount)
+                     ?? maxFinanceable                                     (MAXIMUM mode default)
+                     must satisfy minFinanceable ≤ financedAmount ≤ maxFinanceable → 400 otherwise,
+                     error message quotes both bounds so the client can render the range
+   cashPortion     = listedPrice − financedAmount                          (≥ minDownPayment by construction)
+   mode            = financedAmount == maxFinanceable ? MAXIMUM : PARTIAL
+   coverageRatio   = financedAmount ÷ listedPrice                          (scale 4)
    tenure          = request.financing.requestedTenureMonths ?? product.maxTenureMonths
                      must be within [product.minTenureMonths, product.maxTenureMonths] → 400
    installment     = amortised: P·i / (1 − (1+i)^−n), i = rate/100/12  (rate 0 → P/n)
 
-   return APPLIED(offer, product, level, rate, ltv, maxFinanceable, downPayment,
-                  financedAmount, tenure, installment)
+   return APPLIED(offer, product, level, rate, ltv, minFinanceable, maxFinanceable,
+                  mode, financedAmount, cashPortion, coverageRatio, tenure, installment)
 ```
 
 Only `LoanApplication`'s own bank review decides approval; the resolver never
@@ -395,8 +424,9 @@ maps it onto the order:
 | Loan status | `financing_status` | Order status change |
 | --- | --- | --- |
 | `UNDER_REVIEW` | `UNDER_REVIEW` | none |
-| `APPROVED` | `APPROVED` (stores approved amount / rate / tenure) | `AWAITING_FINANCING → FINANCING_APPROVED → AWAITING_PAYMENT` |
-| `REJECTED` | `REJECTED` | `AWAITING_FINANCING → FINANCING_REJECTED` (buyer may `convert-to-cash` or `cancel`) |
+| `APPROVED`, `approvedAmount ≥ financed_amount` | `APPROVED` (stores approved amount / rate / tenure) | `AWAITING_FINANCING → FINANCING_APPROVED → AWAITING_PAYMENT` |
+| `APPROVED`, `approvedAmount < financed_amount` | `PARTIALLY_APPROVED` | `AWAITING_FINANCING → FINANCING_PARTIALLY_APPROVED`; the buyer is told the new cash portion and must `accept-partial-approval`, `convert-to-cash` or `cancel`. Nothing moves automatically because the shortfall is the buyer's money |
+| `REJECTED` | `REJECTED` | `AWAITING_FINANCING → FINANCING_REJECTED` (buyer may re-apply for a smaller amount via `PUT …/financing`, `convert-to-cash` or `cancel`) |
 | `DISBURSED` | `DISBURSED` | none (payment module completes the order) |
 
 Conversely, buyer cancel / seller reject before a decision calls
@@ -493,16 +523,22 @@ CREATE TABLE purchase_order_financing (
     offer_level                   VARCHAR(16)  NOT NULL,
     applied_interest_rate         NUMERIC(5,2) NOT NULL,
     applied_ltv_ratio             NUMERIC(5,2) NOT NULL,
+    min_financeable_amount        NUMERIC(19,2) NOT NULL,
     max_financeable_amount        NUMERIC(19,2) NOT NULL,
-    down_payment_amount           NUMERIC(19,2) NOT NULL,
+    financing_mode                VARCHAR(16)  NOT NULL,
     financed_amount               NUMERIC(19,2) NOT NULL,
+    cash_portion_amount           NUMERIC(19,2) NOT NULL,
+    financing_coverage_ratio      NUMERIC(5,4)  NOT NULL,
     tenure_months                 INTEGER      NOT NULL,
     estimated_monthly_installment NUMERIC(19,2),
     loan_application_id           UUID REFERENCES loan_applications(id),
     financing_status              VARCHAR(32)  NOT NULL,
     approved_amount               NUMERIC(19,2),
     approved_interest_rate        NUMERIC(5,2),
-    approved_tenure_months        INTEGER
+    approved_tenure_months        INTEGER,
+    CONSTRAINT chk_pof_mode   CHECK (financing_mode IN ('MAXIMUM', 'PARTIAL')),
+    CONSTRAINT chk_pof_bounds CHECK (financed_amount BETWEEN min_financeable_amount AND max_financeable_amount),
+    CONSTRAINT chk_pof_split  CHECK (financed_amount > 0 AND cash_portion_amount >= 0)
 );
 
 CREATE INDEX idx_pof_bank_status ON purchase_order_financing (bank_id, financing_status);
@@ -553,6 +589,20 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
 * `useFinancing = false` → `CASH` order even though an offer exists; preview
   still shows the offers so the UI can explain the choice.
 
+**D. Partial financing**
+
+* Same property and offer as A (`minLoanAmount 500 000`, max financeable
+  `6 800 000`). Buyer posts `financing: { financedAmount: 4 250 000,
+  requestedTenureMonths: 180 }`.
+* Resolver: `500 000 ≤ 4 250 000 ≤ 6 800 000` → valid. `cashPortion =
+  4 250 000`, `mode = PARTIAL`, `coverageRatio = 0.5000`, instalment ≈
+  58 033.79. Loan application opened for `4 250 000`.
+* If the bank later approves only `3 000 000`, the order moves to
+  `FINANCING_PARTIALLY_APPROVED` with a proposed cash portion of
+  `5 500 000`; the buyer accepts, converts to cash, or cancels.
+* Posting `financedAmount: 300 000` instead fails with `400` because it is
+  below the product minimum; the message quotes the allowed range.
+
 ---
 
 ## 6. Test plan (JUnit 5 + Mockito, matching the existing service tests)
@@ -560,8 +610,15 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
 * `PropertyFinancingResolverTest`: no offers → cash; active offer + inactive
   product → cash; building-level offer picked when property-level absent;
   lowest-rate default among several; explicit `financingOfferId` not linked
-  → 400; tenure / down-payment bounds; currency mismatch excluded.
-* `PurchaseOrderServiceImplTest`: happy paths A/B/C above; property not
+  → 400; tenure bounds; partial financing inside / below / above the
+  `[minLoanAmount, maxFinanceable]` range; `financedAmount` and
+  `downPaymentAmount` both present → 400; mode `MAXIMUM` vs `PARTIAL`
+  derivation; currency mismatch excluded.
+* `PurchaseOrderServiceImplTest`: happy paths A/B/C/D above; `PUT …/financing`
+  in `PENDING_SELLER_REVIEW` updates the loan amount, in
+  `FINANCING_REJECTED` re-applies, elsewhere → 400; partial bank approval
+  parks the order in `FINANCING_PARTIALLY_APPROVED` and
+  `accept-partial-approval` recomputes the split; property not
   `AVAILABLE` → 400; duplicate open order → 409; loan-application failure
   rolls back the order; phone normalisation; email optional; status machine
   rejects illegal transitions; accept sets property `RESERVED`; complete sets
@@ -577,6 +634,8 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
 | --- | --- | --- |
 | When to create the loan application | immediately at order creation (`SUBMITTED`) | create as `DRAFT` and submit on seller acceptance |
 | Default tenure | `product.maxTenureMonths` (lowest instalment) | require the buyer to choose |
+| Default financed amount | maximum the offer allows (`MAXIMUM` mode); partial is opt-in | default to a fixed coverage, e.g. 50 % |
+| Bank approves less than requested | park in `FINANCING_PARTIALLY_APPROVED` until the buyer accepts the larger cash portion | auto-accept and move straight to `AWAITING_PAYMENT` |
 | Building-level offers | count as "linked to the property" | property-level offers only |
 | Multiple eligible offers with no choice | pick lowest effective rate | reject with 400 and force a choice |
 | Reservation | property `RESERVED` on seller accept | reserve on order creation |
