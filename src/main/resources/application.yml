@@ -244,7 +244,7 @@ purchase:
   orders:
     expiry-cron: "0 */15 * * * *"
   provider:
-    name: ${PURCHASE_PROVIDER_NAME:Dream Team PLC}
+    name: ${PURCHASE_PROVIDER_NAME:Dream Teams Trading PLC}
     registration-number: ${PURCHASE_PROVIDER_REGISTRATION_NUMBER:}
     address: ${PURCHASE_PROVIDER_ADDRESS:Addis Ababa, Ethiopia}
     email: ${PURCHASE_PROVIDER_EMAIL:}

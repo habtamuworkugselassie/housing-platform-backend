@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 @Setter
 public class PurchaseProviderProperties {
 
-  private String name = "Dream Team PLC";
+  private String name = "Dream Teams Trading PLC";
 
   private String registrationNumber = "";
 

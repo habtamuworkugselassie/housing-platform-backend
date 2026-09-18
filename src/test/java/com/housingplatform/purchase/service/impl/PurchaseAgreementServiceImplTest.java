@@ -247,7 +247,7 @@ class PurchaseAgreementServiceImplTest {
     assertThat(a.getTemplateVersion()).isEqualTo(1);
     assertThat(a.getContent())
         .contains("PROMISE PPO-2026-TEST0001")
-        .contains("Abebe Kebede / Dream Team PLC / 8,500,000.00 ETB")
+        .contains("Abebe Kebede / Dream Teams Trading PLC / 8,500,000.00 ETB")
         .contains("loan 4,250,000.00 from Awash Bank")
         .contains("Ayat Real Estate / 3BR Apartment, Bole")
         .doesNotContain("cash");
@@ -258,7 +258,7 @@ class PurchaseAgreementServiceImplTest {
     assertThat(a.getBuyerSignatureIp()).isEqualTo("41.0.0.1");
     assertThat(a.getBuyerSignatureUserAgent()).isEqualTo("Mozilla");
     assertThat(a.getBuyerSignedAt()).isNotNull();
-    assertThat(a.getProviderName()).isEqualTo("Dream Team PLC");
+    assertThat(a.getProviderName()).isEqualTo("Dream Teams Trading PLC");
     assertThat(a.getProviderSignatoryName()).isEqualTo("Authorized Signatory");
     assertThat(a.getProviderSignedAt()).isNotNull();
     assertThat(a.getProviderSignedByUserId()).isNull();

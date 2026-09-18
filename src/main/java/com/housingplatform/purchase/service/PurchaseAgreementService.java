@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Agreements between the buyer and the provider (Dream Team PLC by default) on a purchase order.
- * The first one, the Promise to Purchase, is signed inside order creation; later ones are issued
- * automatically when the order reaches the stage their template names.
+ * Agreements between the buyer and the provider (Dream Teams Trading PLC by default) on a purchase
+ * order. The first one, the Promise to Purchase, is signed inside order creation; later ones are
+ * issued automatically when the order reaches the stage their template names.
  */
 public interface PurchaseAgreementService {
 

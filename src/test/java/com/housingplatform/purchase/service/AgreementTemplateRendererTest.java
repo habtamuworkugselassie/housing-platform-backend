@@ -12,8 +12,8 @@ class AgreementTemplateRendererTest {
     String out =
         AgreementTemplateRenderer.render(
             "Hello {{buyer.fullName}} from {{provider.name}}{{missing}}.",
-            Map.of("buyer.fullName", "Abebe", "provider.name", "Dream Team PLC"));
-    assertThat(out).isEqualTo("Hello Abebe from Dream Team PLC.\n");
+            Map.of("buyer.fullName", "Abebe", "provider.name", "Dream Teams Trading PLC"));
+    assertThat(out).isEqualTo("Hello Abebe from Dream Teams Trading PLC.\n");
   }
 
   @Test
