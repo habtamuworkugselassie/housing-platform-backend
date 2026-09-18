@@ -15,8 +15,10 @@ import com.housingplatform.purchase.domain.PurchaseOrderFinancing;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.FinancingMode;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.FinancingStatus;
 import com.housingplatform.purchase.domain.PurchaseOrderStatusHistory;
+import com.housingplatform.purchase.dto.AdminPurchaseOrderFilter;
 import com.housingplatform.purchase.dto.CreatePurchaseOrderRequest;
 import com.housingplatform.purchase.dto.PurchaseOrderResponse;
+import com.housingplatform.purchase.dto.PurchaseOrderStatsResponse;
 import com.housingplatform.purchase.dto.PurchasePreviewResponse;
 import com.housingplatform.purchase.dto.UpdatePurchaseFinancingRequest;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
@@ -32,6 +34,7 @@ import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCre
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderStatusChangedEvent;
 import com.housingplatform.purchase.service.PurchaseOrderMapper;
 import com.housingplatform.purchase.service.PurchaseOrderService;
+import com.housingplatform.purchase.service.PurchaseOrderSpecifications;
 import com.housingplatform.purchase.service.SignatureEvidence;
 import com.housingplatform.shared.domain.Currency;
 import com.housingplatform.shared.exception.BusinessException;
@@ -45,6 +48,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -282,6 +286,35 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     return orderRepository
         .findFinancedByBank(banker.organizationId(), status, pageable)
         .map(mapper::toResponse);
+  }
+
+  // ------------------------------------------------------------------ admin
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<PurchaseOrderResponse> searchAll(AdminPurchaseOrderFilter filter, Pageable pageable) {
+    return orderRepository
+        .findAll(PurchaseOrderSpecifications.forAdmin(filter), pageable)
+        .map(mapper::toResponse);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PurchaseOrderStatsResponse adminStats() {
+    Map<PurchaseOrderStatus, Long> byStatus = new EnumMap<>(PurchaseOrderStatus.class);
+    for (PurchaseOrderStatus status : PurchaseOrderStatus.values()) {
+      byStatus.put(status, 0L);
+    }
+    for (PropertyPurchaseOrderRepository.StatusCount row : orderRepository.countByStatus()) {
+      byStatus.put(row.getStatus(), row.getCount());
+    }
+    long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
+    long open =
+        byStatus.entrySet().stream()
+            .filter(e -> PurchaseOrderStatus.OPEN.contains(e.getKey()))
+            .mapToLong(Map.Entry::getValue)
+            .sum();
+    return PurchaseOrderStatsResponse.builder().total(total).open(open).byStatus(byStatus).build();
   }
 
   // ------------------------------------------------------------------ buyer actions

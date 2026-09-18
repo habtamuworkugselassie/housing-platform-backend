@@ -294,6 +294,16 @@ For a cash order `purchaseType` is `CASH` and `financing` is `null`.
 | `GET /api/v1/purchase-orders/received?status=&page=&size=` | `REALTOR_SECURED` | All orders on the caller's company's listings |
 | `GET /api/v1/purchase-orders/financed?status=` | `BANKER_SECURED` | Orders financed by the caller's bank |
 
+### 2.3a Admin listing
+
+| Endpoint | Policy | Notes |
+|---|---|---|
+| `GET /api/v1/admin/purchase-orders` | `ADMIN_SECURED` | Every order on the platform, newest first, paged (`page`, `size` ≤ 200). Optional filters combine with AND: `status`, `purchaseType`, `realEstateCompanyId`, `bankId`, `buyerId`, `q` (substring of order number, contact phone or contact email, case-insensitive), `createdFrom` / `createdTo` (ISO dates; from inclusive, to exclusive). Built with a JPA `Specification` (`PurchaseOrderSpecifications.forAdmin`) so absent filters add no predicate. |
+| `GET /api/v1/admin/purchase-orders/stats` | `ADMIN_SECURED` | `{ total, open, byStatus }` — every status is present, 0 when empty; `open` = statuses in `PurchaseOrderStatus.OPEN`. |
+| `GET /api/v1/purchase-orders/{id}` | `AUTHENTICATED` | Admins read any order here (see §3.6); the admin UI links each row to it. |
+
+Deposit administration stays under `POST /api/v1/admin/purchase-orders/{id}/deposit/waive|refunded` (§10.2).
+
 ### 2.4 Transitions
 
 | Method & path | Policy / action scope | Body | Effect |
