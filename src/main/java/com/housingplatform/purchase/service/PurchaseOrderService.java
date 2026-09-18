@@ -2,8 +2,10 @@ package com.housingplatform.purchase.service;
 
 import com.housingplatform.loan.domain.LoanApplication;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
+import com.housingplatform.purchase.dto.AdminPurchaseOrderFilter;
 import com.housingplatform.purchase.dto.CreatePurchaseOrderRequest;
 import com.housingplatform.purchase.dto.PurchaseOrderResponse;
+import com.housingplatform.purchase.dto.PurchaseOrderStatsResponse;
 import com.housingplatform.purchase.dto.PurchasePreviewResponse;
 import com.housingplatform.purchase.dto.UpdatePurchaseFinancingRequest;
 import com.housingplatform.shared.domain.Currency;
@@ -33,6 +35,12 @@ public interface PurchaseOrderService {
 
   Page<PurchaseOrderResponse> getFinancedPurchaseOrders(
       PurchaseOrderActor banker, PurchaseOrderStatus status, Pageable pageable);
+
+  /** Admin: every order on the platform, newest first, narrowed by the optional filters. */
+  Page<PurchaseOrderResponse> searchAll(AdminPurchaseOrderFilter filter, Pageable pageable);
+
+  /** Admin: counts per status for the overview. */
+  PurchaseOrderStatsResponse adminStats();
 
   PurchaseOrderResponse updateFinancing(
       PurchaseOrderActor buyer, UUID orderId, UpdatePurchaseFinancingRequest request);

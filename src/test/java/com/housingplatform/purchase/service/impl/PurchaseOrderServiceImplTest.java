@@ -27,8 +27,11 @@ import com.housingplatform.purchase.domain.PurchaseOrderFinancing;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.FinancingMode;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.FinancingStatus;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing.OfferLevel;
+import com.housingplatform.purchase.dto.AdminPurchaseOrderFilter;
 import com.housingplatform.purchase.dto.AgreementSignatureRequest;
 import com.housingplatform.purchase.dto.CreatePurchaseOrderRequest;
+import com.housingplatform.purchase.dto.PurchaseOrderResponse;
+import com.housingplatform.purchase.dto.PurchaseOrderStatsResponse;
 import com.housingplatform.purchase.dto.UpdatePurchaseFinancingRequest;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
 import com.housingplatform.purchase.service.PropertyFinancingResolver;
@@ -56,6 +59,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,6 +68,11 @@ import org.mockito.quality.Strictness;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -798,5 +807,71 @@ class PurchaseOrderServiceImplTest {
         financedOrder(PurchaseOrderStatus.AWAITING_FINANCING, "6800000.00");
     service.cancel(buyer, order.getId(), "no");
     verify(depositService).onOrderClosed(eq(order), anyString());
+  }
+
+  // ------------------------------------------------------------------ admin
+
+  @Test
+  void searchAll_appliesTheSpecificationAndMapsEveryRow() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000");
+    Pageable pageable = PageRequest.of(0, 20);
+    when(orderRepository.findAll(
+            ArgumentMatchers.<Specification<PropertyPurchaseOrder>>any(), eq(pageable)))
+        .thenReturn(new PageImpl<>(List.of(order), pageable, 1));
+    PurchaseOrderResponse mapped = PurchaseOrderResponse.builder().id(order.getId()).build();
+    when(mapper.toResponse(order)).thenReturn(mapped);
+
+    Page<PurchaseOrderResponse> page =
+        service.searchAll(
+            new AdminPurchaseOrderFilter(
+                PurchaseOrderStatus.PENDING_SELLER_REVIEW,
+                null,
+                null,
+                null,
+                null,
+                "PPO",
+                null,
+                null),
+            pageable);
+
+    assertThat(page.getTotalElements()).isEqualTo(1);
+    assertThat(page.getContent()).containsExactly(mapped);
+    verify(orderRepository)
+        .findAll(ArgumentMatchers.<Specification<PropertyPurchaseOrder>>any(), eq(pageable));
+  }
+
+  @Test
+  void adminStats_reportsEveryStatusWithZeroesAndSumsOpenOrders() {
+    when(orderRepository.countByStatus())
+        .thenReturn(
+            List.of(
+                statusCount(PurchaseOrderStatus.PENDING_SELLER_REVIEW, 3),
+                statusCount(PurchaseOrderStatus.AWAITING_PAYMENT, 2),
+                statusCount(PurchaseOrderStatus.COMPLETED, 5),
+                statusCount(PurchaseOrderStatus.CANCELLED, 1)));
+
+    PurchaseOrderStatsResponse stats = service.adminStats();
+
+    assertThat(stats.getTotal()).isEqualTo(11);
+    assertThat(stats.getOpen()).isEqualTo(5);
+    assertThat(stats.getByStatus()).hasSize(PurchaseOrderStatus.values().length);
+    assertThat(stats.getByStatus().get(PurchaseOrderStatus.COMPLETED)).isEqualTo(5);
+    assertThat(stats.getByStatus().get(PurchaseOrderStatus.EXPIRED)).isZero();
+  }
+
+  private static PropertyPurchaseOrderRepository.StatusCount statusCount(
+      PurchaseOrderStatus status, long count) {
+    return new PropertyPurchaseOrderRepository.StatusCount() {
+      @Override
+      public PurchaseOrderStatus getStatus() {
+        return status;
+      }
+
+      @Override
+      public long getCount() {
+        return count;
+      }
+    };
   }
 }
