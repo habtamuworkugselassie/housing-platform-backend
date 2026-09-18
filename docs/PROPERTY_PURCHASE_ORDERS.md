@@ -519,7 +519,10 @@ Listeners are `@TransactionalEventListener(phase = AFTER_COMMIT)` and
   `agent_id` / `real_estate_company_id`.
 * Bank endpoints compare `UserContext.getCurrentUserOrganizationId()` with
   `financing.bank_id`.
-* Admins (`UserContext.isAdmin()`) can read everything.
+* Admins (`UserContext.isAdmin()`) can read everything, and may accept, reject and complete any
+  order on the seller's behalf: `ScopeAuthorizationFilter` lets an ADMIN token through every
+  non-super-admin policy (so `REALTOR_SECURED` endpoints are reachable) and `canSell` returns true
+  for admins. The status history records the admin's user id as `changedBy`.
 
 Action scopes on the endpoints: `purchase-orders.create`, `purchase-orders.cancel`,
 `purchase-orders.review`, `purchase-orders.complete`. As with every other module, the policy

@@ -415,6 +415,25 @@ class PurchaseOrderServiceImplTest {
   }
 
   @Test
+  void aPlatformAdminMayAcceptAndRejectOnTheSellersBehalf() {
+    // Admin from no company at all: canSell() admits the admin flag, not an organisation match.
+    PurchaseOrderActor admin = new PurchaseOrderActor(UUID.randomUUID(), null, null, true);
+
+    PropertyPurchaseOrder toAccept =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
+    service.accept(admin, toAccept.getId(), "Accepted by Dream Team support");
+    assertThat(toAccept.getStatus()).isEqualTo(PurchaseOrderStatus.AWAITING_FINANCING);
+    assertThat(toAccept.getStatusHistory())
+        .last()
+        .satisfies(h -> assertThat(h.getChangedBy()).isEqualTo(admin.userId().toString()));
+
+    PropertyPurchaseOrder toReject =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
+    service.reject(admin, toReject.getId(), "Listing withdrawn");
+    assertThat(toReject.getStatus()).isEqualTo(PurchaseOrderStatus.REJECTED);
+  }
+
+  @Test
   void acceptIsOnlyLegalFromPendingReview() {
     PropertyPurchaseOrder order =
         financedOrder(PurchaseOrderStatus.AWAITING_FINANCING, "6800000.00");
