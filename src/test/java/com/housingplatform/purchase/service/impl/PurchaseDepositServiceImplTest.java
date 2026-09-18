@@ -111,7 +111,7 @@ class PurchaseDepositServiceImplTest {
             .blocksCompletion(true)
             .issuedAt(LocalDateTime.now())
             .buyerUserId(buyerId)
-            .providerName("Dream Team PLC")
+            .providerName("Dream Teams Trading PLC")
             .build();
     order.getAgreements().add(a);
   }

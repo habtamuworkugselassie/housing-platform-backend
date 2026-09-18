@@ -421,7 +421,7 @@ class PurchaseOrderServiceImplTest {
 
     PropertyPurchaseOrder toAccept =
         financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
-    service.accept(admin, toAccept.getId(), "Accepted by Dream Team support");
+    service.accept(admin, toAccept.getId(), "Accepted by Dream Teams Trading support");
     assertThat(toAccept.getStatus()).isEqualTo(PurchaseOrderStatus.AWAITING_FINANCING);
     assertThat(toAccept.getStatusHistory())
         .last()

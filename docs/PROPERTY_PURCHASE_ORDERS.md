@@ -259,7 +259,7 @@ Validation:
       "title": "Promise to Purchase Agreement", "status": "FULLY_SIGNED", "blocksCompletion": true,
       "contentHash": "9f2c…", "issuedAt": "2026-09-17T10:15:00",
       "buyerSignatoryName": "Abebe Kebede", "buyerSignedAt": "2026-09-17T10:15:00",
-      "providerName": "Dream Team PLC", "providerSignatoryName": "Authorized Signatory",
+      "providerName": "Dream Teams Trading PLC", "providerSignatoryName": "Authorized Signatory",
       "providerSignedAt": "2026-09-17T10:15:00"
     }
   ],
@@ -350,7 +350,7 @@ com.housingplatform.purchase
 ├── service/AgreementTemplateRenderer.java           {{placeholders}} + conditional blocks + SHA-256
 ├── api/PurchaseAgreementController.java            /api/v1/purchase-orders/{id}/agreements/**
 ├── api/AdminAgreementController.java               templates, countersign, manual issue
-├── config/PurchaseProviderProperties.java          purchase.provider.* (Dream Team PLC)
+├── config/PurchaseProviderProperties.java          purchase.provider.* (Dream Teams Trading PLC)
 └── service/impl/PurchaseOrderServiceImpl.java, PurchaseAgreementServiceImpl.java,
         LoggingPurchaseOrderContactNotifier.java
 ```
@@ -717,7 +717,7 @@ CREATE INDEX idx_posh_order_changed ON purchase_order_status_history (purchase_o
 ## 8. Agreements between the buyer and the provider
 
 Every purchase order carries a chain of agreements between the **buyer** and the **provider**, the
-company operating the platform (Dream Team PLC by default, configured under `purchase.provider.*`).
+company operating the platform (Dream Teams Trading PLC by default, configured under `purchase.provider.*`).
 The listing company is not a party: its sale contract with the buyer is concluded off-platform and
 merely acknowledged here.
 
