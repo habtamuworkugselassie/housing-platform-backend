@@ -30,7 +30,7 @@ public class OpenApiConfig {
                 .contact(
                     new Contact()
                         .name("Ethio Build Connect")
-                        .email("support@ethiobuildconnect.com"))
+                        .email("ethiobuildconnect@gmail.com"))
                 .license(new License().name("Proprietary").url("https://ethiobuildconnect.com")))
         .servers(
             List.of(
