@@ -814,6 +814,9 @@ identity table exists.
 
 ## 10. Reservation deposit through Chapa
 
+> Business-side guide (merchant onboarding, configuration, extending to full payment and other
+> providers): see `PAYMENTS_INTEGRATION_GUIDE.md`.
+
 When the seller accepts, the buyer owes the **provider** a reservation deposit, paid through
 Chapa's hosted checkout. Card and wallet details are entered on Chapa; this platform stores only
 Chapa's transaction reference and the outcome. Chapa does not expose card tokenisation, so there is
