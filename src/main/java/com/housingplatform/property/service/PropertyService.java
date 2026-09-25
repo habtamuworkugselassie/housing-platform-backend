@@ -23,6 +23,24 @@ public interface PropertyService {
 
   List<PropertyResponse> getPropertiesByCompanyId(UUID companyId);
 
+  /**
+   * Every property belonging to the calling realtor's own organization.
+   *
+   * <p>Takes no id: the organization is resolved from the authenticated user's agent record, so a
+   * realtor cannot read another company's listings by guessing an id. Works for every agent, not
+   * just super agents — managing properties is already company-scoped
+   * (RealEstateAgentServiceImpl#validateAgentCanManageProperty), so what an agent may edit and what
+   * they can see now agree.
+   */
+  List<PropertyResponse> getMyOrganizationProperties();
+
+  /**
+   * Throws unless the caller may read the given organization's properties: an admin, or an agent of
+   * that organization. Guards the by-id endpoint, whose scope check alone proves only that the
+   * caller is some realtor.
+   */
+  void assertCallerBelongsToOrganization(UUID organizationId);
+
   /** Public marketplace: available properties for an organization with sponsorship enrichment. */
   List<PropertyResponse> getAvailablePropertiesByCompanyIdForMarketplace(UUID companyId);
 

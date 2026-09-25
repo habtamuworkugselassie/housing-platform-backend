@@ -2,6 +2,7 @@ package com.housingplatform.property.service.impl;
 
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.SponsorshipApplication;
+import com.housingplatform.identity.dto.AgentResponse;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.SponsorshipApplicationRepository;
 import com.housingplatform.identity.service.OrganizationPublicVisibility;
@@ -404,6 +405,39 @@ public class PropertyServiceImpl implements PropertyService {
   public List<PropertyResponse> getPropertiesByCompanyId(UUID companyId) {
     List<Property> properties = propertyRepository.findByRealEstateCompanyId(companyId);
     return toResponseWithImagesAndSponsorship(properties);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<PropertyResponse> getMyOrganizationProperties() {
+    return getPropertiesByCompanyId(currentAgentOrganizationId());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public void assertCallerBelongsToOrganization(UUID organizationId) {
+    if (UserContext.isAdmin()) {
+      return;
+    }
+    if (!currentAgentOrganizationId().equals(organizationId)) {
+      throw new BusinessException(
+          "You can only view properties belonging to your own organization");
+    }
+  }
+
+  /**
+   * The organization of the agent making the request.
+   *
+   * <p>Resolving it here rather than accepting it as a path variable is the point: the caller
+   * cannot name someone else's company.
+   */
+  private UUID currentAgentOrganizationId() {
+    AgentResponse agent = agentService.getAgentByUserId(UserContext.getCurrentUserId());
+    UUID organizationId = agent.getOrganizationId();
+    if (organizationId == null) {
+      throw new BusinessException("This agent is not linked to an organization");
+    }
+    return organizationId;
   }
 
   @Override
