@@ -110,7 +110,8 @@ public class ChapaRestClient implements ChapaClient {
         str(d.get("status")),
         decimal(d.get("amount")),
         str(d.get("currency")),
-        str(d.get("reference")),
+        // chapa.co returns "reference"; chapa.global returns "chapa_reference".
+        str(d.get("reference") != null ? d.get("reference") : d.get("chapa_reference")),
         str(d.get("tx_ref")),
         str(d.get("method")),
         str(d.get("type")),

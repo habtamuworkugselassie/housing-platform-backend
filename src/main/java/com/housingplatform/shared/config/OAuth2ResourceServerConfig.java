@@ -263,6 +263,10 @@ public class OAuth2ResourceServerConfig {
                         "SCOPE_realtor",
                         "SCOPE_supplier")
 
+                    // Chapa calls this without a token; the controller checks its HMAC signature.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/chapa/webhook")
+                    .permitAll()
+
                     // Payment APIs (restricted)
                     .requestMatchers("/api/v1/payments/**")
                     .hasAnyAuthority("SCOPE_banker", "SCOPE_admin")
