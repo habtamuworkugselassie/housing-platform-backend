@@ -517,4 +517,114 @@ class PurchaseAgreementServiceImplTest {
     assertThat(previews.get(0).getTemplateId()).isEqualTo(promise.getId());
     assertThat(previews.get(0).getContent()).contains("PROMISE to be assigned").contains("/ cash");
   }
+
+  // ------------------------------------------------------------------ deposit terms at creation
+
+  private AgreementTemplate depositTermsAtCreation() {
+    return template(
+        AgreementType.RESERVATION_DEPOSIT_TERMS,
+        2,
+        IssueTrigger.ORDER_CREATION,
+        AppliesTo.ALL,
+        true,
+        "# DEPOSIT {{deposit.amount}} {{deposit.currency}}");
+  }
+
+  private static void withDeposit(PropertyPurchaseOrder order) {
+    order.setDeposit(
+        com.housingplatform.purchase.domain.PurchaseDeposit.builder()
+            .purchaseOrder(order)
+            .amount(new BigDecimal("85000.00"))
+            .currency(com.housingplatform.shared.domain.Currency.ETB)
+            .status(com.housingplatform.purchase.domain.PurchaseDeposit.DepositStatus.DUE)
+            .build());
+  }
+
+  @Test
+  void depositTermsAreSignedWithTheOrderWhenTheBuyerSignsThem() {
+    AgreementTemplate terms = depositTermsAtCreation();
+    PropertyPurchaseOrder order = order(false);
+    withDeposit(order);
+    service.signPromiseToPurchaseAtCreation(
+        order, signature(promise.getId()), signature(terms.getId()), SignatureEvidence.none());
+
+    PurchaseAgreement a =
+        order.getAgreements().stream()
+            .filter(x -> x.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS)
+            .findFirst()
+            .orElseThrow();
+    assertThat(a.getContent()).contains("DEPOSIT 85,000.00 ETB");
+    assertThat(a.getStatus()).isEqualTo(AgreementStatus.FULLY_SIGNED);
+  }
+
+  @Test
+  void depositTermsStayPendingWhenOnlyThePromiseIsSigned() {
+    depositTermsAtCreation();
+    PropertyPurchaseOrder order = order(false);
+    withDeposit(order);
+    service.signPromiseToPurchaseAtCreation(
+        order, signature(promise.getId()), SignatureEvidence.none());
+    assertThat(order.getAgreements())
+        .filteredOn(x -> x.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS)
+        .singleElement()
+        .extracting(PurchaseAgreement::getStatus)
+        .isEqualTo(AgreementStatus.PENDING_BUYER_SIGNATURE);
+  }
+
+  @Test
+  void depositTermsAreNotIssuedWhenTheOrderHasNoDeposit() {
+    depositTermsAtCreation();
+    PropertyPurchaseOrder order = order(false);
+    service.signPromiseToPurchaseAtCreation(
+        order, signature(promise.getId()), SignatureEvidence.none());
+    assertThat(order.getAgreements())
+        .extracting(PurchaseAgreement::getType)
+        .containsExactly(AgreementType.PROMISE_TO_PURCHASE);
+  }
+
+  @Test
+  void signingOutdatedDepositTermsIsRejected() {
+    depositTermsAtCreation();
+    PropertyPurchaseOrder order = order(false);
+    withDeposit(order);
+    assertThatThrownBy(
+            () ->
+                service.signPromiseToPurchaseAtCreation(
+                    order,
+                    signature(promise.getId()),
+                    signature(UUID.randomUUID()),
+                    SignatureEvidence.none()))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("Reservation Deposit Terms have changed");
+  }
+
+  @Test
+  void previewIncludesDepositTermsOnlyWithAQuote() {
+    depositTermsAtCreation();
+    var quote =
+        com.housingplatform.purchase.dto.PurchasePreviewResponse.DepositQuote.builder()
+            .amount(new BigDecimal("85000.00"))
+            .currency(com.housingplatform.shared.domain.Currency.ETB)
+            .build();
+    assertThat(
+            service.previewOrderCreationAgreements(
+                property,
+                buyerId,
+                com.housingplatform.shared.domain.Currency.ETB,
+                new BigDecimal("8500000.00"),
+                null,
+                quote))
+        .extracting(a -> a.getType())
+        .containsExactly(
+            AgreementType.PROMISE_TO_PURCHASE, AgreementType.RESERVATION_DEPOSIT_TERMS);
+    assertThat(
+            service.previewOrderCreationAgreements(
+                property,
+                buyerId,
+                com.housingplatform.shared.domain.Currency.ETB,
+                new BigDecimal("8500000.00"),
+                null))
+        .extracting(a -> a.getType())
+        .containsExactly(AgreementType.PROMISE_TO_PURCHASE);
+  }
 }

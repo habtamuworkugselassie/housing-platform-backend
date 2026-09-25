@@ -1,5 +1,6 @@
 package com.housingplatform.purchase.dto;
 
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.purchase.domain.PurchaseDeposit;
 import com.housingplatform.shared.domain.Currency;
 import java.math.BigDecimal;
@@ -26,6 +27,9 @@ public class PurchaseDepositResponse {
 
   private String providerReference;
   private String paymentMethod;
+
+  /** The method the buyer picked on our side, if any. */
+  private ChapaPaymentMethod preferredMethod;
   private LocalDateTime paidAt;
   private String failureReason;
   private Integer attempts;

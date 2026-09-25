@@ -1,5 +1,10 @@
 package com.housingplatform.purchase.service.impl;
 
+import java.util.List;
+import java.math.BigDecimal;
+import com.housingplatform.shared.domain.Currency;
+import com.housingplatform.purchase.dto.PurchasePreviewResponse;
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.payment.chapa.ChapaClient;
@@ -55,7 +60,7 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   // ------------------------------------------------------------------ workflow hooks
 
   @Override
-  public void issueForOrder(PropertyPurchaseOrder order) {
+  public void issueForOrder(PropertyPurchaseOrder order, ChapaPaymentMethod preferredMethod) {
     if (!policy.isEnabled() || order.getDeposit() != null) {
       return;
     }
@@ -66,8 +71,22 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
             .currency(order.getCurrency())
             .status(DepositStatus.DUE)
             .dueAt(LocalDateTime.now().plusDays(policy.dueDays()))
+            .preferredMethod(preferredMethod)
             .build();
     order.setDeposit(deposit);
+  }
+
+  @Override
+  public PurchasePreviewResponse.DepositQuote quote(BigDecimal price, Currency currency) {
+    if (!policy.isEnabled()) {
+      return null;
+    }
+    return PurchasePreviewResponse.DepositQuote.builder()
+        .amount(policy.amountFor(price, currency))
+        .currency(currency)
+        .checkoutAvailable(chapa.isConfigured())
+        .paymentMethods(List.of(ChapaPaymentMethod.values()))
+        .build();
   }
 
   @Override
@@ -106,7 +125,8 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   }
 
   @Override
-  public DepositCheckoutResponse startCheckout(PurchaseOrderActor buyer, UUID orderId) {
+  public DepositCheckoutResponse startCheckout(
+      PurchaseOrderActor buyer, UUID orderId, ChapaPaymentMethod method) {
     PropertyPurchaseOrder order = loadOwn(buyer, orderId);
     PurchaseDeposit d = requireDeposit(order);
     if (!chapa.isConfigured()) {
@@ -139,6 +159,10 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
       markFailed(d, "Previous attempt failed at the provider");
     }
 
+    // Only a fresh checkout takes a new method; a pending one above is resumed as it was started.
+    if (method != null) {
+      d.setPreferredMethod(method);
+    }
     User buyerUser = userRepository.findById(order.getBuyerId()).orElse(null);
     String txRef = newTxRef(order.getOrderNumber(), d.getAttempts() + 1);
     InitializeResult result =
@@ -156,7 +180,10 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
                 callbackUrl(),
                 returnUrl(order),
                 "Deposit " + order.getOrderNumber(),
-                "Reservation deposit to " + provider.getName() + " for " + order.getOrderNumber()));
+                "Reservation deposit to " + provider.getName() + " for " + order.getOrderNumber(),
+                d.getPreferredMethod() != null
+                    ? d.getPreferredMethod().preferredPaymentMethods()
+                    : List.of()));
     d.setTxRef(txRef);
     d.setCheckoutUrl(result.checkoutUrl());
     d.setStatus(DepositStatus.PENDING);
@@ -242,6 +269,7 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
         .checkoutUrl(d.getStatus() == DepositStatus.PENDING ? d.getCheckoutUrl() : null)
         .providerReference(d.getProviderReference())
         .paymentMethod(d.getPaymentMethod())
+        .preferredMethod(d.getPreferredMethod())
         .paidAt(d.getPaidAt())
         .failureReason(d.getFailureReason())
         .attempts(d.getAttempts())

@@ -1,5 +1,6 @@
 package com.housingplatform.purchase.dto;
 
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.purchase.domain.AgreementTemplate;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PurchaseOrderFinancing;
@@ -32,6 +33,24 @@ public class PurchasePreviewResponse {
    * Agreements the buyer must sign inside the create call, rendered for this buyer and property.
    */
   private List<AgreementPreview> agreementsToSign;
+
+  /** The reservation deposit an order would require; null when deposits are disabled. */
+  private DepositQuote deposit;
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class DepositQuote {
+    private BigDecimal amount;
+    private Currency currency;
+
+    /** False when online checkout is not configured on this server. */
+    private boolean checkoutAvailable;
+
+    /** Methods the buyer can pick before checkout, in display order. */
+    private List<ChapaPaymentMethod> paymentMethods;
+  }
 
   @Data
   @Builder

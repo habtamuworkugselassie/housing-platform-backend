@@ -70,7 +70,12 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
   @Override
   @Transactional(readOnly = true)
   public List<PurchasePreviewResponse.AgreementPreview> previewOrderCreationAgreements(
-      Property property, UUID buyerId, Currency currency, BigDecimal price, FinancingTerms terms) {
+      Property property,
+      UUID buyerId,
+      Currency currency,
+      BigDecimal price,
+      FinancingTerms terms,
+      PurchasePreviewResponse.DepositQuote deposit) {
     PurchaseType type = terms != null ? PurchaseType.BANK_FINANCED : PurchaseType.CASH;
     Map<String, String> values = new HashMap<>();
     putProvider(values);
@@ -89,8 +94,17 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
       values.put("financing.interestRate", terms.eligible().interestRate().toPlainString());
       values.put("financing.tenureMonths", String.valueOf(terms.tenureMonths()));
     }
+    if (deposit != null) {
+      values.put("deposit", "true");
+      values.put("deposit.amount", money(deposit.getAmount()));
+      values.put("deposit.currency", deposit.getCurrency().getCode());
+      values.put("deposit.dueDate", "the time the order is placed");
+    }
     List<PurchasePreviewResponse.AgreementPreview> previews = new ArrayList<>();
     for (AgreementTemplate t : activeTemplates(IssueTrigger.ORDER_CREATION, type)) {
+      if (t.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS && deposit == null) {
+        continue;
+      }
       previews.add(
           PurchasePreviewResponse.AgreementPreview.builder()
               .templateId(t.getId())
@@ -107,6 +121,7 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
   public void signPromiseToPurchaseAtCreation(
       PropertyPurchaseOrder order,
       AgreementSignatureRequest signature,
+      AgreementSignatureRequest depositTerms,
       SignatureEvidence evidence) {
     AgreementTemplate promise =
         templateRepository
@@ -124,17 +139,57 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
               + "). Please review and sign the current text");
     }
     PurchaseAgreement signed = null;
+    PurchaseAgreement terms = null;
     for (AgreementTemplate t :
         activeTemplates(IssueTrigger.ORDER_CREATION, order.getPurchaseType())) {
+      if (t.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS && order.getDeposit() == null) {
+        continue; // deposits disabled: nothing to agree to
+      }
       PurchaseAgreement a = issue(order, t);
       if (t.getId().equals(promise.getId())) {
         signed = a;
+      } else if (t.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS) {
+        terms = a;
       }
     }
     if (signed == null) {
       signed = issue(order, promise);
     }
     applyBuyerSignature(signed, signature, evidence);
+    if (depositTerms != null && terms != null) {
+      if (!terms.getTemplateId().equals(depositTerms.getTemplateId())) {
+        throw new BusinessException(
+            "The Reservation Deposit Terms have changed (current version "
+                + terms.getTemplateVersion()
+                + "). Please review and sign the current text");
+      }
+      applyBuyerSignature(terms, depositTerms, evidence);
+    }
+  }
+
+  @Override
+  public void ensureDepositTermsIssued(PropertyPurchaseOrder order) {
+    if (order.getDeposit() == null) {
+      return;
+    }
+    boolean present =
+        order.getAgreements().stream()
+            .anyMatch(
+                a ->
+                    a.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS
+                        && a.getStatus() != AgreementStatus.VOID);
+    if (present) {
+      return;
+    }
+    templateRepository
+        .findFirstByTypeAndActiveTrueOrderByTemplateVersionDesc(
+            AgreementType.RESERVATION_DEPOSIT_TERMS)
+        .ifPresent(
+            t -> {
+              PurchaseAgreement a = issue(order, t);
+              eventPublisher.publishEvent(
+                  new PurchaseAgreementIssuedEvent(order.getId(), a.getId()));
+            });
   }
 
   @Override

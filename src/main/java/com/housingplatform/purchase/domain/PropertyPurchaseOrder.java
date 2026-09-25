@@ -85,8 +85,8 @@ public class PropertyPurchaseOrder extends BaseAuditEntity {
   private PurchaseOrderFinancing financing;
 
   /**
-   * Reservation deposit owed to the provider after seller acceptance; null until then or when
-   * disabled.
+   * Reservation deposit owed to the provider, issued when the order is placed (on seller acceptance
+   * for older orders); null when disabled.
    */
   @OneToOne(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   private PurchaseDeposit deposit;

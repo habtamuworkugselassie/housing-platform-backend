@@ -52,6 +52,9 @@ public class ChapaRestClient implements ChapaClient {
       body.put("callback_url", request.callbackUrl());
     }
     body.put("return_url", request.returnUrl());
+    if (request.preferredPaymentMethods() != null && !request.preferredPaymentMethods().isEmpty()) {
+      body.put("preferred_payment_methods", request.preferredPaymentMethods());
+    }
     Map<String, Object> customization = new LinkedHashMap<>();
     // Chapa caps the title at 16 characters.
     customization.put("title", truncate(request.title(), 16));

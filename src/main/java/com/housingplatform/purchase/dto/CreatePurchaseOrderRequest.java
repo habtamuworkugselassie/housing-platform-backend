@@ -1,5 +1,6 @@
 package com.housingplatform.purchase.dto;
 
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.shared.domain.Currency;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -48,6 +49,15 @@ public class CreatePurchaseOrderRequest {
   @NotNull(message = "The Promise to Purchase agreement must be signed")
   @Valid
   private AgreementSignatureRequest promiseToPurchase;
+
+  /**
+   * Optional: signs the Reservation Deposit Terms together with the order so the deposit can be
+   * paid right away. Left out, the terms stay pending and are signed on the order page.
+   */
+  @Valid private AgreementSignatureRequest depositTerms;
+
+  /** Optional: how the buyer wants to pay the reservation deposit. */
+  private ChapaPaymentMethod depositPaymentMethod;
 
   @Data
   public static class FinancingSelection {

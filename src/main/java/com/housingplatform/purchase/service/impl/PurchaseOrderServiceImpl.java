@@ -143,9 +143,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .resolve(property, effective, price, null, FinancingChoice.none())
                 .terms()
             : null;
+    PurchasePreviewResponse.DepositQuote deposit = depositService.quote(price, effective);
+    preview.setDeposit(deposit);
     preview.setAgreementsToSign(
         agreementService.previewOrderCreationAgreements(
-            property, buyer.userId(), effective, price, defaultTerms));
+            property, buyer.userId(), effective, price, defaultTerms, deposit));
     return preview;
   }
 
@@ -203,10 +205,14 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       order.setFinancing(newFinancing(order, terms, loan.getId()));
     }
 
+    // The deposit is paid when the order is placed; it is issued first so the deposit terms can
+    // quote its amount.
+    depositService.issueForOrder(order, request.getDepositPaymentMethod());
+
     // The Promise to Purchase between buyer and provider is part of the same transaction: no
     // order exists without it.
     agreementService.signPromiseToPurchaseAtCreation(
-        order, request.getPromiseToPurchase(), evidence);
+        order, request.getPromiseToPurchase(), request.getDepositTerms(), evidence);
 
     order
         .getStatusHistory()
@@ -461,9 +467,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             : PurchaseOrderStatus.AWAITING_PAYMENT;
     order.setExpiresAt(null);
     transition(order, next, seller.userId().toString(), blankToNull(notes));
-    // The deposit is issued first so the deposit-terms agreement can quote its amount and due date.
+    // Orders placed before deposits moved to order creation get theirs now; the deposit is issued
+    // first so the deposit terms can quote its amount and due date.
     depositService.issueForOrder(order);
     agreementService.issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
+    agreementService.ensureDepositTermsIssued(order);
     reserveProperty(order.getPropertyId());
     return mapper.toResponse(orderRepository.save(order));
   }
