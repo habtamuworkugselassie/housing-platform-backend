@@ -1,16 +1,12 @@
 package com.housingplatform.purchase.service.impl;
 
-import java.util.List;
-import java.math.BigDecimal;
-import com.housingplatform.shared.domain.Currency;
-import com.housingplatform.purchase.dto.PurchasePreviewResponse;
-import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.payment.chapa.ChapaClient;
 import com.housingplatform.payment.chapa.ChapaClient.InitializeRequest;
 import com.housingplatform.payment.chapa.ChapaClient.InitializeResult;
 import com.housingplatform.payment.chapa.ChapaClient.VerifyResult;
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.payment.chapa.ChapaProperties;
 import com.housingplatform.purchase.config.PurchaseProviderProperties;
 import com.housingplatform.purchase.domain.AgreementTemplate.AgreementType;
@@ -20,6 +16,7 @@ import com.housingplatform.purchase.domain.PurchaseDeposit;
 import com.housingplatform.purchase.domain.PurchaseDeposit.DepositStatus;
 import com.housingplatform.purchase.dto.DepositCheckoutResponse;
 import com.housingplatform.purchase.dto.PurchaseDepositResponse;
+import com.housingplatform.purchase.dto.PurchasePreviewResponse;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
 import com.housingplatform.purchase.repository.PurchaseDepositRepository;
 import com.housingplatform.purchase.service.DepositPolicy;
@@ -27,9 +24,12 @@ import com.housingplatform.purchase.service.PurchaseDepositService;
 import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseDepositPaidEvent;
+import com.housingplatform.shared.domain.Currency;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -341,7 +341,9 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
         .build();
   }
 
-  /** Chapa Global rejects references over this length ("Reference must be at most 20 characters"). */
+  /**
+   * Chapa Global rejects references over this length ("Reference must be at most 20 characters").
+   */
   static final int MAX_TX_REF_LENGTH = 20;
 
   /**
@@ -366,10 +368,25 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   }
 
   private String returnUrl(PropertyPurchaseOrder order) {
-    return frontendBaseUrl.replaceAll("/$", "")
+    return returnBase(frontendBaseUrl, chapaProperties.getPublicApiBaseUrl())
         + "/purchase-orders/"
         + order.getId()
         + "?deposit=return";
+  }
+
+  /**
+   * Chapa rejects non-https return URLs ("Callback URL must start with https://"), so an unset
+   * FRONTEND_BASE_URL (default http://localhost:5173) falls back to the public site URL, which
+   * serves the web app too.
+   */
+  static String returnBase(String frontendBase, String publicBase) {
+    String base =
+        frontendBase != null && frontendBase.startsWith("https://")
+                || publicBase == null
+                || !publicBase.startsWith("https://")
+            ? frontendBase
+            : publicBase;
+    return base == null ? "" : base.replaceAll("/$", "");
   }
 
   private PropertyPurchaseOrder loadOrder(UUID orderId) {

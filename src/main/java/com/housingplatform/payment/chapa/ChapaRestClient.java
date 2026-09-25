@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Chapa's REST API: {@code POST /transaction/initialize} returns a hosted checkout URL; {@code GET
@@ -72,6 +73,17 @@ public class ChapaRestClient implements ChapaClient {
               .body(body)
               .retrieve()
               .body(Map.class);
+    } catch (RestClientResponseException e) {
+      // Chapa explains 4xx rejections in the body, e.g. "Reference must be at most 20 characters".
+      String reason = providerMessage(e.getResponseBodyAsString());
+      log.error(
+          "Chapa initialize rejected for {}: HTTP {} {}",
+          request.txRef(),
+          e.getStatusCode().value(),
+          e.getResponseBodyAsString());
+      throw new BusinessException(
+          "The payment provider could not start the checkout"
+              + (reason != null ? ": " + reason : ". Please try again."));
     } catch (RestClientException e) {
       log.error("Chapa initialize failed for {}", request.txRef(), e);
       throw new BusinessException(
@@ -151,5 +163,15 @@ public class ChapaRestClient implements ChapaClient {
       return "";
     }
     return s.length() <= max ? s : s.substring(0, max);
+  }
+
+  /** The "message" field of a Chapa error body, or null. */
+  static String providerMessage(String body) {
+    if (body == null || body.isBlank()) {
+      return null;
+    }
+    java.util.regex.Matcher m =
+        java.util.regex.Pattern.compile("\"message\"\\s*:\\s*\"([^\"]{1,300})\"").matcher(body);
+    return m.find() ? m.group(1) : null;
   }
 }

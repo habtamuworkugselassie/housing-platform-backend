@@ -409,4 +409,18 @@ class PurchaseDepositServiceImplTest {
     assertThat(q.getAmount()).isEqualByComparingTo("85000.00");
     assertThat(q.getPaymentMethods()).startsWith(ChapaPaymentMethod.TELEBIRR);
   }
+
+  @Test
+  void returnUrlFallsBackToThePublicHttpsSiteWhenTheFrontendUrlIsLocal() {
+    assertThat(
+            PurchaseDepositServiceImpl.returnBase(
+                "http://localhost:5173", "https://ethiobuildconnect.et/"))
+        .isEqualTo("https://ethiobuildconnect.et");
+    assertThat(
+            PurchaseDepositServiceImpl.returnBase(
+                "https://app.example.com/", "https://ethiobuildconnect.et"))
+        .isEqualTo("https://app.example.com");
+    assertThat(PurchaseDepositServiceImpl.returnBase("http://localhost:5173", ""))
+        .isEqualTo("http://localhost:5173");
+  }
 }
