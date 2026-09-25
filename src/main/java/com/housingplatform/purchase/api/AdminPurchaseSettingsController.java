@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPurchaseSettingsController {
 
   private final DepositPolicy policy;
+  private final com.housingplatform.purchase.service.OnlinePaymentLimits onlineLimits;
   private final com.housingplatform.purchase.service.PurchaseFeeSettings feeSettings;
   private final com.housingplatform.purchase.service.ProviderBankAccountSettings bankAccount;
 
@@ -84,5 +85,26 @@ public class AdminPurchaseSettingsController {
   public ResponseEntity<com.housingplatform.purchase.service.PurchaseFeeSettings.Rates> setFees(
       @RequestBody com.housingplatform.purchase.service.PurchaseFeeSettings.Rates request) {
     return ResponseEntity.ok(feeSettings.set(request.markupPercent(), request.vatRate()));
+  }
+
+  @GetMapping("/online-limits")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(summary = "Maximum amount of one online (Chapa) payment, per currency")
+  public ResponseEntity<com.housingplatform.purchase.service.OnlinePaymentLimits.Limits>
+      getOnlineLimits() {
+    return ResponseEntity.ok(onlineLimits.get());
+  }
+
+  @PutMapping("/online-limits")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(
+      summary = "Set the maximum per online payment",
+      description =
+          "Match Chapa's limits for your account; 0 or empty removes the limit. Deposits"
+              + " are capped at it because a deposit is one payment.")
+  public ResponseEntity<com.housingplatform.purchase.service.OnlinePaymentLimits.Limits>
+      setOnlineLimits(
+          @RequestBody com.housingplatform.purchase.service.OnlinePaymentLimits.Limits request) {
+    return ResponseEntity.ok(onlineLimits.set(request.maxEtb(), request.maxUsd()));
   }
 }
