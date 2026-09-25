@@ -68,6 +68,9 @@ jobs:
     #   SUPPORT_CHAT_API_BASE_URL — optional; default https://api.openai.com/v1 if unset
     #   SUPPORT_CHAT_API_KEY — OpenAI-compatible API key (or leave unset for offline fallback)
     #   SUPPORT_CHAT_MODEL — optional; default gpt-4o-mini if unset
+    #   CHAPA_SECRET_KEY — CHASECK_TEST-… (sandbox) or CHASECK-… (live); unset disables deposit checkout
+    #   CHAPA_WEBHOOK_SECRET — from Chapa dashboard → Settings → Webhooks
+    #   PUBLIC_API_BASE_URL — public URL of this API, used for Chapa's callback_url
     # DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are no longer used and can be deleted.
     steps:
       - name: Deploy on DigitalOcean droplet
@@ -83,11 +86,14 @@ jobs:
           SUPPORT_CHAT_API_BASE_URL: ${{ secrets.SUPPORT_CHAT_API_BASE_URL }}
           SUPPORT_CHAT_API_KEY: ${{ secrets.SUPPORT_CHAT_API_KEY }}
           SUPPORT_CHAT_MODEL: ${{ secrets.SUPPORT_CHAT_MODEL }}
+          CHAPA_SECRET_KEY: ${{ secrets.CHAPA_SECRET_KEY }}
+          CHAPA_WEBHOOK_SECRET: ${{ secrets.CHAPA_WEBHOOK_SECRET }}
+          PUBLIC_API_BASE_URL: ${{ secrets.PUBLIC_API_BASE_URL }}
         with:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_SSH_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: GHCR_USER,GHCR_TOKEN,REGISTRY_IMAGE,DEPLOY_IMAGE,SHA,FRONTEND_BASE_URL,SUPPORT_CHAT_API_BASE_URL,SUPPORT_CHAT_API_KEY,SUPPORT_CHAT_MODEL
+          envs: GHCR_USER,GHCR_TOKEN,REGISTRY_IMAGE,DEPLOY_IMAGE,SHA,FRONTEND_BASE_URL,SUPPORT_CHAT_API_BASE_URL,SUPPORT_CHAT_API_KEY,SUPPORT_CHAT_MODEL,CHAPA_SECRET_KEY,CHAPA_WEBHOOK_SECRET,PUBLIC_API_BASE_URL
           script: |
             set -euo pipefail
             cd ~/housing-platform
@@ -98,6 +104,9 @@ jobs:
             export SUPPORT_CHAT_API_BASE_URL="${SUPPORT_CHAT_API_BASE_URL:-}"
             export SUPPORT_CHAT_API_KEY="${SUPPORT_CHAT_API_KEY:-}"
             export SUPPORT_CHAT_MODEL="${SUPPORT_CHAT_MODEL:-}"
+            export CHAPA_SECRET_KEY="${CHAPA_SECRET_KEY:-}"
+            export CHAPA_WEBHOOK_SECRET="${CHAPA_WEBHOOK_SECRET:-}"
+            export PUBLIC_API_BASE_URL="${PUBLIC_API_BASE_URL:-}"
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
