@@ -3,6 +3,7 @@ package com.housingplatform.payment.chapa;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -44,6 +45,6 @@ public final class ChapaSignature {
     }
     return MessageDigest.isEqual(
         expected.getBytes(StandardCharsets.UTF_8),
-        provided.trim().getBytes(StandardCharsets.UTF_8));
+        provided.trim().toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
   }
 }

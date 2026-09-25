@@ -45,6 +45,10 @@ public class ChapaWebhookController {
       if (txRef == null) {
         txRef = node.path("data").path("tx_ref").asText(null);
       }
+      // chapa.global (v2) calls our tx_ref "merchant_reference".
+      if (txRef == null) {
+        txRef = node.path("merchant_reference").asText(null);
+      }
     } catch (Exception e) {
       return ResponseEntity.badRequest().build();
     }
