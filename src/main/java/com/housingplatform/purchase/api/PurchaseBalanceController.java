@@ -32,13 +32,21 @@ public class PurchaseBalanceController {
   private final PurchaseBalanceService balance;
   private final PurchaseOrderActorResolver actors;
 
-  public record OnlineRequest(BigDecimal amount, ChapaPaymentMethod paymentMethod) {}
+  public record OnlineRequest(
+      BigDecimal amount,
+      ChapaPaymentMethod paymentMethod,
+      com.housingplatform.purchase.domain.PurchaseBalancePayment.Purpose purpose) {}
 
   public record ScheduleRequest(List<InstalmentLine> instalments) {}
 
   public record ReviewRequest(boolean approve, String note) {}
 
-  public record RecordRequest(BigDecimal amount, String reference, LocalDate paidOn, String note) {}
+  public record RecordRequest(
+      BigDecimal amount,
+      String reference,
+      LocalDate paidOn,
+      String note,
+      com.housingplatform.purchase.domain.PurchaseBalancePayment.Purpose purpose) {}
 
   @GetMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
@@ -59,7 +67,12 @@ public class PurchaseBalanceController {
   public ResponseEntity<DepositCheckoutResponse> checkout(
       @PathVariable UUID orderId, @RequestBody OnlineRequest request) {
     return ResponseEntity.ok(
-        balance.startOnline(actors.current(), orderId, request.amount(), request.paymentMethod()));
+        balance.startOnline(
+            actors.current(),
+            orderId,
+            request.amount(),
+            request.paymentMethod(),
+            request.purpose()));
   }
 
   @PostMapping("/confirm")
@@ -79,9 +92,12 @@ public class PurchaseBalanceController {
       @RequestParam String reference,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate paidOn,
-      @RequestParam("slip") MultipartFile slip) {
+      @RequestParam("slip") MultipartFile slip,
+      @RequestParam(required = false)
+          com.housingplatform.purchase.domain.PurchaseBalancePayment.Purpose purpose) {
     return ResponseEntity.ok(
-        balance.reportTransfer(actors.current(), orderId, amount, reference, paidOn, slip));
+        balance.reportTransfer(
+            actors.current(), orderId, amount, reference, paidOn, slip, purpose));
   }
 
   @GetMapping("/payments/{paymentId}/slip")
@@ -126,6 +142,7 @@ public class PurchaseBalanceController {
             request.amount(),
             request.reference(),
             request.paidOn(),
-            request.note()));
+            request.note(),
+            request.purpose()));
   }
 }

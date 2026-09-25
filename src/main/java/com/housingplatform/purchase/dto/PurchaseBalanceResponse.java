@@ -48,6 +48,23 @@ public class PurchaseBalanceResponse {
   private List<Instalment> instalments;
   private List<Payment> payments;
 
+  /** The provider's service fee (markup + VAT), paid separately; null when none applies. */
+  private Fees fees;
+
+  @Data
+  @Builder
+  public static class Fees {
+    private BigDecimal markupPercent;
+    private BigDecimal markupAmount;
+    private BigDecimal vatRate;
+    private BigDecimal vatAmount;
+    private BigDecimal total;
+    private BigDecimal paid;
+    private BigDecimal inProgress;
+    private BigDecimal remaining;
+    private boolean fullyPaid;
+  }
+
   @Data
   @Builder
   public static class BankAccount {
@@ -78,6 +95,7 @@ public class PurchaseBalanceResponse {
   public static class Payment {
     private UUID id;
     private PurchaseBalancePayment.Channel channel;
+    private PurchaseBalancePayment.Purpose purpose;
     private PurchaseBalancePayment.Status status;
     private BigDecimal amount;
     private Currency currency;

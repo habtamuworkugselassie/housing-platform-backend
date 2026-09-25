@@ -91,6 +91,29 @@ public class PropertyPurchaseOrder extends BaseAuditEntity {
   @OneToOne(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   private PurchaseDeposit deposit;
 
+  /**
+   * The provider's service fee fixed when the order was placed: markup = price x markup %, VAT =
+   * (price + markup) x VAT %. Paid once the seller accepts. Null on orders placed before fees.
+   */
+  @Column(name = "fee_markup_percent", precision = 7, scale = 4)
+  private BigDecimal feeMarkupPercent;
+
+  @Column(name = "fee_markup_amount", precision = 19, scale = 2)
+  private BigDecimal feeMarkupAmount;
+
+  @Column(name = "fee_vat_rate", precision = 7, scale = 4)
+  private BigDecimal feeVatRate;
+
+  @Column(name = "fee_vat_amount", precision = 19, scale = 2)
+  private BigDecimal feeVatAmount;
+
+  /** Service fee owed (markup + VAT), zero when none. */
+  public BigDecimal feesDue() {
+    BigDecimal m = feeMarkupAmount != null ? feeMarkupAmount : BigDecimal.ZERO;
+    BigDecimal v = feeVatAmount != null ? feeVatAmount : BigDecimal.ZERO;
+    return m.add(v);
+  }
+
   @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("changedAt ASC")
   @Builder.Default

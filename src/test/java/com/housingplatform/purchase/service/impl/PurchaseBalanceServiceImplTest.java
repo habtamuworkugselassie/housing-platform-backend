@@ -303,4 +303,45 @@ class PurchaseBalanceServiceImplTest {
     service.startOnline(buyer, order.getId(), new BigDecimal("1000"), ChapaPaymentMethod.TELEBIRR);
     assertThat(payments.get(0).getPreferredMethod()).isEqualTo(ChapaPaymentMethod.CARD);
   }
+
+  @Test
+  void theServiceFeeIsPaidSeparatelyAndBlocksCompletionToo() {
+    order.setFeeMarkupPercent(new BigDecimal("2"));
+    order.setFeeMarkupAmount(new BigDecimal("64000.00"));
+    order.setFeeVatRate(new BigDecimal("15"));
+    order.setFeeVatAmount(new BigDecimal("489600.00"));
+    var r = service.get(buyer, order.getId());
+    assertThat(r.getFees().getTotal()).isEqualByComparingTo("553600.00");
+    assertThat(r.getBalanceDue()).isEqualByComparingTo("3168000.00");
+
+    service.record(seller, order.getId(), new BigDecimal("3168000"), "CHQ-9", null, null);
+    assertThat(service.blocksCompletion(order)).isTrue();
+
+    var checkout =
+        service.startOnline(
+            buyer,
+            order.getId(),
+            new BigDecimal("553600"),
+            ChapaPaymentMethod.CBE_BIRR,
+            PurchaseBalancePayment.Purpose.FEES);
+    assertThat(checkout.getTxRef()).contains("-F1-");
+    assertThatThrownBy(
+            () ->
+                service.startOnline(
+                    buyer,
+                    order.getId(),
+                    BigDecimal.ONE,
+                    null,
+                    PurchaseBalancePayment.Purpose.FEES))
+        .hasMessageContaining("Nothing more is due");
+    when(chapa.verify(checkout.getTxRef())).thenReturn(success("553600.00"));
+    service.handleProviderNotification(checkout.getTxRef());
+    assertThat(service.get(buyer, order.getId()).getFees().isFullyPaid()).isTrue();
+    assertThat(service.blocksCompletion(order)).isFalse();
+  }
+
+  @Test
+  void ordersWithoutAMarkupHaveNoFee() {
+    assertThat(service.get(buyer, order.getId()).getFees()).isNull();
+  }
 }

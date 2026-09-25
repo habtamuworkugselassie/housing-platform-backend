@@ -35,6 +35,12 @@ public class PurchaseBalancePayment extends BaseAuditEntity {
   @Column(nullable = false, length = 24)
   private Status status;
 
+  /** What the money is for: the balance of the price, or the service fee (markup + VAT). */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 16)
+  @Builder.Default
+  private Purpose purpose = Purpose.BALANCE;
+
   @Column(nullable = false, precision = 19, scale = 2)
   private BigDecimal amount;
 
@@ -92,6 +98,11 @@ public class PurchaseBalancePayment extends BaseAuditEntity {
 
   @Column(name = "paid_at")
   private LocalDateTime paidAt;
+
+  public enum Purpose {
+    BALANCE,
+    FEES
+  }
 
   public enum Channel {
     ONLINE,

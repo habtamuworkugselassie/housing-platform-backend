@@ -16,6 +16,7 @@ import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseType;
 import com.housingplatform.purchase.domain.PurchaseBalanceInstalment;
 import com.housingplatform.purchase.domain.PurchaseBalancePayment;
 import com.housingplatform.purchase.domain.PurchaseBalancePayment.Channel;
+import com.housingplatform.purchase.domain.PurchaseBalancePayment.Purpose;
 import com.housingplatform.purchase.domain.PurchaseBalancePayment.Status;
 import com.housingplatform.purchase.domain.PurchaseDeposit;
 import com.housingplatform.purchase.domain.PurchaseDeposit.DepositStatus;
@@ -104,7 +105,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     PropertyPurchaseOrder order = loadManaged(seller, orderId);
     requireOpen(order);
     List<PurchaseBalancePayment> payments = payments(order);
-    if (!seller.admin() && sum(payments, Status.PAID).signum() > 0) {
+    if (!seller.admin() && sum(payments, Status.PAID, Purpose.BALANCE).signum() > 0) {
       throw new BusinessException(
           "Payments have already been made; ask the platform to change the schedule");
     }
@@ -161,7 +162,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     }
     if (approve) {
       requireOpen(order);
-      requireWithinRemaining(order, p.getAmount(), p.getId());
+      requireWithinRemaining(order, p.getAmount(), p.getId(), p.getPurpose());
       p.setStatus(Status.PAID);
       p.setPaidAt(LocalDateTime.now());
     } else {
@@ -181,11 +182,13 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
       BigDecimal amount,
       String reference,
       LocalDate paidOn,
-      String note) {
+      String note,
+      Purpose purpose) {
     PropertyPurchaseOrder order = loadManaged(seller, orderId);
     requireOpen(order);
+    Purpose what = purpose != null ? purpose : Purpose.BALANCE;
     BigDecimal value = positive(amount);
-    requireWithinRemaining(order, value, null);
+    requireWithinRemaining(order, value, null, what);
     if (reference == null || reference.isBlank()) {
       throw new BusinessException("Give the bank or receipt reference of the payment");
     }
@@ -193,6 +196,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
         PurchaseBalancePayment.builder()
             .purchaseOrder(order)
             .channel(Channel.RECORDED)
+            .purpose(what)
             .status(Status.PAID)
             .amount(value)
             .currency(order.getCurrency())
@@ -211,7 +215,12 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
 
   @Override
   public DepositCheckoutResponse startOnline(
-      PurchaseOrderActor buyer, UUID orderId, BigDecimal amount, ChapaPaymentMethod method) {
+      PurchaseOrderActor buyer,
+      UUID orderId,
+      BigDecimal amount,
+      ChapaPaymentMethod method,
+      Purpose purpose) {
+    Purpose what = purpose != null ? purpose : Purpose.BALANCE;
     PropertyPurchaseOrder order = loadOwn(buyer, orderId);
     requirePayable(order);
     if (!chapa.isConfigured()) {
@@ -219,13 +228,13 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     }
     settlePending(order);
     BigDecimal value = positive(amount);
-    requireWithinRemaining(order, value, null);
+    requireWithinRemaining(order, value, null, what);
 
     ChapaPaymentMethod chosen =
         order.getCurrency() == Currency.USD ? ChapaPaymentMethod.CARD : method;
     long attempt =
         payments(order).stream().filter(x -> x.getChannel() == Channel.ONLINE).count() + 1;
-    String txRef = newTxRef(order.getOrderNumber(), attempt);
+    String txRef = newTxRef(order.getOrderNumber(), what == Purpose.FEES ? "F" : "B", attempt);
     User user = userRepository.findById(order.getBuyerId()).orElse(null);
     var result =
         chapa.initialize(
@@ -241,14 +250,18 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
                 order.getContactPhone(),
                 callbackUrl(),
                 returnUrl(order),
-                "Balance " + order.getOrderNumber(),
-                "Balance payment to " + provider.getName() + " for " + order.getOrderNumber(),
+                (what == Purpose.FEES ? "Fee " : "Balance ") + order.getOrderNumber(),
+                (what == Purpose.FEES ? "Service fee and VAT to " : "Balance payment to ")
+                    + provider.getName()
+                    + " for "
+                    + order.getOrderNumber(),
                 chosen != null ? chosen.preferredPaymentMethods() : List.of()));
     PurchaseBalancePayment p =
         paymentRepository.save(
             PurchaseBalancePayment.builder()
                 .purchaseOrder(order)
                 .channel(Channel.ONLINE)
+                .purpose(what)
                 .status(Status.PENDING)
                 .amount(value)
                 .currency(order.getCurrency())
@@ -282,11 +295,13 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
       BigDecimal amount,
       String reference,
       LocalDate paidOn,
-      MultipartFile slip) {
+      MultipartFile slip,
+      Purpose purpose) {
     PropertyPurchaseOrder order = loadOwn(buyer, orderId);
     requirePayable(order);
+    Purpose what = purpose != null ? purpose : Purpose.BALANCE;
     BigDecimal value = positive(amount);
-    requireWithinRemaining(order, value, null);
+    requireWithinRemaining(order, value, null, what);
     if (reference == null || reference.isBlank()) {
       throw new BusinessException("Give the bank's transaction reference from your receipt");
     }
@@ -306,6 +321,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
         PurchaseBalancePayment.builder()
             .purchaseOrder(order)
             .channel(Channel.BANK_TRANSFER)
+            .purpose(what)
             .status(Status.SUBMITTED)
             .amount(value)
             .currency(order.getCurrency())
@@ -364,7 +380,9 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
   @Override
   @Transactional(readOnly = true)
   public boolean blocksCompletion(PropertyPurchaseOrder order) {
-    return remaining(order, payments(order)).signum() > 0;
+    List<PurchaseBalancePayment> payments = payments(order);
+    return remaining(order, payments, Purpose.BALANCE).signum() > 0
+        || remaining(order, payments, Purpose.FEES).signum() > 0;
   }
 
   @Override
@@ -415,22 +433,30 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     return amount != null ? amount : BigDecimal.ZERO;
   }
 
-  private BigDecimal remaining(PropertyPurchaseOrder order, List<PurchaseBalancePayment> payments) {
-    return balanceDue(order).subtract(sum(payments, Status.PAID)).max(BigDecimal.ZERO);
+  static BigDecimal due(PropertyPurchaseOrder order, Purpose purpose) {
+    return purpose == Purpose.FEES
+        ? order.feesDue().setScale(2, RoundingMode.HALF_UP)
+        : balanceDue(order);
+  }
+
+  private static BigDecimal remaining(
+      PropertyPurchaseOrder order, List<PurchaseBalancePayment> payments, Purpose purpose) {
+    return due(order, purpose).subtract(sum(payments, Status.PAID, purpose)).max(BigDecimal.ZERO);
   }
 
   /** New money must fit in what is left after paid and in-flight payments. */
   private void requireWithinRemaining(
-      PropertyPurchaseOrder order, BigDecimal amount, UUID excludingPaymentId) {
+      PropertyPurchaseOrder order, BigDecimal amount, UUID excludingPaymentId, Purpose purpose) {
     List<PurchaseBalancePayment> payments = payments(order);
     BigDecimal inFlight = BigDecimal.ZERO;
     for (PurchaseBalancePayment p : payments) {
-      if ((p.getStatus() == Status.PENDING || p.getStatus() == Status.SUBMITTED)
+      if (p.getPurpose() == purpose
+          && (p.getStatus() == Status.PENDING || p.getStatus() == Status.SUBMITTED)
           && !p.getId().equals(excludingPaymentId)) {
         inFlight = inFlight.add(p.getAmount());
       }
     }
-    BigDecimal room = remaining(order, payments).subtract(inFlight);
+    BigDecimal room = remaining(order, payments, purpose).subtract(inFlight);
     if (amount.compareTo(room) > 0) {
       throw new BusinessException(
           room.signum() > 0
@@ -443,9 +469,10 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     }
   }
 
-  private static BigDecimal sum(List<PurchaseBalancePayment> payments, Status status) {
+  private static BigDecimal sum(
+      List<PurchaseBalancePayment> payments, Status status, Purpose purpose) {
     return payments.stream()
-        .filter(p -> p.getStatus() == status)
+        .filter(p -> p.getStatus() == status && p.getPurpose() == purpose)
         .map(PurchaseBalancePayment::getAmount)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
@@ -491,12 +518,12 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     }
   }
 
-  /** {@code <order code>-B<n>-<random>}, within Chapa Global's 20-character limit. */
-  static String newTxRef(String orderNumber, long attempt) {
+  /** {@code <order code>-B<n>-<random>} (F for fees), within Chapa Global's 20 characters. */
+  static String newTxRef(String orderNumber, String kind, long attempt) {
     String code = orderNumber.substring(orderNumber.lastIndexOf('-') + 1);
     String random =
         UUID.randomUUID().toString().replace("-", "").substring(0, 4).toUpperCase(Locale.ROOT);
-    String suffix = "-B" + attempt + "-" + random;
+    String suffix = "-" + kind + attempt + "-" + random;
     int room = PurchaseDepositServiceImpl.MAX_TX_REF_LENGTH - suffix.length();
     return (code.length() > room ? code.substring(0, room) : code) + suffix;
   }
@@ -522,8 +549,10 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
   PurchaseBalanceResponse toResponse(PropertyPurchaseOrder order) {
     List<PurchaseBalancePayment> payments = payments(order);
     BigDecimal due = balanceDue(order);
-    BigDecimal paid = sum(payments, Status.PAID);
-    BigDecimal inProgress = sum(payments, Status.PENDING).add(sum(payments, Status.SUBMITTED));
+    BigDecimal paid = sum(payments, Status.PAID, Purpose.BALANCE);
+    BigDecimal inProgress =
+        sum(payments, Status.PENDING, Purpose.BALANCE)
+            .add(sum(payments, Status.SUBMITTED, Purpose.BALANCE));
     BigDecimal remaining = due.subtract(paid).max(BigDecimal.ZERO);
 
     List<PurchaseBalanceInstalment> saved =
@@ -567,7 +596,30 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
         .bankAccount(bankAccount.get())
         .transferReference(order.getOrderNumber() + "-BAL")
         .instalments(instalments)
+        .fees(feesOf(order, payments))
         .payments(payments.stream().map(PurchaseBalanceServiceImpl::toPayment).toList())
+        .build();
+  }
+
+  private static PurchaseBalanceResponse.Fees feesOf(
+      PropertyPurchaseOrder order, List<PurchaseBalancePayment> payments) {
+    if (order.feesDue().signum() <= 0) {
+      return null;
+    }
+    BigDecimal total = due(order, Purpose.FEES);
+    BigDecimal paid = sum(payments, Status.PAID, Purpose.FEES);
+    return PurchaseBalanceResponse.Fees.builder()
+        .markupPercent(order.getFeeMarkupPercent())
+        .markupAmount(order.getFeeMarkupAmount())
+        .vatRate(order.getFeeVatRate())
+        .vatAmount(order.getFeeVatAmount())
+        .total(total)
+        .paid(paid)
+        .inProgress(
+            sum(payments, Status.PENDING, Purpose.FEES)
+                .add(sum(payments, Status.SUBMITTED, Purpose.FEES)))
+        .remaining(total.subtract(paid).max(BigDecimal.ZERO))
+        .fullyPaid(paid.compareTo(total) >= 0)
         .build();
   }
 
@@ -597,6 +649,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     return PurchaseBalanceResponse.Payment.builder()
         .id(p.getId())
         .channel(p.getChannel())
+        .purpose(p.getPurpose())
         .status(p.getStatus())
         .amount(p.getAmount())
         .currency(p.getCurrency())

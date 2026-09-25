@@ -96,6 +96,8 @@ class PurchaseOrderServiceImplTest {
 
   @Mock private com.housingplatform.purchase.service.PurchaseBalanceService balanceService;
 
+  @Mock private com.housingplatform.purchase.service.PurchaseFeeSettings feeSettings;
+
   @InjectMocks private PurchaseOrderServiceImpl service;
 
   private Property property;
@@ -108,6 +110,13 @@ class PurchaseOrderServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient()
+        .when(feeSettings.quote(any()))
+        .thenReturn(
+            com.housingplatform.purchase.service.PurchaseFeeSettings.quote(
+                BigDecimal.ONE,
+                new com.housingplatform.purchase.service.PurchaseFeeSettings.Rates(
+                    BigDecimal.ZERO, BigDecimal.ZERO)));
     property =
         Property.builder()
             .title("3BR Apartment, Bole")
@@ -835,6 +844,23 @@ class PurchaseOrderServiceImplTest {
     org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(depositService, agreementService);
     inOrder.verify(depositService).issueForOrder(order);
     inOrder.verify(agreementService).issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
+  }
+
+  @Test
+  void placingAnOrderFixesTheServiceFeeOnIt() {
+    when(feeSettings.quote(any()))
+        .thenReturn(
+            com.housingplatform.purchase.service.PurchaseFeeSettings.quote(
+                new BigDecimal("3200000.00"),
+                new com.housingplatform.purchase.service.PurchaseFeeSettings.Rates(
+                    new BigDecimal("2"), new BigDecimal("15"))));
+    service.createPurchaseOrder(buyer, request(), EVIDENCE);
+    ArgumentCaptor<PropertyPurchaseOrder> saved =
+        ArgumentCaptor.forClass(PropertyPurchaseOrder.class);
+    verify(orderRepository).save(saved.capture());
+    assertThat(saved.getValue().getFeeMarkupAmount()).isEqualByComparingTo("64000.00");
+    assertThat(saved.getValue().getFeeVatAmount()).isEqualByComparingTo("489600.00");
+    assertThat(saved.getValue().feesDue()).isEqualByComparingTo("553600.00");
   }
 
   @Test
