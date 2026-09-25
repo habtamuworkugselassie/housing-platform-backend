@@ -28,7 +28,9 @@ import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingC
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingResolution;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
 import com.housingplatform.purchase.service.PurchaseAgreementService;
+import com.housingplatform.purchase.service.PurchaseBalanceService;
 import com.housingplatform.purchase.service.PurchaseDepositService;
+import com.housingplatform.purchase.service.PurchaseFeeSettings;
 import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseOrderCreatedEvent;
@@ -124,6 +126,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   private final PurchaseAgreementService agreementService;
   private final PurchaseDepositService depositService;
   private final PropertyDocumentService documentService;
+  private final PurchaseBalanceService balanceService;
+  private final PurchaseFeeSettings feeSettings;
   private final ApplicationEventPublisher eventPublisher;
   private final CacheManager cacheManager;
 
@@ -151,6 +155,18 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       preview.setDocuments(documentService.verified(property.getId()));
     }
     preview.setDeposit(deposit);
+    PurchaseFeeSettings.Quote fees = feeSettings.quote(price);
+    if (fees != null && !fees.isEmpty()) {
+      preview.setFees(
+          PurchasePreviewResponse.FeeQuote.builder()
+              .markupPercent(fees.markupPercent())
+              .markupAmount(fees.markupAmount())
+              .vatRate(fees.vatRate())
+              .vatAmount(fees.vatAmount())
+              .total(fees.total())
+              .currency(effective)
+              .build());
+    }
     preview.setAgreementsToSign(
         agreementService.previewOrderCreationAgreements(
             property, buyer.userId(), effective, price, defaultTerms, deposit));
@@ -209,6 +225,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       FinancingTerms terms = resolution.terms();
       LoanApplicationResponse loan = openLoanApplication(buyer.userId(), order, terms);
       order.setFinancing(newFinancing(order, terms, loan.getId()));
+    }
+
+    // The service fee (markup + VAT) is fixed now so the Promise to Purchase quotes what is owed.
+    PurchaseFeeSettings.Quote fees = feeSettings.quote(price);
+    if (fees != null && !fees.isEmpty()) {
+      order.setFeeMarkupPercent(fees.markupPercent());
+      order.setFeeMarkupAmount(fees.markupAmount());
+      order.setFeeVatRate(fees.vatRate());
+      order.setFeeVatAmount(fees.vatAmount());
     }
 
     // The deposit is paid when the order is placed; it is issued first so the deposit terms can
@@ -511,6 +536,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
               + order.getOrderNumber()
               + " still has an unpaid reservation deposit; the sale cannot be completed");
     }
+    if (balanceService.blocksCompletion(order)) {
+      throw new BusinessException(
+          "Order "
+              + order.getOrderNumber()
+              + " still has an unpaid balance; record or confirm the payments first");
+    }
     order.setPaymentReference(blankToNull(paymentReference));
     String actor = seller.userId().toString();
     transition(order, PurchaseOrderStatus.COMPLETED, actor, blankToNull(paymentReference));
@@ -621,6 +652,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     transition(order, terminal, actor, blankToNull(notes));
     agreementService.voidOpenAgreements(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
     depositService.onOrderClosed(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
+    balanceService.onOrderClosed(order);
     if (hadReservation) {
       releaseReservationIfUnused(order.getPropertyId(), order.getId());
     }

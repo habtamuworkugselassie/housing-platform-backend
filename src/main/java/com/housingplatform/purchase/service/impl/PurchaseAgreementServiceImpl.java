@@ -29,6 +29,7 @@ import com.housingplatform.purchase.service.AgreementTemplateRenderer;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
 import com.housingplatform.purchase.service.PurchaseAgreementMapper;
 import com.housingplatform.purchase.service.PurchaseAgreementService;
+import com.housingplatform.purchase.service.PurchaseFeeSettings;
 import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseAgreementIssuedEvent;
@@ -67,6 +68,7 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
   private final PurchaseAgreementMapper mapper;
   private final ApplicationEventPublisher eventPublisher;
   private final PropertyDocumentRepository documentRepository;
+  private final PurchaseFeeSettings feeSettings;
 
   // ------------------------------------------------------------------ workflow hooks
 
@@ -87,6 +89,10 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
     putBuyer(values, buyerId, null, null);
     putProperty(values, property);
     putDocuments(values, property.getId());
+    PurchaseFeeSettings.Quote fees = feeSettings.quote(price);
+    if (fees != null && !fees.isEmpty()) {
+      putFees(values, fees.markupPercent(), fees.markupAmount(), fees.vatRate(), fees.vatAmount());
+    }
     values.put("seller.companyName", organizationName(property.getRealEstateCompanyId()));
     values.put("price.amount", money(price));
     values.put("price.currency", currency.getCode());
@@ -473,6 +479,14 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
     putBuyer(values, order.getBuyerId(), order.getContactPhone(), order.getContactEmail());
     propertyRepository.findById(order.getPropertyId()).ifPresent(p -> putProperty(values, p));
     putDocuments(values, order.getPropertyId());
+    if (order.feesDue().signum() > 0) {
+      putFees(
+          values,
+          order.getFeeMarkupPercent(),
+          order.getFeeMarkupAmount(),
+          order.getFeeVatRate(),
+          order.getFeeVatAmount());
+    }
     values.put("seller.companyName", organizationName(order.getRealEstateCompanyId()));
     values.put("price.amount", money(order.getListedPrice()));
     values.put("price.currency", order.getCurrency().getCode());
@@ -645,5 +659,20 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
   /** Seller-entered text on one line without Markdown emphasis markers. */
   private static String plain(String value) {
     return value == null ? "" : value.replaceAll("[\\r\\n]+", " ").replace("*", "").trim();
+  }
+
+  /** {{#fees}}: the provider's markup and the VAT on price plus markup. */
+  private static void putFees(
+      Map<String, String> values,
+      BigDecimal markupPercent,
+      BigDecimal markupAmount,
+      BigDecimal vatRate,
+      BigDecimal vatAmount) {
+    values.put("fees", "true");
+    values.put("fees.markupPercent", markupPercent.stripTrailingZeros().toPlainString());
+    values.put("fees.markupAmount", money(markupAmount));
+    values.put("fees.vatRate", vatRate.stripTrailingZeros().toPlainString());
+    values.put("fees.vatAmount", money(vatAmount));
+    values.put("fees.total", money(markupAmount.add(vatAmount)));
   }
 }

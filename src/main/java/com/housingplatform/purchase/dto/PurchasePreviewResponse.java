@@ -40,6 +40,25 @@ public class PurchasePreviewResponse {
    */
   private List<com.housingplatform.property.dto.PropertyDocumentResponse> documents;
 
+  /**
+   * The provider's service fee (markup + VAT on price and markup), paid once the seller accepts;
+   * null when no markup is configured.
+   */
+  private FeeQuote fees;
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class FeeQuote {
+    private BigDecimal markupPercent;
+    private BigDecimal markupAmount;
+    private BigDecimal vatRate;
+    private BigDecimal vatAmount;
+    private BigDecimal total;
+    private Currency currency;
+  }
+
   /** The reservation deposit an order would require; null when deposits are disabled. */
   private DepositQuote deposit;
 

@@ -71,6 +71,8 @@ class PurchaseAgreementServiceImplTest {
   @Mock
   private com.housingplatform.property.repository.PropertyDocumentRepository documentRepository;
 
+  @Mock private com.housingplatform.purchase.service.PurchaseFeeSettings feeSettings;
+
   @Spy private PurchaseProviderProperties provider = new PurchaseProviderProperties();
   @Spy private PurchaseAgreementMapper mapper = new PurchaseAgreementMapper();
 
@@ -96,7 +98,8 @@ class PurchaseAgreementServiceImplTest {
             provider,
             mapper,
             eventPublisher,
-            documentRepository);
+            documentRepository,
+            feeSettings);
 
     User buyer = new User();
     buyer.setId(buyerId);
@@ -713,5 +716,33 @@ class PurchaseAgreementServiceImplTest {
     service.signPromiseToPurchaseAtCreation(
         bare, signature(annexed.getId()), SignatureEvidence.none());
     assertThat(bare.getAgreements().get(0).getContent()).contains("NONE");
+  }
+
+  @Test
+  void thePromiseQuotesTheServiceFeeFixedOnTheOrder() {
+    AgreementTemplate withFees =
+        template(
+            AgreementType.PROMISE_TO_PURCHASE,
+            3,
+            IssueTrigger.ORDER_CREATION,
+            AppliesTo.ALL,
+            true,
+            "P{{#fees}} FEE {{fees.markupPercent}}% {{fees.markupAmount}} VAT {{fees.vatRate}}%"
+                + " {{fees.vatAmount}} = {{fees.total}}{{/fees}}");
+    promise.setActive(false);
+    PropertyPurchaseOrder order = order(false);
+    order.setFeeMarkupPercent(new BigDecimal("2.0000"));
+    order.setFeeMarkupAmount(new BigDecimal("170000.00"));
+    order.setFeeVatRate(new BigDecimal("15.0000"));
+    order.setFeeVatAmount(new BigDecimal("1300500.00"));
+    service.signPromiseToPurchaseAtCreation(
+        order, signature(withFees.getId()), SignatureEvidence.none());
+    assertThat(order.getAgreements().get(0).getContent())
+        .contains("FEE 2% 170,000.00 VAT 15% 1,300,500.00 = 1,470,500.00");
+
+    PropertyPurchaseOrder none = order(false);
+    service.signPromiseToPurchaseAtCreation(
+        none, signature(withFees.getId()), SignatureEvidence.none());
+    assertThat(none.getAgreements().get(0).getContent()).doesNotContain("FEE");
   }
 }

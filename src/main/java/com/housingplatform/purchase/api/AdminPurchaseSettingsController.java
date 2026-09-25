@@ -26,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPurchaseSettingsController {
 
   private final DepositPolicy policy;
+  private final com.housingplatform.purchase.service.PurchaseFeeSettings feeSettings;
+  private final com.housingplatform.purchase.service.ProviderBankAccountSettings bankAccount;
 
   /** Birr per USD for deposits paid in USD by international card; null turns USD off. */
   public record UsdRate(
@@ -47,5 +49,40 @@ public class AdminPurchaseSettingsController {
   public ResponseEntity<UsdRate> setUsdRate(@Valid @RequestBody UsdRate request) {
     policy.setAdminEtbPerUsd(request.etbPerUsd());
     return ResponseEntity.ok(new UsdRate(policy.etbPerUsd()));
+  }
+
+  @GetMapping("/bank-account")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(summary = "The provider's bank account for balance transfers (null until set)")
+  public ResponseEntity<com.housingplatform.purchase.dto.PurchaseBalanceResponse.BankAccount>
+      getBankAccount() {
+    return ResponseEntity.ok(bankAccount.get());
+  }
+
+  @PutMapping("/bank-account")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(summary = "Set the bank account buyers transfer the balance to; blank fields clear it")
+  public ResponseEntity<com.housingplatform.purchase.dto.PurchaseBalanceResponse.BankAccount>
+      setBankAccount(
+          @RequestBody
+              com.housingplatform.purchase.dto.PurchaseBalanceResponse.BankAccount request) {
+    return ResponseEntity.ok(bankAccount.set(request));
+  }
+
+  @GetMapping("/fees")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(summary = "Markup % and VAT rate charged to buyers on top of the price")
+  public ResponseEntity<com.housingplatform.purchase.service.PurchaseFeeSettings.Rates> getFees() {
+    return ResponseEntity.ok(feeSettings.rates());
+  }
+
+  @PutMapping("/fees")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(
+      summary = "Set the markup % and VAT rate",
+      description = "Applies to orders placed from now on; placed orders keep their amounts.")
+  public ResponseEntity<com.housingplatform.purchase.service.PurchaseFeeSettings.Rates> setFees(
+      @RequestBody com.housingplatform.purchase.service.PurchaseFeeSettings.Rates request) {
+    return ResponseEntity.ok(feeSettings.set(request.markupPercent(), request.vatRate()));
   }
 }
