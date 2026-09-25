@@ -313,10 +313,20 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
         .build();
   }
 
+  /** Chapa Global rejects references over this length ("Reference must be at most 20 characters"). */
+  static final int MAX_TX_REF_LENGTH = 20;
+
+  /**
+   * {@code <order code>-D<attempt>-<random>}, e.g. {@code 3F9A1C2B-D1-7K2Q} for order
+   * PPO-2026-3F9A1C2B. The "PPO-year-" prefix is dropped to stay within Chapa's 20-character limit.
+   */
   static String newTxRef(String orderNumber, int attempt) {
+    String code = orderNumber.substring(orderNumber.lastIndexOf('-') + 1);
     String random =
-        UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
-    return orderNumber + "-DEP" + attempt + "-" + random;
+        UUID.randomUUID().toString().replace("-", "").substring(0, 4).toUpperCase(Locale.ROOT);
+    String suffix = "-D" + attempt + "-" + random;
+    int room = MAX_TX_REF_LENGTH - suffix.length();
+    return (code.length() > room ? code.substring(0, room) : code) + suffix;
   }
 
   private String callbackUrl() {

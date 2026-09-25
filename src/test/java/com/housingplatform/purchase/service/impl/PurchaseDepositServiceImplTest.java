@@ -180,7 +180,7 @@ class PurchaseDepositServiceImplTest {
     assertThat(req.getValue().currency()).isEqualTo("ETB");
     assertThat(req.getValue().email()).isEqualTo("abebe@example.com");
     assertThat(req.getValue().phoneNumber()).isEqualTo("+251911223344");
-    assertThat(req.getValue().txRef()).startsWith("PPO-2026-TEST0001-DEP1-");
+    assertThat(req.getValue().txRef()).startsWith("TEST0001-D1-").hasSizeLessThanOrEqualTo(20);
     assertThat(req.getValue().returnUrl())
         .contains("/purchase-orders/" + order.getId() + "?deposit=return");
     assertThat(r.getCheckoutUrl()).isEqualTo("https://checkout.chapa.co/x");
@@ -218,7 +218,7 @@ class PurchaseDepositServiceImplTest {
 
     DepositCheckoutResponse r = service.startCheckout(buyer, order.getId());
     assertThat(r.getCheckoutUrl()).isEqualTo("https://checkout.chapa.co/new");
-    assertThat(d.getTxRef()).startsWith("PPO-2026-TEST0001-DEP2-");
+    assertThat(d.getTxRef()).startsWith("TEST0001-D2-");
     assertThat(d.getAttempts()).isEqualTo(2);
   }
 
@@ -370,5 +370,16 @@ class PurchaseDepositServiceImplTest {
     d.setStatus(DepositStatus.PAID);
     assertThat(service.toResponse(order).getCheckoutUrl()).isNull();
     assertThat(service.toResponse(order).getCheckoutAvailable()).isTrue();
+  }
+
+  @Test
+  void txRefFitsChapasTwentyCharacterLimit() {
+    assertThat(PurchaseDepositServiceImpl.newTxRef("PPO-2026-3F9A1C2B", 1))
+        .matches("3F9A1C2B-D1-[0-9A-F]{4}");
+    assertThat(PurchaseDepositServiceImpl.newTxRef("PPO-2026-3F9A1C2B", 123))
+        .hasSizeLessThanOrEqualTo(20)
+        .contains("-D123-");
+    assertThat(PurchaseDepositServiceImpl.newTxRef("SOME-VERY-LONG-ORDER-NUMBER-XYZ", 1))
+        .hasSizeLessThanOrEqualTo(20);
   }
 }
