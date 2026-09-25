@@ -3,6 +3,8 @@ package com.housingplatform.purchase.service.impl;
 import com.housingplatform.identity.repository.OrganizationRepository;
 import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.property.domain.Property;
+import com.housingplatform.property.domain.PropertyDocument;
+import com.housingplatform.property.repository.PropertyDocumentRepository;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.purchase.config.PurchaseProviderProperties;
 import com.housingplatform.purchase.domain.AgreementTemplate;
@@ -64,6 +66,7 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
   private final PurchaseProviderProperties provider;
   private final PurchaseAgreementMapper mapper;
   private final ApplicationEventPublisher eventPublisher;
+  private final PropertyDocumentRepository documentRepository;
 
   // ------------------------------------------------------------------ workflow hooks
 
@@ -83,6 +86,7 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
     values.put("date.today", LocalDate.now().toString());
     putBuyer(values, buyerId, null, null);
     putProperty(values, property);
+    putDocuments(values, property.getId());
     values.put("seller.companyName", organizationName(property.getRealEstateCompanyId()));
     values.put("price.amount", money(price));
     values.put("price.currency", currency.getCode());
@@ -468,6 +472,7 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
     values.put("date.today", LocalDate.now().toString());
     putBuyer(values, order.getBuyerId(), order.getContactPhone(), order.getContactEmail());
     propertyRepository.findById(order.getPropertyId()).ifPresent(p -> putProperty(values, p));
+    putDocuments(values, order.getPropertyId());
     values.put("seller.companyName", organizationName(order.getRealEstateCompanyId()));
     values.put("price.amount", money(order.getListedPrice()));
     values.put("price.currency", order.getCurrency().getCode());
@@ -594,5 +599,51 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
     values.put("deposit.baseAmount", money(baseAmount));
     values.put("deposit.baseCurrency", baseCurrency.getCode());
     values.put("deposit.rate", rate.stripTrailingZeros().toPlainString());
+  }
+
+  /**
+   * {{#documents}} / {{documents.annex}}: the property's verified official documents as a numbered
+   * list, each with its file fingerprint so the signed text pins the exact files.
+   */
+  private void putDocuments(Map<String, String> values, UUID propertyId) {
+    if (propertyId == null) {
+      return;
+    }
+    List<PropertyDocument> docs =
+        documentRepository.findByPropertyIdAndStatusOrderByCreatedAtAsc(
+            propertyId, PropertyDocument.DocumentStatus.VERIFIED);
+    if (docs.isEmpty()) {
+      return;
+    }
+    StringBuilder annex = new StringBuilder();
+    int n = 1;
+    for (PropertyDocument d : docs) {
+      annex
+          .append(n++)
+          .append(". **")
+          .append(PropertyDocument.DocumentType.fromStored(d.getDocumentType()).label())
+          .append("**");
+      if (d.getDocumentNumber() != null) {
+        annex.append(", No. ").append(plain(d.getDocumentNumber()));
+      }
+      if (d.getIssuingAuthority() != null) {
+        annex.append(", issued by ").append(plain(d.getIssuingAuthority()));
+      }
+      if (d.getIssuedOn() != null) {
+        annex.append(" on ").append(d.getIssuedOn());
+      }
+      annex.append(". File ").append(plain(d.getFileName()));
+      if (d.getSha256() != null) {
+        annex.append(", SHA-256 ").append(d.getSha256());
+      }
+      annex.append(".\n");
+    }
+    values.put("documents", "true");
+    values.put("documents.annex", annex.toString());
+  }
+
+  /** Seller-entered text on one line without Markdown emphasis markers. */
+  private static String plain(String value) {
+    return value == null ? "" : value.replaceAll("[\\r\\n]+", " ").replace("*", "").trim();
   }
 }

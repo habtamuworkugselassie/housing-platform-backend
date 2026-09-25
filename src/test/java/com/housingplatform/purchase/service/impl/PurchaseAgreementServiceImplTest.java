@@ -67,6 +67,10 @@ class PurchaseAgreementServiceImplTest {
   @Mock private UserRepository userRepository;
   @Mock private OrganizationRepository organizationRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+
+  @Mock
+  private com.housingplatform.property.repository.PropertyDocumentRepository documentRepository;
+
   @Spy private PurchaseProviderProperties provider = new PurchaseProviderProperties();
   @Spy private PurchaseAgreementMapper mapper = new PurchaseAgreementMapper();
 
@@ -91,7 +95,8 @@ class PurchaseAgreementServiceImplTest {
             organizationRepository,
             provider,
             mapper,
-            eventPublisher);
+            eventPublisher,
+            documentRepository);
 
     User buyer = new User();
     buyer.setId(buyerId);
@@ -663,5 +668,50 @@ class PurchaseAgreementServiceImplTest {
         .findFirst()
         .orElseThrow()
         .getContent();
+  }
+
+  // ------------------------------------------------------------------ annex A: property documents
+
+  @Test
+  void theAnnexListsVerifiedDocumentsWithTheirFingerprints() {
+    AgreementTemplate annexed =
+        template(
+            AgreementType.PROMISE_TO_PURCHASE,
+            2,
+            IssueTrigger.ORDER_CREATION,
+            AppliesTo.ALL,
+            true,
+            "BODY{{#documents}}\n{{documents.annex}}{{/documents}}{{^documents}}\nNONE{{/documents}}");
+    promise.setActive(false);
+    var deed =
+        com.housingplatform.property.domain.PropertyDocument.builder()
+            .documentType("TITLE_DEED")
+            .documentNumber("AA/1234*\n5")
+            .issuingAuthority("Addis Ababa Land Administration")
+            .issuedOn(java.time.LocalDate.of(2020, 1, 15))
+            .fileName("deed.pdf")
+            .sha256("ab".repeat(32))
+            .build();
+    when(documentRepository.findByPropertyIdAndStatusOrderByCreatedAtAsc(
+            property.getId(),
+            com.housingplatform.property.domain.PropertyDocument.DocumentStatus.VERIFIED))
+        .thenReturn(List.of(deed));
+
+    PropertyPurchaseOrder order = order(false);
+    service.signPromiseToPurchaseAtCreation(
+        order, signature(annexed.getId()), SignatureEvidence.none());
+    assertThat(order.getAgreements().get(0).getContent())
+        .contains(
+            "1. **Title deed / certificate of ownership**, No. AA/1234 5, issued by Addis Ababa"
+                + " Land Administration on 2020-01-15. File deed.pdf, SHA-256 "
+                + "ab".repeat(32))
+        .doesNotContain("NONE");
+
+    when(documentRepository.findByPropertyIdAndStatusOrderByCreatedAtAsc(any(), any()))
+        .thenReturn(List.of());
+    PropertyPurchaseOrder bare = order(false);
+    service.signPromiseToPurchaseAtCreation(
+        bare, signature(annexed.getId()), SignatureEvidence.none());
+    assertThat(bare.getAgreements().get(0).getContent()).contains("NONE");
   }
 }

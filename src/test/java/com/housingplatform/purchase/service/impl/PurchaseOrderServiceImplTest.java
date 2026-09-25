@@ -92,6 +92,8 @@ class PurchaseOrderServiceImplTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private CacheManager cacheManager;
   @Mock private Cache propertyCache;
+  @Mock private com.housingplatform.property.service.PropertyDocumentService documentService;
+
   @InjectMocks private PurchaseOrderServiceImpl service;
 
   private Property property;

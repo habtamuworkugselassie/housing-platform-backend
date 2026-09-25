@@ -34,6 +34,12 @@ public class PurchasePreviewResponse {
    */
   private List<AgreementPreview> agreementsToSign;
 
+  /**
+   * The property's verified official documents (title deed, lease contract) listed in Annex A of
+   * the Promise to Purchase. Only for signed-in users; null for visitors.
+   */
+  private List<com.housingplatform.property.dto.PropertyDocumentResponse> documents;
+
   /** The reservation deposit an order would require; null when deposits are disabled. */
   private DepositQuote deposit;
 

@@ -7,6 +7,7 @@ import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.service.LoanApplicationService;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.repository.PropertyRepository;
+import com.housingplatform.property.service.PropertyDocumentService;
 import com.housingplatform.purchase.domain.AgreementTemplate.IssueTrigger;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
@@ -122,6 +123,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   private final PurchaseOrderMapper mapper;
   private final PurchaseAgreementService agreementService;
   private final PurchaseDepositService depositService;
+  private final PropertyDocumentService documentService;
   private final ApplicationEventPublisher eventPublisher;
   private final CacheManager cacheManager;
 
@@ -145,6 +147,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             : null;
     PurchasePreviewResponse.DepositQuote deposit =
         depositService.quote(price, effective, depositCurrency);
+    if (buyer != null && buyer.userId() != null) {
+      preview.setDocuments(documentService.verified(property.getId()));
+    }
     preview.setDeposit(deposit);
     preview.setAgreementsToSign(
         agreementService.previewOrderCreationAgreements(
