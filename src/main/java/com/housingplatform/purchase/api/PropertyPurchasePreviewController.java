@@ -23,6 +23,7 @@ public class PropertyPurchasePreviewController {
 
   private final PurchaseOrderService purchaseOrderService;
   private final PurchaseOrderActorResolver actors;
+  private final com.housingplatform.property.service.PropertyDocumentService documentService;
 
   @GetMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
@@ -34,8 +35,22 @@ public class PropertyPurchasePreviewController {
               + " to create the order. Public: visitors see it before signing up; a signed-in"
               + " buyer gets the agreement rendered with their name. No side effects.")
   public ResponseEntity<PurchasePreviewResponse> preview(
-      @PathVariable UUID propertyId, @RequestParam(required = false) Currency currency) {
+      @PathVariable UUID propertyId,
+      @RequestParam(required = false) Currency currency,
+      @RequestParam(required = false) Currency depositCurrency) {
     return ResponseEntity.ok(
-        purchaseOrderService.preview(actors.currentOrAnonymous(), propertyId, currency));
+        purchaseOrderService.preview(
+            actors.currentOrAnonymous(), propertyId, currency, depositCurrency));
+  }
+
+  @GetMapping("/documents/{documentId}/file")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @Operation(
+      summary = "Open a verified property document before ordering",
+      description = "For signed-in buyers reviewing Annex A of the Promise to Purchase. Logged.")
+  public ResponseEntity<org.springframework.core.io.Resource> documentFile(
+      @PathVariable UUID propertyId, @PathVariable UUID documentId) throws java.io.IOException {
+    return com.housingplatform.property.api.DocumentFileResponses.inline(
+        documentService.verifiedFile(propertyId, documentId));
   }
 }

@@ -62,6 +62,10 @@ public class UploadsController {
     if (path.startsWith("/")) {
       path = path.substring(1);
     }
+    // Private files (e.g. property title deeds) are only served by endpoints that check access.
+    if (isPrivate(path)) {
+      return ResponseEntity.notFound().build();
+    }
     String imageUrl = prefix + "/" + path;
     if (!mediaStorageService.isUploadsUrl(imageUrl)) {
       return ResponseEntity.notFound().build();
@@ -83,6 +87,13 @@ public class UploadsController {
       log.error("Failed to serve upload path={} url={}", path, imageUrl, e);
       throw new UncheckedIOException(e);
     }
+  }
+
+  /** True for anything under the private folder, however the path is spelled. */
+  static boolean isPrivate(String path) {
+    String normalized =
+        java.nio.file.Paths.get(path.replace('\\', '/')).normalize().toString().replace('\\', '/');
+    return normalized.equals("private") || normalized.startsWith("private/");
   }
 
   private static String guessContentType(String filename) {

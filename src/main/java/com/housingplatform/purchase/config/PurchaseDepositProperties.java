@@ -26,6 +26,12 @@ public class PurchaseDepositProperties {
   private BigDecimal minUsd = new BigDecimal("100");
   private BigDecimal maxUsd = new BigDecimal("2500");
 
-  /** Days after seller acceptance until the deposit is due. */
+  /** Days after the deposit is issued until it is due. */
   private int dueDays = 3;
+
+  /**
+   * Birr per US dollar for buyers who pay an ETB deposit in USD by international card. Unset (null)
+   * turns the USD option off; there is deliberately no built-in rate.
+   */
+  private BigDecimal etbPerUsd;
 }

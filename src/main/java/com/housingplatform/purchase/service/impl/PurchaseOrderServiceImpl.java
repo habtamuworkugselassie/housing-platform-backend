@@ -7,6 +7,7 @@ import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.service.LoanApplicationService;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.repository.PropertyRepository;
+import com.housingplatform.property.service.PropertyDocumentService;
 import com.housingplatform.purchase.domain.AgreementTemplate.IssueTrigger;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder.PurchaseOrderStatus;
@@ -122,6 +123,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   private final PurchaseOrderMapper mapper;
   private final PurchaseAgreementService agreementService;
   private final PurchaseDepositService depositService;
+  private final PropertyDocumentService documentService;
   private final ApplicationEventPublisher eventPublisher;
   private final CacheManager cacheManager;
 
@@ -130,7 +132,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   @Override
   @Transactional(readOnly = true)
   public PurchasePreviewResponse preview(
-      PurchaseOrderActor buyer, UUID propertyId, Currency currency) {
+      PurchaseOrderActor buyer, UUID propertyId, Currency currency, Currency depositCurrency) {
     Property property = loadProperty(propertyId);
     Currency effective = currency != null ? currency : Currency.ETB;
     BigDecimal price = resolvePrice(property, effective);
@@ -143,7 +145,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .resolve(property, effective, price, null, FinancingChoice.none())
                 .terms()
             : null;
-    PurchasePreviewResponse.DepositQuote deposit = depositService.quote(price, effective);
+    PurchasePreviewResponse.DepositQuote deposit =
+        depositService.quote(price, effective, depositCurrency);
+    if (buyer != null && buyer.userId() != null) {
+      preview.setDocuments(documentService.verified(property.getId()));
+    }
     preview.setDeposit(deposit);
     preview.setAgreementsToSign(
         agreementService.previewOrderCreationAgreements(
@@ -207,7 +213,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     // The deposit is paid when the order is placed; it is issued first so the deposit terms can
     // quote its amount.
-    depositService.issueForOrder(order, request.getDepositPaymentMethod());
+    depositService.issueForOrder(
+        order, request.getDepositPaymentMethod(), request.getDepositCurrency());
 
     // The Promise to Purchase between buyer and provider is part of the same transaction: no
     // order exists without it.

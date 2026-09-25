@@ -32,6 +32,7 @@ public class PurchaseOrderController {
 
   private final PurchaseOrderService purchaseOrderService;
   private final PurchaseOrderActorResolver actors;
+  private final com.housingplatform.property.service.PropertyDocumentService documentService;
 
   @PostMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.BUYER_SECURED)
@@ -183,5 +184,27 @@ public class PurchaseOrderController {
       @PathVariable UUID propertyId, @RequestParam(required = false) PurchaseOrderStatus status) {
     return ResponseEntity.ok(
         purchaseOrderService.getPurchaseOrdersForProperty(actors.current(), propertyId, status));
+  }
+
+  @GetMapping("/{id}/documents")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @Operation(summary = "Verified official documents of the ordered property")
+  public ResponseEntity<java.util.List<com.housingplatform.property.dto.PropertyDocumentResponse>>
+      documents(@PathVariable UUID id) {
+    // Viewing the order checks the caller is its buyer, seller, financing bank or an admin.
+    UUID propertyId =
+        purchaseOrderService.getPurchaseOrder(actors.current(), id).getProperty().getId();
+    return ResponseEntity.ok(documentService.verified(propertyId));
+  }
+
+  @GetMapping("/{id}/documents/{documentId}/file")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @Operation(summary = "Open a verified document of the ordered property")
+  public ResponseEntity<org.springframework.core.io.Resource> documentFile(
+      @PathVariable UUID id, @PathVariable UUID documentId) throws java.io.IOException {
+    UUID propertyId =
+        purchaseOrderService.getPurchaseOrder(actors.current(), id).getProperty().getId();
+    return com.housingplatform.property.api.DocumentFileResponses.inline(
+        documentService.verifiedFile(propertyId, documentId));
   }
 }

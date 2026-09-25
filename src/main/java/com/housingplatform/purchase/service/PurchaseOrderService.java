@@ -16,7 +16,14 @@ import org.springframework.data.domain.Pageable;
 
 public interface PurchaseOrderService {
 
-  PurchasePreviewResponse preview(PurchaseOrderActor buyer, UUID propertyId, Currency currency);
+  default PurchasePreviewResponse preview(
+      PurchaseOrderActor buyer, UUID propertyId, Currency currency) {
+    return preview(buyer, propertyId, currency, null);
+  }
+
+  /** As above; {@code depositCurrency} USD quotes (and renders the terms for) a USD deposit. */
+  PurchasePreviewResponse preview(
+      PurchaseOrderActor buyer, UUID propertyId, Currency currency, Currency depositCurrency);
 
   /** Creates the order and signs the Promise to Purchase in one transaction. */
   PurchaseOrderResponse createPurchaseOrder(

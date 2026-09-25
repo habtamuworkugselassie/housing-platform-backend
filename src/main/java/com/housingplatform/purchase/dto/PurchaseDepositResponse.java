@@ -28,8 +28,15 @@ public class PurchaseDepositResponse {
   private String providerReference;
   private String paymentMethod;
 
+  /** Set when an ETB deposit is paid in another currency: the ETB amount and the rate used. */
+  private BigDecimal baseAmount;
+
+  private Currency baseCurrency;
+  private BigDecimal exchangeRate;
+
   /** The method the buyer picked on our side, if any. */
   private ChapaPaymentMethod preferredMethod;
+
   private LocalDateTime paidAt;
   private String failureReason;
   private Integer attempts;
