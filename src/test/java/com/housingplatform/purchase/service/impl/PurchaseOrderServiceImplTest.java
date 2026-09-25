@@ -17,6 +17,7 @@ import com.housingplatform.loan.domain.LoanApplication;
 import com.housingplatform.loan.dto.LoanApplicationRequest;
 import com.housingplatform.loan.dto.LoanApplicationResponse;
 import com.housingplatform.loan.service.LoanApplicationService;
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.purchase.domain.AgreementTemplate.IssueTrigger;
@@ -707,7 +708,7 @@ class PurchaseOrderServiceImplTest {
         ArgumentCaptor.forClass(PropertyPurchaseOrder.class);
     verify(agreementService)
         .signPromiseToPurchaseAtCreation(
-            order.capture(), eq(r.getPromiseToPurchase()), eq(EVIDENCE));
+            order.capture(), eq(r.getPromiseToPurchase()), eq(null), eq(EVIDENCE));
     assertThat(order.getValue().getOrderNumber()).startsWith("PPO-");
     verify(orderRepository).save(order.getValue());
   }
@@ -716,7 +717,7 @@ class PurchaseOrderServiceImplTest {
   void aFailedPromiseSignatureAbortsTheOrder() {
     org.mockito.Mockito.doThrow(new BusinessException("template changed"))
         .when(agreementService)
-        .signPromiseToPurchaseAtCreation(any(), any(), any());
+        .signPromiseToPurchaseAtCreation(any(), any(), any(), any());
     assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
         .isInstanceOf(BusinessException.class);
     verify(orderRepository, never()).save(any());
@@ -799,6 +800,28 @@ class PurchaseOrderServiceImplTest {
   }
 
   // ------------------------------------------------------------------ reservation deposit
+
+  @Test
+  void placingAnOrderIssuesTheDepositWithTheChosenMethodBeforeSigning() {
+    CreatePurchaseOrderRequest r = request();
+    r.setDepositPaymentMethod(ChapaPaymentMethod.TELEBIRR);
+    AgreementSignatureRequest terms = new AgreementSignatureRequest();
+    r.setDepositTerms(terms);
+    service.createPurchaseOrder(buyer, r, EVIDENCE);
+    org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(depositService, agreementService);
+    inOrder.verify(depositService).issueForOrder(any(), eq(ChapaPaymentMethod.TELEBIRR));
+    inOrder
+        .verify(agreementService)
+        .signPromiseToPurchaseAtCreation(any(), any(), eq(terms), eq(EVIDENCE));
+  }
+
+  @Test
+  void sellerAcceptanceIssuesDepositTermsForOrdersPlacedBeforeTheChange() {
+    PropertyPurchaseOrder order =
+        financedOrder(PurchaseOrderStatus.PENDING_SELLER_REVIEW, "6800000.00");
+    service.accept(seller, order.getId(), null);
+    verify(agreementService).ensureDepositTermsIssued(order);
+  }
 
   @Test
   void sellerAcceptanceIssuesTheDepositBeforeTheFollowUpAgreements() {

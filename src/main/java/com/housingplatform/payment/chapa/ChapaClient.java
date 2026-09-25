@@ -16,7 +16,9 @@ public interface ChapaClient {
       String callbackUrl,
       String returnUrl,
       String title,
-      String description) {}
+      String description,
+      /** Chapa {@code preferred_payment_methods}; empty shows every enabled method. */
+      java.util.List<String> preferredPaymentMethods) {}
 
   record InitializeResult(String checkoutUrl) {}
 

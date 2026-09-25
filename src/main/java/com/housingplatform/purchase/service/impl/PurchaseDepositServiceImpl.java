@@ -6,6 +6,7 @@ import com.housingplatform.payment.chapa.ChapaClient;
 import com.housingplatform.payment.chapa.ChapaClient.InitializeRequest;
 import com.housingplatform.payment.chapa.ChapaClient.InitializeResult;
 import com.housingplatform.payment.chapa.ChapaClient.VerifyResult;
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.payment.chapa.ChapaProperties;
 import com.housingplatform.purchase.config.PurchaseProviderProperties;
 import com.housingplatform.purchase.domain.AgreementTemplate.AgreementType;
@@ -15,6 +16,7 @@ import com.housingplatform.purchase.domain.PurchaseDeposit;
 import com.housingplatform.purchase.domain.PurchaseDeposit.DepositStatus;
 import com.housingplatform.purchase.dto.DepositCheckoutResponse;
 import com.housingplatform.purchase.dto.PurchaseDepositResponse;
+import com.housingplatform.purchase.dto.PurchasePreviewResponse;
 import com.housingplatform.purchase.repository.PropertyPurchaseOrderRepository;
 import com.housingplatform.purchase.repository.PurchaseDepositRepository;
 import com.housingplatform.purchase.service.DepositPolicy;
@@ -22,9 +24,12 @@ import com.housingplatform.purchase.service.PurchaseDepositService;
 import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
 import com.housingplatform.purchase.service.PurchaseOrderEvents.PurchaseDepositPaidEvent;
+import com.housingplatform.shared.domain.Currency;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +60,7 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   // ------------------------------------------------------------------ workflow hooks
 
   @Override
-  public void issueForOrder(PropertyPurchaseOrder order) {
+  public void issueForOrder(PropertyPurchaseOrder order, ChapaPaymentMethod preferredMethod) {
     if (!policy.isEnabled() || order.getDeposit() != null) {
       return;
     }
@@ -66,8 +71,22 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
             .currency(order.getCurrency())
             .status(DepositStatus.DUE)
             .dueAt(LocalDateTime.now().plusDays(policy.dueDays()))
+            .preferredMethod(preferredMethod)
             .build();
     order.setDeposit(deposit);
+  }
+
+  @Override
+  public PurchasePreviewResponse.DepositQuote quote(BigDecimal price, Currency currency) {
+    if (!policy.isEnabled()) {
+      return null;
+    }
+    return PurchasePreviewResponse.DepositQuote.builder()
+        .amount(policy.amountFor(price, currency))
+        .currency(currency)
+        .checkoutAvailable(chapa.isConfigured())
+        .paymentMethods(List.of(ChapaPaymentMethod.values()))
+        .build();
   }
 
   @Override
@@ -106,7 +125,8 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   }
 
   @Override
-  public DepositCheckoutResponse startCheckout(PurchaseOrderActor buyer, UUID orderId) {
+  public DepositCheckoutResponse startCheckout(
+      PurchaseOrderActor buyer, UUID orderId, ChapaPaymentMethod method) {
     PropertyPurchaseOrder order = loadOwn(buyer, orderId);
     PurchaseDeposit d = requireDeposit(order);
     if (!chapa.isConfigured()) {
@@ -139,6 +159,10 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
       markFailed(d, "Previous attempt failed at the provider");
     }
 
+    // Only a fresh checkout takes a new method; a pending one above is resumed as it was started.
+    if (method != null) {
+      d.setPreferredMethod(method);
+    }
     User buyerUser = userRepository.findById(order.getBuyerId()).orElse(null);
     String txRef = newTxRef(order.getOrderNumber(), d.getAttempts() + 1);
     InitializeResult result =
@@ -156,7 +180,10 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
                 callbackUrl(),
                 returnUrl(order),
                 "Deposit " + order.getOrderNumber(),
-                "Reservation deposit to " + provider.getName() + " for " + order.getOrderNumber()));
+                "Reservation deposit to " + provider.getName() + " for " + order.getOrderNumber(),
+                d.getPreferredMethod() != null
+                    ? d.getPreferredMethod().preferredPaymentMethods()
+                    : List.of()));
     d.setTxRef(txRef);
     d.setCheckoutUrl(result.checkoutUrl());
     d.setStatus(DepositStatus.PENDING);
@@ -242,6 +269,7 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
         .checkoutUrl(d.getStatus() == DepositStatus.PENDING ? d.getCheckoutUrl() : null)
         .providerReference(d.getProviderReference())
         .paymentMethod(d.getPaymentMethod())
+        .preferredMethod(d.getPreferredMethod())
         .paidAt(d.getPaidAt())
         .failureReason(d.getFailureReason())
         .attempts(d.getAttempts())
@@ -313,7 +341,9 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
         .build();
   }
 
-  /** Chapa Global rejects references over this length ("Reference must be at most 20 characters"). */
+  /**
+   * Chapa Global rejects references over this length ("Reference must be at most 20 characters").
+   */
   static final int MAX_TX_REF_LENGTH = 20;
 
   /**
@@ -338,10 +368,25 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   }
 
   private String returnUrl(PropertyPurchaseOrder order) {
-    return frontendBaseUrl.replaceAll("/$", "")
+    return returnBase(frontendBaseUrl, chapaProperties.getPublicApiBaseUrl())
         + "/purchase-orders/"
         + order.getId()
         + "?deposit=return";
+  }
+
+  /**
+   * Chapa rejects non-https return URLs ("Callback URL must start with https://"), so an unset
+   * FRONTEND_BASE_URL (default http://localhost:5173) falls back to the public site URL, which
+   * serves the web app too.
+   */
+  static String returnBase(String frontendBase, String publicBase) {
+    String base =
+        frontendBase != null && frontendBase.startsWith("https://")
+                || publicBase == null
+                || !publicBase.startsWith("https://")
+            ? frontendBase
+            : publicBase;
+    return base == null ? "" : base.replaceAll("/$", "");
   }
 
   private PropertyPurchaseOrder loadOrder(UUID orderId) {

@@ -1,5 +1,6 @@
 package com.housingplatform.purchase.domain;
 
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import com.housingplatform.shared.domain.Currency;
 import jakarta.persistence.*;
@@ -56,6 +57,11 @@ public class PurchaseDeposit extends BaseAuditEntity {
   /** e.g. "card", "telebirr" as reported by the provider. */
   @Column(name = "payment_method", length = 64)
   private String paymentMethod;
+
+  /** What the buyer picked on our side; steers Chapa's checkout. Null means no preference. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "preferred_method", length = 24)
+  private ChapaPaymentMethod preferredMethod;
 
   @Column(name = "paid_at")
   private LocalDateTime paidAt;

@@ -1,5 +1,9 @@
 package com.housingplatform.purchase.service;
 
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
+import com.housingplatform.purchase.dto.PurchasePreviewResponse;
+import com.housingplatform.shared.domain.Currency;
+import java.math.BigDecimal;
 import com.housingplatform.purchase.domain.PropertyPurchaseOrder;
 import com.housingplatform.purchase.dto.DepositCheckoutResponse;
 import com.housingplatform.purchase.dto.PurchaseDepositResponse;
@@ -8,7 +12,8 @@ import java.util.UUID;
 /**
  * Reservation deposit paid by the buyer to the provider through Chapa's hosted checkout.
  *
- * <p>Lifecycle: issued on seller acceptance (DUE) → buyer starts a checkout (PENDING) → the
+ * <p>Lifecycle: issued when the order is placed (DUE; orders placed before that change get it on
+ * seller acceptance) → buyer starts a checkout (PENDING) → the
  * provider's webhook or the buyer's return confirms it (PAID / FAILED). Closing the order cancels
  * an unpaid deposit and flags a paid one for refund.
  */
@@ -16,8 +21,16 @@ public interface PurchaseDepositService {
 
   // ---- order workflow hooks (same transaction as the order)
 
-  /** Creates the DUE deposit for a freshly accepted order; no-op when deposits are disabled. */
-  void issueForOrder(PropertyPurchaseOrder order);
+  /** Creates the DUE deposit for the order; no-op when deposits are disabled or one exists. */
+  default void issueForOrder(PropertyPurchaseOrder order) {
+    issueForOrder(order, null);
+  }
+
+  /** As above, remembering how the buyer wants to pay. */
+  void issueForOrder(PropertyPurchaseOrder order, ChapaPaymentMethod preferredMethod);
+
+  /** What a deposit on this price would be, for the order preview; null when disabled. */
+  PurchasePreviewResponse.DepositQuote quote(BigDecimal price, Currency currency);
 
   /** Cancels an unpaid deposit or flags a paid one for refund when the order closes. */
   void onOrderClosed(PropertyPurchaseOrder order, String reason);
@@ -30,7 +43,13 @@ public interface PurchaseDepositService {
   PurchaseDepositResponse get(PurchaseOrderActor actor, UUID orderId);
 
   /** Starts (or restarts after a failure) a hosted checkout and returns where to send the buyer. */
-  DepositCheckoutResponse startCheckout(PurchaseOrderActor buyer, UUID orderId);
+  default DepositCheckoutResponse startCheckout(PurchaseOrderActor buyer, UUID orderId) {
+    return startCheckout(buyer, orderId, null);
+  }
+
+  /** As above; a non-null {@code method} replaces the one picked when the order was placed. */
+  DepositCheckoutResponse startCheckout(
+      PurchaseOrderActor buyer, UUID orderId, ChapaPaymentMethod method);
 
   /**
    * Called when the buyer returns from the provider: confirms the result through the verify API.

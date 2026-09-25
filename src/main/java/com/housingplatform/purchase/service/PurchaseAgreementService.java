@@ -24,15 +24,47 @@ public interface PurchaseAgreementService {
   // ---- used by the order workflow (entity-level, same transaction)
 
   /** Renders the agreements a buyer must sign to create an order on this property. */
+  default List<PurchasePreviewResponse.AgreementPreview> previewOrderCreationAgreements(
+      Property property, UUID buyerId, Currency currency, BigDecimal price, FinancingTerms terms) {
+    return previewOrderCreationAgreements(property, buyerId, currency, price, terms, null);
+  }
+
+  /**
+   * As above; with a deposit quote the Reservation Deposit Terms are included and quote it. Without
+   * one (deposits disabled) they are left out.
+   */
   List<PurchasePreviewResponse.AgreementPreview> previewOrderCreationAgreements(
-      Property property, UUID buyerId, Currency currency, BigDecimal price, FinancingTerms terms);
+      Property property,
+      UUID buyerId,
+      Currency currency,
+      BigDecimal price,
+      FinancingTerms terms,
+      PurchasePreviewResponse.DepositQuote deposit);
 
   /**
    * Issues every active ORDER_CREATION agreement on the new order and applies the buyer's signature
    * to the Promise to Purchase. Fails if the referenced template is not the current one.
    */
+  default void signPromiseToPurchaseAtCreation(
+      PropertyPurchaseOrder order, AgreementSignatureRequest signature, SignatureEvidence evidence) {
+    signPromiseToPurchaseAtCreation(order, signature, null, evidence);
+  }
+
+  /**
+   * As above, and also signs the Reservation Deposit Terms when {@code depositTerms} is given (it
+   * must reference the current template). Without it the terms stay pending for the order page.
+   */
   void signPromiseToPurchaseAtCreation(
-      PropertyPurchaseOrder order, AgreementSignatureRequest signature, SignatureEvidence evidence);
+      PropertyPurchaseOrder order,
+      AgreementSignatureRequest signature,
+      AgreementSignatureRequest depositTerms,
+      SignatureEvidence evidence);
+
+  /**
+   * Issues the current Reservation Deposit Terms if the order has a deposit but no live terms yet
+   * (orders placed before the terms moved to order creation).
+   */
+  void ensureDepositTermsIssued(PropertyPurchaseOrder order);
 
   /** Issues the active agreements for a lifecycle trigger that are not yet on the order. */
   void issueForTrigger(PropertyPurchaseOrder order, AgreementTemplate.IssueTrigger trigger);

@@ -12,6 +12,7 @@ import com.housingplatform.payment.chapa.ChapaClient;
 import com.housingplatform.payment.chapa.ChapaClient.InitializeRequest;
 import com.housingplatform.payment.chapa.ChapaClient.InitializeResult;
 import com.housingplatform.payment.chapa.ChapaClient.VerifyResult;
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.payment.chapa.ChapaProperties;
 import com.housingplatform.purchase.config.PurchaseDepositProperties;
 import com.housingplatform.purchase.config.PurchaseProviderProperties;
@@ -381,5 +382,45 @@ class PurchaseDepositServiceImplTest {
         .contains("-D123-");
     assertThat(PurchaseDepositServiceImpl.newTxRef("SOME-VERY-LONG-ORDER-NUMBER-XYZ", 1))
         .hasSizeLessThanOrEqualTo(20);
+  }
+
+  @Test
+  void theChosenMethodSteersChapasCheckoutAndCanBeChangedOnRetry() {
+    issued();
+    order.getDeposit().setPreferredMethod(ChapaPaymentMethod.TELEBIRR);
+    addSignedTerms(AgreementStatus.FULLY_SIGNED);
+    when(chapa.initialize(any())).thenReturn(new InitializeResult("https://checkout.chapa.co/x"));
+
+    service.startCheckout(buyer, order.getId());
+    ArgumentCaptor<InitializeRequest> req = ArgumentCaptor.forClass(InitializeRequest.class);
+    verify(chapa).initialize(req.capture());
+    assertThat(req.getValue().preferredPaymentMethods()).containsExactly("telebirr");
+
+    order.getDeposit().setStatus(DepositStatus.FAILED);
+    service.startCheckout(buyer, order.getId(), ChapaPaymentMethod.CARD);
+    verify(chapa, org.mockito.Mockito.times(2)).initialize(req.capture());
+    assertThat(req.getValue().preferredPaymentMethods()).isEmpty();
+    assertThat(order.getDeposit().getPreferredMethod()).isEqualTo(ChapaPaymentMethod.CARD);
+  }
+
+  @Test
+  void quoteMatchesThePolicyAndListsTheMethods() {
+    var q = service.quote(new BigDecimal("8500000.00"), Currency.ETB);
+    assertThat(q.getAmount()).isEqualByComparingTo("85000.00");
+    assertThat(q.getPaymentMethods()).startsWith(ChapaPaymentMethod.TELEBIRR);
+  }
+
+  @Test
+  void returnUrlFallsBackToThePublicHttpsSiteWhenTheFrontendUrlIsLocal() {
+    assertThat(
+            PurchaseDepositServiceImpl.returnBase(
+                "http://localhost:5173", "https://ethiobuildconnect.et/"))
+        .isEqualTo("https://ethiobuildconnect.et");
+    assertThat(
+            PurchaseDepositServiceImpl.returnBase(
+                "https://app.example.com/", "https://ethiobuildconnect.et"))
+        .isEqualTo("https://app.example.com");
+    assertThat(PurchaseDepositServiceImpl.returnBase("http://localhost:5173", ""))
+        .isEqualTo("http://localhost:5173");
   }
 }
