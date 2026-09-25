@@ -94,6 +94,8 @@ class PurchaseOrderServiceImplTest {
   @Mock private Cache propertyCache;
   @Mock private com.housingplatform.property.service.PropertyDocumentService documentService;
 
+  @Mock private com.housingplatform.purchase.service.PurchaseBalanceService balanceService;
+
   @InjectMocks private PurchaseOrderServiceImpl service;
 
   private Property property;
@@ -833,6 +835,15 @@ class PurchaseOrderServiceImplTest {
     org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(depositService, agreementService);
     inOrder.verify(depositService).issueForOrder(order);
     inOrder.verify(agreementService).issueForTrigger(order, IssueTrigger.SELLER_ACCEPTANCE);
+  }
+
+  @Test
+  void completionIsBlockedWhileTheBalanceIsUnpaid() {
+    PropertyPurchaseOrder order = financedOrder(PurchaseOrderStatus.AWAITING_PAYMENT, "6800000.00");
+    when(balanceService.blocksCompletion(order)).thenReturn(true);
+    assertThatThrownBy(() -> service.complete(seller, order.getId(), "REF"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("unpaid balance");
   }
 
   @Test

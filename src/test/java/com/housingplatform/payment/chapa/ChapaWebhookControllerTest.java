@@ -16,6 +16,7 @@ class ChapaWebhookControllerTest {
   private static final String SECRET = "whsec_test";
 
   private PurchaseDepositService depositService;
+  private com.housingplatform.purchase.service.PurchaseBalanceService balanceService;
   private ChapaWebhookController controller;
 
   @BeforeEach
@@ -23,7 +24,9 @@ class ChapaWebhookControllerTest {
     ChapaProperties properties = new ChapaProperties();
     properties.setWebhookSecret(SECRET);
     depositService = mock(PurchaseDepositService.class);
-    controller = new ChapaWebhookController(properties, depositService, new ObjectMapper());
+    balanceService = mock(com.housingplatform.purchase.service.PurchaseBalanceService.class);
+    controller =
+        new ChapaWebhookController(properties, depositService, balanceService, new ObjectMapper());
   }
 
   @Test
@@ -43,5 +46,15 @@ class ChapaWebhookControllerTest {
     String sig = ChapaSignature.hmacSha256Hex(SECRET, body);
     assertThat(controller.webhook(body, null, sig).getStatusCode().value()).isEqualTo(200);
     verify(depositService).handleProviderNotification("PPO-1-DEP1-ABC");
+  }
+
+  @Test
+  void balancePaymentsAreRoutedToTheBalanceService() {
+    String body = "{\"merchant_reference\":\"3F9A1C2B-B1-7K2Q\"}";
+    org.mockito.Mockito.when(balanceService.ownsTxRef("3F9A1C2B-B1-7K2Q")).thenReturn(true);
+    String sig = ChapaSignature.hmacSha256Hex(SECRET, body);
+    assertThat(controller.webhook(body, null, sig).getStatusCode().value()).isEqualTo(200);
+    verify(balanceService).handleProviderNotification("3F9A1C2B-B1-7K2Q");
+    verify(depositService, never()).handleProviderNotification(any());
   }
 }

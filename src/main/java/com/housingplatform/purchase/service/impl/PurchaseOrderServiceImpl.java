@@ -28,6 +28,7 @@ import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingC
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingResolution;
 import com.housingplatform.purchase.service.PropertyFinancingResolver.FinancingTerms;
 import com.housingplatform.purchase.service.PurchaseAgreementService;
+import com.housingplatform.purchase.service.PurchaseBalanceService;
 import com.housingplatform.purchase.service.PurchaseDepositService;
 import com.housingplatform.purchase.service.PurchaseOrderAccess;
 import com.housingplatform.purchase.service.PurchaseOrderActor;
@@ -124,6 +125,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   private final PurchaseAgreementService agreementService;
   private final PurchaseDepositService depositService;
   private final PropertyDocumentService documentService;
+  private final PurchaseBalanceService balanceService;
   private final ApplicationEventPublisher eventPublisher;
   private final CacheManager cacheManager;
 
@@ -511,6 +513,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
               + order.getOrderNumber()
               + " still has an unpaid reservation deposit; the sale cannot be completed");
     }
+    if (balanceService.blocksCompletion(order)) {
+      throw new BusinessException(
+          "Order "
+              + order.getOrderNumber()
+              + " still has an unpaid balance; record or confirm the payments first");
+    }
     order.setPaymentReference(blankToNull(paymentReference));
     String actor = seller.userId().toString();
     transition(order, PurchaseOrderStatus.COMPLETED, actor, blankToNull(paymentReference));
@@ -621,6 +629,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     transition(order, terminal, actor, blankToNull(notes));
     agreementService.voidOpenAgreements(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
     depositService.onOrderClosed(order, "Order " + terminal.name().toLowerCase(Locale.ROOT));
+    balanceService.onOrderClosed(order);
     if (hadReservation) {
       releaseReservationIfUnused(order.getPropertyId(), order.getId());
     }

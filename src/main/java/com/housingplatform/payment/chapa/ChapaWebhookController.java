@@ -2,6 +2,7 @@ package com.housingplatform.payment.chapa;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.housingplatform.purchase.service.PurchaseBalanceService;
 import com.housingplatform.purchase.service.PurchaseDepositService;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -25,6 +26,7 @@ public class ChapaWebhookController {
 
   private final ChapaProperties properties;
   private final PurchaseDepositService depositService;
+  private final PurchaseBalanceService balanceService;
   private final ObjectMapper objectMapper;
 
   @PostMapping("/webhook")
@@ -56,7 +58,11 @@ public class ChapaWebhookController {
       return ResponseEntity.badRequest().build();
     }
     try {
-      depositService.handleProviderNotification(txRef);
+      if (balanceService.ownsTxRef(txRef)) {
+        balanceService.handleProviderNotification(txRef);
+      } else {
+        depositService.handleProviderNotification(txRef);
+      }
     } catch (RuntimeException e) {
       // Chapa retries on non-2xx; a transient verify failure should be retried, unknown refs not.
       log.warn("Chapa webhook for {} could not be processed: {}", txRef, e.getMessage());

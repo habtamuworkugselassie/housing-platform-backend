@@ -270,7 +270,7 @@ public class PropertyDocumentServiceImpl implements PropertyDocumentService {
   }
 
   /** Browsers sometimes send octet-stream for PDFs; fall back to the extension. */
-  static String normaliseType(String contentType, String fileName) {
+  public static String normaliseType(String contentType, String fileName) {
     String type = contentType != null ? contentType.toLowerCase(Locale.ROOT).trim() : "";
     if (ALLOWED_TYPES.contains(type)) {
       return type;
