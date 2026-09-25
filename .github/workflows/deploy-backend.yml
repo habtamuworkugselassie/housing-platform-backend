@@ -68,9 +68,9 @@ jobs:
     #   SUPPORT_CHAT_API_BASE_URL — optional; default https://api.openai.com/v1 if unset
     #   SUPPORT_CHAT_API_KEY — OpenAI-compatible API key (or leave unset for offline fallback)
     #   SUPPORT_CHAT_MODEL — optional; default gpt-4o-mini if unset
-    #   CHAPA_SECRET_KEY — CHASECK_TEST-… (sandbox) or CHASECK-… (live); unset disables deposit checkout
-    #   CHAPA_WEBHOOK_SECRET — from Chapa dashboard → Settings → Webhooks
-    #   CHAPA_BASE_URL — optional; https://api.chapa.global/v1 for Chapa Global accounts (default api.chapa.co)
+    #   CHAPA_SECRET_KEY / CHAPA_WEBHOOK_SECRET — optional while testing (application.yml has test
+    #     defaults); required with fresh values before going live
+    #   CHAPA_BASE_URL — optional; defaults to https://api.chapa.global/v1 (application.yml)
     #   PUBLIC_API_BASE_URL — public URL of this API, used for Chapa's callback_url
     # DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are no longer used and can be deleted.
     steps:
@@ -106,11 +106,11 @@ jobs:
             export SUPPORT_CHAT_API_BASE_URL="${SUPPORT_CHAT_API_BASE_URL:-}"
             export SUPPORT_CHAT_API_KEY="${SUPPORT_CHAT_API_KEY:-}"
             export SUPPORT_CHAT_MODEL="${SUPPORT_CHAT_MODEL:-}"
-            export CHAPA_SECRET_KEY="${CHAPA_SECRET_KEY:-}"
-            export CHAPA_WEBHOOK_SECRET="${CHAPA_WEBHOOK_SECRET:-}"
-            # Empty would override the application.yml default, so fall back explicitly.
-            export CHAPA_BASE_URL="${CHAPA_BASE_URL:-https://api.chapa.co/v1}"
-            export PUBLIC_API_BASE_URL="${PUBLIC_API_BASE_URL:-}"
+            # Chapa: export only when the GitHub secret is set. An empty value would override the
+            # defaults in application.yml, so unset secrets are left unset instead.
+            for v in CHAPA_SECRET_KEY CHAPA_WEBHOOK_SECRET CHAPA_BASE_URL PUBLIC_API_BASE_URL; do
+              if [ -n "${!v:-}" ]; then export "$v"; else unset "$v"; fi
+            done
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT

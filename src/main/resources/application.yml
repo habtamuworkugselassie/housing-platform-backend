@@ -226,11 +226,13 @@ twilio:
 # Property purchase orders. The provider is the legal counterparty to every buyer agreement.
 # Chapa hosted checkout for reservation deposits (card data never touches this server).
 chapa:
-  secret-key: ${CHAPA_SECRET_KEY:}
-  webhook-secret: ${CHAPA_WEBHOOK_SECRET:}
-  base-url: ${CHAPA_BASE_URL:https://api.chapa.co/v1}
+  # TEST-MODE defaults for the Chapa Global sandbox, committed at the owner's request. This repo is
+  # public: rotate both values and set them via env (GitHub secrets) before going live.
+  secret-key: ${CHAPA_SECRET_KEY:CHAPA_TEST_PRIV_xm8eFixGro4YITIaVRnshjLEvMEy9mKwIKHp96ja}
+  webhook-secret: ${CHAPA_WEBHOOK_SECRET:c2cd50004f494ab2e9c77cddb1b535583f5faed77a4a046d2e6c1855bf139e4e}
+  base-url: ${CHAPA_BASE_URL:https://api.chapa.global/v1}
   # Public URL of this API so Chapa can call /api/v1/payments/chapa/webhook (else configure it in the dashboard).
-  public-api-base-url: ${PUBLIC_API_BASE_URL:}
+  public-api-base-url: ${PUBLIC_API_BASE_URL:https://ethiobuildconnect.et}
 
 purchase:
   deposit:
