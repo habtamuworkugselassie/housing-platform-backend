@@ -99,6 +99,8 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
       values.put("deposit.amount", money(deposit.getAmount()));
       values.put("deposit.currency", deposit.getCurrency().getCode());
       values.put("deposit.dueDate", "the time the order is placed");
+      putConversion(
+          values, deposit.getBaseAmount(), deposit.getBaseCurrency(), deposit.getExchangeRate());
     }
     List<PurchasePreviewResponse.AgreementPreview> previews = new ArrayList<>();
     for (AgreementTemplate t : activeTemplates(IssueTrigger.ORDER_CREATION, type)) {
@@ -478,6 +480,11 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
           order.getDeposit().getDueAt() != null
               ? order.getDeposit().getDueAt().toLocalDate().toString()
               : "");
+      putConversion(
+          values,
+          order.getDeposit().getBaseAmount(),
+          order.getDeposit().getBaseCurrency(),
+          order.getDeposit().getExchangeRate());
     }
     PurchaseOrderFinancing f = order.getFinancing();
     if (order.getPurchaseType() == PurchaseType.BANK_FINANCED && f != null) {
@@ -575,5 +582,17 @@ public class PurchaseAgreementServiceImpl implements PurchaseAgreementService {
       return null;
     }
     return s.length() <= max ? s : s.substring(0, max);
+  }
+
+  /** {{#deposit.converted}} blocks explain a deposit paid in another currency than the order. */
+  private static void putConversion(
+      Map<String, String> values, BigDecimal baseAmount, Currency baseCurrency, BigDecimal rate) {
+    if (baseAmount == null || baseCurrency == null || rate == null) {
+      return;
+    }
+    values.put("deposit.converted", "true");
+    values.put("deposit.baseAmount", money(baseAmount));
+    values.put("deposit.baseCurrency", baseCurrency.getCode());
+    values.put("deposit.rate", rate.stripTrailingZeros().toPlainString());
   }
 }

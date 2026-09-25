@@ -59,6 +59,12 @@ public class CreatePurchaseOrderRequest {
   /** Optional: how the buyer wants to pay the reservation deposit. */
   private ChapaPaymentMethod depositPaymentMethod;
 
+  /**
+   * Optional: USD pays an ETB deposit by international card at the platform's rate. Null or the
+   * order currency pays it as quoted.
+   */
+  private Currency depositCurrency;
+
   @Data
   public static class FinancingSelection {
     /**

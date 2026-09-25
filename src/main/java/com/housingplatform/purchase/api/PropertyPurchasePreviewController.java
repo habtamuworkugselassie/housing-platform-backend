@@ -34,8 +34,11 @@ public class PropertyPurchasePreviewController {
               + " to create the order. Public: visitors see it before signing up; a signed-in"
               + " buyer gets the agreement rendered with their name. No side effects.")
   public ResponseEntity<PurchasePreviewResponse> preview(
-      @PathVariable UUID propertyId, @RequestParam(required = false) Currency currency) {
+      @PathVariable UUID propertyId,
+      @RequestParam(required = false) Currency currency,
+      @RequestParam(required = false) Currency depositCurrency) {
     return ResponseEntity.ok(
-        purchaseOrderService.preview(actors.currentOrAnonymous(), propertyId, currency));
+        purchaseOrderService.preview(
+            actors.currentOrAnonymous(), propertyId, currency, depositCurrency));
   }
 }

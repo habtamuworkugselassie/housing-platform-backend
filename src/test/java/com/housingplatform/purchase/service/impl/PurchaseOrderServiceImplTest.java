@@ -809,7 +809,7 @@ class PurchaseOrderServiceImplTest {
     r.setDepositTerms(terms);
     service.createPurchaseOrder(buyer, r, EVIDENCE);
     org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(depositService, agreementService);
-    inOrder.verify(depositService).issueForOrder(any(), eq(ChapaPaymentMethod.TELEBIRR));
+    inOrder.verify(depositService).issueForOrder(any(), eq(ChapaPaymentMethod.TELEBIRR), eq(null));
     inOrder
         .verify(agreementService)
         .signPromiseToPurchaseAtCreation(any(), any(), eq(terms), eq(EVIDENCE));

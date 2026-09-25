@@ -627,4 +627,41 @@ class PurchaseAgreementServiceImplTest {
         .extracting(a -> a.getType())
         .containsExactly(AgreementType.PROMISE_TO_PURCHASE);
   }
+
+  @Test
+  void aDepositPaidInUsdStatesTheConversion() {
+    AgreementTemplate terms =
+        template(
+            AgreementType.RESERVATION_DEPOSIT_TERMS,
+            3,
+            IssueTrigger.ORDER_CREATION,
+            AppliesTo.ALL,
+            true,
+            "PAY {{deposit.amount}} {{deposit.currency}}{{#deposit.converted}} = {{deposit.baseAmount}}"
+                + " {{deposit.baseCurrency}} @ {{deposit.rate}}{{/deposit.converted}}");
+    PropertyPurchaseOrder usd = order(false);
+    withDeposit(usd);
+    usd.getDeposit().setAmount(new BigDecimal("566.67"));
+    usd.getDeposit().setCurrency(com.housingplatform.shared.domain.Currency.USD);
+    usd.getDeposit().setBaseAmount(new BigDecimal("85000.00"));
+    usd.getDeposit().setBaseCurrency(com.housingplatform.shared.domain.Currency.ETB);
+    usd.getDeposit().setExchangeRate(new BigDecimal("150.000000"));
+    service.signPromiseToPurchaseAtCreation(
+        usd, signature(promise.getId()), signature(terms.getId()), SignatureEvidence.none());
+    assertThat(depositTermsOf(usd)).contains("PAY 566.67 USD = 85,000.00 ETB @ 150");
+
+    PropertyPurchaseOrder etb = order(false);
+    withDeposit(etb);
+    service.signPromiseToPurchaseAtCreation(
+        etb, signature(promise.getId()), signature(terms.getId()), SignatureEvidence.none());
+    assertThat(depositTermsOf(etb)).contains("PAY 85,000.00 ETB").doesNotContain("@");
+  }
+
+  private static String depositTermsOf(PropertyPurchaseOrder order) {
+    return order.getAgreements().stream()
+        .filter(x -> x.getType() == AgreementType.RESERVATION_DEPOSIT_TERMS)
+        .findFirst()
+        .orElseThrow()
+        .getContent();
+  }
 }

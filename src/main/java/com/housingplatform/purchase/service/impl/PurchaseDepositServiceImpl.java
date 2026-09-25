@@ -60,33 +60,78 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
   // ------------------------------------------------------------------ workflow hooks
 
   @Override
-  public void issueForOrder(PropertyPurchaseOrder order, ChapaPaymentMethod preferredMethod) {
+  public void issueForOrder(
+      PropertyPurchaseOrder order, ChapaPaymentMethod preferredMethod, Currency payCurrency) {
     if (!policy.isEnabled() || order.getDeposit() != null) {
       return;
     }
+    BigDecimal amount = policy.amountFor(order.getListedPrice(), order.getCurrency());
     PurchaseDeposit deposit =
         PurchaseDeposit.builder()
             .purchaseOrder(order)
-            .amount(policy.amountFor(order.getListedPrice(), order.getCurrency()))
+            .amount(amount)
             .currency(order.getCurrency())
             .status(DepositStatus.DUE)
             .dueAt(LocalDateTime.now().plusDays(policy.dueDays()))
             .preferredMethod(preferredMethod)
             .build();
+    if (convertsToUsd(order.getCurrency(), payCurrency)) {
+      deposit.setBaseAmount(amount);
+      deposit.setBaseCurrency(order.getCurrency());
+      deposit.setExchangeRate(policy.etbPerUsd());
+      deposit.setAmount(policy.toUsd(amount));
+      deposit.setCurrency(Currency.USD);
+    }
+    deposit.setPreferredMethod(methodFor(deposit.getCurrency(), preferredMethod));
     order.setDeposit(deposit);
   }
 
+  /** True when an ETB deposit is to be paid in USD; fails if that option is off. */
+  private boolean convertsToUsd(Currency orderCurrency, Currency payCurrency) {
+    if (payCurrency != Currency.USD || orderCurrency == Currency.USD) {
+      return false;
+    }
+    if (policy.etbPerUsd() == null) {
+      throw new BusinessException("Paying the deposit in USD is not available at the moment");
+    }
+    return true;
+  }
+
+  /** Mobile wallets only take birr: a USD deposit is always paid by card. */
+  private static ChapaPaymentMethod methodFor(Currency currency, ChapaPaymentMethod method) {
+    return currency == Currency.USD ? ChapaPaymentMethod.CARD : method;
+  }
+
+  private static List<ChapaPaymentMethod> methodsFor(Currency currency) {
+    return currency == Currency.USD
+        ? List.of(ChapaPaymentMethod.CARD)
+        : List.of(ChapaPaymentMethod.values());
+  }
+
   @Override
-  public PurchasePreviewResponse.DepositQuote quote(BigDecimal price, Currency currency) {
+  public PurchasePreviewResponse.DepositQuote quote(
+      BigDecimal price, Currency currency, Currency payCurrency) {
     if (!policy.isEnabled()) {
       return null;
     }
-    return PurchasePreviewResponse.DepositQuote.builder()
-        .amount(policy.amountFor(price, currency))
-        .currency(currency)
-        .checkoutAvailable(chapa.isConfigured())
-        .paymentMethods(List.of(ChapaPaymentMethod.values()))
-        .build();
+    BigDecimal amount = policy.amountFor(price, currency);
+    boolean usdOption = currency != Currency.USD && policy.etbPerUsd() != null;
+    PurchasePreviewResponse.DepositQuote.DepositQuoteBuilder q =
+        PurchasePreviewResponse.DepositQuote.builder()
+            .amount(amount)
+            .currency(currency)
+            .checkoutAvailable(chapa.isConfigured())
+            .paymentMethods(methodsFor(currency))
+            .usdAmount(usdOption ? policy.toUsd(amount) : null);
+    if (convertsToUsd(currency, payCurrency)) {
+      q.amount(policy.toUsd(amount))
+          .currency(Currency.USD)
+          .paymentMethods(methodsFor(Currency.USD))
+          .baseAmount(amount)
+          .baseCurrency(currency)
+          .exchangeRate(policy.etbPerUsd());
+    }
+    return q.build();
   }
 
   @Override
@@ -161,7 +206,7 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
 
     // Only a fresh checkout takes a new method; a pending one above is resumed as it was started.
     if (method != null) {
-      d.setPreferredMethod(method);
+      d.setPreferredMethod(methodFor(d.getCurrency(), method));
     }
     User buyerUser = userRepository.findById(order.getBuyerId()).orElse(null);
     String txRef = newTxRef(order.getOrderNumber(), d.getAttempts() + 1);
@@ -270,6 +315,9 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
         .providerReference(d.getProviderReference())
         .paymentMethod(d.getPaymentMethod())
         .preferredMethod(d.getPreferredMethod())
+        .baseAmount(d.getBaseAmount())
+        .baseCurrency(d.getBaseCurrency())
+        .exchangeRate(d.getExchangeRate())
         .paidAt(d.getPaidAt())
         .failureReason(d.getFailureReason())
         .attempts(d.getAttempts())

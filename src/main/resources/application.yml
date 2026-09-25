@@ -243,6 +243,8 @@ purchase:
     min-usd: ${PURCHASE_DEPOSIT_MIN_USD:100}
     max-usd: ${PURCHASE_DEPOSIT_MAX_USD:2500}
     due-days: ${PURCHASE_DEPOSIT_DUE_DAYS:3}
+    # Birr per USD for paying an ETB deposit in USD by international card; empty turns USD off.
+    etb-per-usd: ${PURCHASE_DEPOSIT_ETB_PER_USD:}
   orders:
     expiry-cron: "0 */15 * * * *"
   provider:

@@ -423,4 +423,54 @@ class PurchaseDepositServiceImplTest {
     assertThat(PurchaseDepositServiceImpl.returnBase("http://localhost:5173", ""))
         .isEqualTo("http://localhost:5173");
   }
+
+  // ------------------------------------------------------------------ paying in USD
+
+  private PurchaseDepositServiceImpl withRate(String etbPerUsd) {
+    PurchaseDepositProperties props = new PurchaseDepositProperties();
+    props.setEtbPerUsd(etbPerUsd == null ? null : new BigDecimal(etbPerUsd));
+    return new PurchaseDepositServiceImpl(
+        depositRepository,
+        orderRepository,
+        userRepository,
+        new DepositPolicy(props),
+        chapa,
+        new ChapaProperties(),
+        new PurchaseProviderProperties(),
+        eventPublisher);
+  }
+
+  @Test
+  void anEtbDepositCanBePaidInUsdByCardAtTheConfiguredRate() {
+    PurchaseDepositServiceImpl usd = withRate("150");
+    usd.issueForOrder(order, ChapaPaymentMethod.TELEBIRR, Currency.USD);
+    PurchaseDeposit d = order.getDeposit();
+    assertThat(d.getCurrency()).isEqualTo(Currency.USD);
+    assertThat(d.getAmount()).isEqualByComparingTo("566.67"); // 85,000 / 150
+    assertThat(d.getBaseAmount()).isEqualByComparingTo("85000.00");
+    assertThat(d.getBaseCurrency()).isEqualTo(Currency.ETB);
+    assertThat(d.getExchangeRate()).isEqualByComparingTo("150");
+    assertThat(d.getPreferredMethod()).isEqualTo(ChapaPaymentMethod.CARD);
+  }
+
+  @Test
+  void usdIsRefusedWhenNoRateIsConfigured() {
+    PurchaseDepositServiceImpl noRate = withRate(null);
+    assertThatThrownBy(() -> noRate.issueForOrder(order, null, Currency.USD))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("USD");
+    assertThat(noRate.quote(new BigDecimal("8500000.00"), Currency.ETB).getUsdAmount()).isNull();
+  }
+
+  @Test
+  void quoteOffersUsdAndCanBeRenderedInUsd() {
+    PurchaseDepositServiceImpl usd = withRate("150");
+    var etb = usd.quote(new BigDecimal("8500000.00"), Currency.ETB);
+    assertThat(etb.getUsdAmount()).isEqualByComparingTo("566.67");
+    var inUsd = usd.quote(new BigDecimal("8500000.00"), Currency.ETB, Currency.USD);
+    assertThat(inUsd.getCurrency()).isEqualTo(Currency.USD);
+    assertThat(inUsd.getAmount()).isEqualByComparingTo("566.67");
+    assertThat(inUsd.getPaymentMethods()).containsExactly(ChapaPaymentMethod.CARD);
+    assertThat(inUsd.getBaseAmount()).isEqualByComparingTo("85000.00");
+  }
 }

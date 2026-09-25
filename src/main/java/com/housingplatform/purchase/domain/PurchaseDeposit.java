@@ -58,6 +58,20 @@ public class PurchaseDeposit extends BaseAuditEntity {
   @Column(name = "payment_method", length = 64)
   private String paymentMethod;
 
+  /**
+   * Set when the buyer pays an ETB deposit in another currency: the ETB amount it stands for and
+   * the rate used (birr per unit of {@link #currency}). Refunds are in {@link #currency}.
+   */
+  @Column(name = "base_amount", precision = 19, scale = 2)
+  private BigDecimal baseAmount;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "base_currency", length = 3)
+  private Currency baseCurrency;
+
+  @Column(name = "exchange_rate", precision = 19, scale = 6)
+  private BigDecimal exchangeRate;
+
   /** What the buyer picked on our side; steers Chapa's checkout. Null means no preference. */
   @Enumerated(EnumType.STRING)
   @Column(name = "preferred_method", length = 24)

@@ -50,6 +50,18 @@ public class PurchasePreviewResponse {
 
     /** Methods the buyer can pick before checkout, in display order. */
     private List<ChapaPaymentMethod> paymentMethods;
+
+    /** When paying an ETB deposit in USD: the ETB amount it stands for and the rate used. */
+    private BigDecimal baseAmount;
+
+    private Currency baseCurrency;
+    private BigDecimal exchangeRate;
+
+    /**
+     * What the deposit would be in USD by international card, when that option is on and the quote
+     * is in ETB; null otherwise.
+     */
+    private BigDecimal usdAmount;
   }
 
   @Data
