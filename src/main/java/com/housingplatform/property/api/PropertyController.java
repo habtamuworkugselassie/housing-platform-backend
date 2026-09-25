@@ -112,13 +112,32 @@ public class PropertyController {
     return ResponseEntity.ok(properties);
   }
 
+  @GetMapping("/my-organization")
+  @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
+  @Operation(
+      summary = "Get my organization's properties",
+      description =
+          "Every property belonging to the calling realtor's own organization, including listings"
+              + " created by colleagues and those not publicly visible. Takes no id: the"
+              + " organization comes from the authenticated agent, so one company cannot read"
+              + " another's listings.")
+  public ResponseEntity<List<PropertyResponse>> getMyOrganizationProperties() {
+    return ResponseEntity.ok(propertyService.getMyOrganizationProperties());
+  }
+
   @GetMapping("/organization/{organizationId}")
   @AuthPolicyScope(AuthPolicyScope.Policy.REALTOR_SECURED)
   @Operation(
       summary = "Get properties by organization",
-      description = "Get all properties for a specific organization (super agents only)")
+      description =
+          "Get all properties for a specific organization. Callable only for the caller's own"
+              + " organization, or by an admin; realtors should prefer /my-organization.")
   public ResponseEntity<List<PropertyResponse>> getPropertiesByOrganization(
       @PathVariable UUID organizationId) {
+    // REALTOR_SECURED only proves the caller is *a* realtor, not that this organization is theirs.
+    // Without this check any realtor could read any company's full property list — including
+    // listings that are not publicly visible — just by supplying its id.
+    propertyService.assertCallerBelongsToOrganization(organizationId);
     List<PropertyResponse> properties = propertyService.getPropertiesByCompanyId(organizationId);
     return ResponseEntity.ok(properties);
   }
