@@ -81,6 +81,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
   private final PurchaseProviderProperties provider;
   private final ProviderBankAccountSettings bankAccount;
   private final MediaStorageService storage;
+  private final com.housingplatform.purchase.service.OnlinePaymentLimits onlineLimits;
 
   @Value("${app.frontend-base-url:http://localhost:5173}")
   private String frontendBaseUrl = "http://localhost:5173";
@@ -229,6 +230,15 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
     settlePending(order);
     BigDecimal value = positive(amount);
     requireWithinRemaining(order, value, null, what);
+    BigDecimal max = onlineLimits.maxFor(order.getCurrency());
+    if (max != null && value.compareTo(max) > 0) {
+      throw new BusinessException(
+          "Online payments are limited to "
+              + max.stripTrailingZeros().toPlainString()
+              + " "
+              + order.getCurrency().getCode()
+              + " each. Pay in several parts or by bank transfer");
+    }
 
     ChapaPaymentMethod chosen =
         order.getCurrency() == Currency.USD ? ChapaPaymentMethod.CARD : method;
@@ -589,6 +599,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
         .fullyPaid(remaining.signum() == 0)
         .payable(PAYABLE.contains(order.getStatus()))
         .checkoutAvailable(chapa.isConfigured())
+        .onlineMaxPerPayment(onlineLimits.maxFor(order.getCurrency()))
         .paymentMethods(
             order.getCurrency() == Currency.USD
                 ? List.of(ChapaPaymentMethod.CARD)

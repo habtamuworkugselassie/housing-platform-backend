@@ -39,6 +39,10 @@ public class PurchaseBalanceResponse {
   private boolean payable;
 
   private boolean checkoutAvailable;
+
+  /** The most one online payment may be (Chapa's limit); null when none is set. */
+  private BigDecimal onlineMaxPerPayment;
+
   private List<ChapaPaymentMethod> paymentMethods;
 
   /** Where to send a bank transfer, and the reference to quote; null until an admin sets it. */

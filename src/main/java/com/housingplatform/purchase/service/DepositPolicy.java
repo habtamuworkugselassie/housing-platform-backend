@@ -22,6 +22,13 @@ public class DepositPolicy {
 
   private SiteSettingRepository siteSettings;
 
+  private OnlinePaymentLimits onlineLimits;
+
+  @Autowired(required = false)
+  public void setOnlineLimits(OnlinePaymentLimits onlineLimits) {
+    this.onlineLimits = onlineLimits;
+  }
+
   @Autowired(required = false)
   public void setSiteSettings(SiteSettingRepository siteSettings) {
     this.siteSettings = siteSettings;
@@ -38,6 +45,12 @@ public class DepositPolicy {
             .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     BigDecimal min = currency == Currency.USD ? properties.getMinUsd() : properties.getMinEtb();
     BigDecimal max = currency == Currency.USD ? properties.getMaxUsd() : properties.getMaxEtb();
+    // The deposit is one online payment, so it must fit Chapa's per-payment maximum.
+    BigDecimal online = onlineLimits != null ? onlineLimits.maxFor(currency) : null;
+    if (online != null) {
+      max = max.min(online);
+      min = min.min(max);
+    }
     BigDecimal clamped = raw.max(min).min(max);
     // Never ask for more than the price itself (tiny listings).
     return clamped.min(listedPrice).setScale(2, RoundingMode.HALF_UP);

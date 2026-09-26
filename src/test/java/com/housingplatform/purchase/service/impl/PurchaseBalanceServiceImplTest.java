@@ -56,6 +56,8 @@ class PurchaseBalanceServiceImplTest {
   private final ChapaClient chapa = mock(ChapaClient.class);
   private final MediaStorageService storage = mock(MediaStorageService.class);
   private final ProviderBankAccountSettings bank = mock(ProviderBankAccountSettings.class);
+  private final com.housingplatform.purchase.service.OnlinePaymentLimits onlineLimits =
+      mock(com.housingplatform.purchase.service.OnlinePaymentLimits.class);
 
   private final List<PurchaseBalancePayment> payments = new ArrayList<>();
   private final List<PurchaseBalanceInstalment> instalments = new ArrayList<>();
@@ -81,7 +83,8 @@ class PurchaseBalanceServiceImplTest {
             new ChapaProperties(),
             new PurchaseProviderProperties(),
             bank,
-            storage);
+            storage,
+            onlineLimits);
     order =
         PropertyPurchaseOrder.builder()
             .orderNumber("PPO-2026-1F99D681")
@@ -343,5 +346,16 @@ class PurchaseBalanceServiceImplTest {
   @Test
   void ordersWithoutAMarkupHaveNoFee() {
     assertThat(service.get(buyer, order.getId()).getFees()).isNull();
+  }
+
+  @Test
+  void anOnlinePaymentAboveChapasLimitIsRefusedWithAHint() {
+    when(onlineLimits.maxFor(Currency.ETB)).thenReturn(new BigDecimal("75000"));
+    assertThatThrownBy(
+            () -> service.startOnline(buyer, order.getId(), new BigDecimal("75000.01"), null))
+        .hasMessageContaining("limited to 75000 ETB each");
+    service.startOnline(buyer, order.getId(), new BigDecimal("75000"), null);
+    assertThat(service.get(buyer, order.getId()).getOnlineMaxPerPayment())
+        .isEqualByComparingTo("75000");
   }
 }
