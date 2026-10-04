@@ -1,10 +1,10 @@
-package com.housingplatform.etrade.service;
+package com.housingplatform.etradeservice.service;
 
-import com.housingplatform.etrade.client.EtradeRegistrationResponse;
-import com.housingplatform.etrade.dto.EtradeBusinessDetails;
-import com.housingplatform.etrade.dto.EtradeBusinessDetails.LicenseStatus;
-import com.housingplatform.etrade.dto.EtradeBusinessDetails.LicensedBusiness;
-import com.housingplatform.etrade.dto.EtradeLegalCondition;
+import com.housingplatform.etradeservice.client.EtradeRegistrationResponse;
+import com.housingplatform.etradeservice.dto.EtradeBusinessDetails;
+import com.housingplatform.etradeservice.dto.EtradeBusinessDetails.LicenseStatus;
+import com.housingplatform.etradeservice.dto.EtradeBusinessDetails.LicensedBusiness;
+import com.housingplatform.etradeservice.dto.EtradeLegalCondition;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

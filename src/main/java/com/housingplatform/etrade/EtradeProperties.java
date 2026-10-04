@@ -7,9 +7,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Ethiopian Ministry of Trade "eTrade" portal (https://etrade.gov.et). The public business license
- * checker page is backed by an unauthenticated JSON API that returns a trader's registration and
- * licensed businesses by Tax Identification Number (TIN).
+ * Connection to the standalone <b>etrade-service</b> ({@code services/etrade-service}), which wraps
+ * the Ministry of Trade eTrade portal (https://etrade.gov.et). The monolith never calls
+ * etrade.gov.et itself; the service owns the upstream quirks (Referer, TLS chain, caching).
  */
 @Component
 @ConfigurationProperties(prefix = "etrade")
@@ -17,39 +17,17 @@ import org.springframework.stereotype.Component;
 @Setter
 public class EtradeProperties {
 
-  /** Master switch; when false the lookup endpoints answer 400 without calling eTrade. */
+  /** Master switch; when false the lookup endpoints answer 400 without calling the service. */
   private boolean enabled = true;
 
-  /** Origin of the eTrade portal. The API lives under {@code /api}. */
-  private String baseUrl = "https://etrade.gov.et";
+  /** Base URL of the etrade-service, e.g. {@code http://etrade-service:8085}. */
+  private String serviceUrl = "http://localhost:8085";
 
-  /**
-   * eTrade rejects API calls with HTTP 417 "Invalid referer header" unless the Referer points at
-   * one of its own pages, so every request carries this value.
-   */
-  private String referer = "https://etrade.gov.et/business-license-checker";
+  /** Sent as {@code X-API-Key}; must be one of the service's {@code ETRADE_SERVICE_API_KEYS}. */
+  private String serviceApiKey = "";
 
-  /** Sent as the User-Agent header. */
-  private String userAgent = "EthioBuildConnect/1.0 (+https://ethiobuildconnect.et)";
+  private Duration connectTimeout = Duration.ofSeconds(5);
 
-  /**
-   * Language segment of the API path. "en" returns Gregorian dates (M/d/yyyy); "am" returns the
-   * same record with Ethiopian-calendar dates, which the mapper cannot parse.
-   */
-  private String language = "en";
-
-  private Duration connectTimeout = Duration.ofSeconds(10);
-
-  private Duration readTimeout = Duration.ofSeconds(30);
-
-  /**
-   * etrade.gov.et serves its leaf certificate without the GlobalSign intermediate, so a stock JDK
-   * trust store cannot validate the chain. When true, the bundled intermediate (see {@code
-   * classpath:etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem}) is added to the trusted certificates
-   * for this client only. Set false if the server starts sending a complete chain.
-   */
-  private boolean trustBundledIntermediate = true;
-
-  /** Classpath or file location of extra PEM certificates to trust (one or more in one file). */
-  private String intermediateCertificate = "classpath:etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem";
+  /** The service may itself wait up to ~30 s on a slow eTrade; allow for that. */
+  private Duration readTimeout = Duration.ofSeconds(40);
 }

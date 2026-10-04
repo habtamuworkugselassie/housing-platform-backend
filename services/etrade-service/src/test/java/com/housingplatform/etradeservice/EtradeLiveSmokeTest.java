@@ -1,10 +1,11 @@
-package com.housingplatform.etrade;
+package com.housingplatform.etradeservice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.housingplatform.etrade.client.EtradeRegistrationResponse;
-import com.housingplatform.etrade.client.EtradeRestClient;
+import com.housingplatform.etradeservice.client.EtradeRegistrationResponse;
+import com.housingplatform.etradeservice.client.EtradeRestClient;
+import com.housingplatform.etradeservice.config.EtradeProperties;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;

@@ -1,4 +1,4 @@
-package com.housingplatform.etrade.client;
+package com.housingplatform.etradeservice.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Wire format of {@code GET /api/Registration/GetRegistrationInfoByTin/{tin}/{lang}} on
  * etrade.gov.et, kept 1:1 with the upstream PascalCase names (typos included). Mapped to {@link
- * com.housingplatform.etrade.dto.EtradeBusinessDetails} before it leaves the module.
+ * com.housingplatform.etradeservice.dto.EtradeBusinessDetails} before it leaves the module.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record EtradeRegistrationResponse(

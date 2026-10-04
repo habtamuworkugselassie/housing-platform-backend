@@ -1,4 +1,4 @@
-package com.housingplatform.etrade.client;
+package com.housingplatform.etradeservice.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -10,8 +10,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.housingplatform.etrade.EtradeProperties;
-import com.housingplatform.etrade.EtradeUnavailableException;
+import com.housingplatform.etradeservice.EtradeUnavailableException;
+import com.housingplatform.etradeservice.config.EtradeProperties;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;

@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.housingplatform.etrade.EtradeProperties;
-import com.housingplatform.etrade.client.EtradeRegistrationResponse;
+import com.housingplatform.etrade.client.EtradeServiceClient;
 import com.housingplatform.etrade.dto.EtradeBusinessDetails;
 import com.housingplatform.etrade.dto.EtradeBusinessDetails.LicenseStatus;
 import com.housingplatform.etrade.dto.EtradeOrganizationVerification;
@@ -26,17 +26,15 @@ import org.junit.jupiter.api.Test;
 
 class EtradeBusinessServiceTest {
 
-  private EtradeRegistrationLookup lookup;
-  private EtradeBusinessMapper mapper;
+  private EtradeServiceClient client;
   private EtradeBusinessService service;
 
   @BeforeEach
   void setUp() {
-    lookup = mock(EtradeRegistrationLookup.class);
-    mapper = mock(EtradeBusinessMapper.class);
+    client = mock(EtradeServiceClient.class);
     service =
         new EtradeBusinessService(
-            new EtradeProperties(), lookup, mapper, mock(OrganizationRepository.class));
+            new EtradeProperties(), client, mock(OrganizationRepository.class));
   }
 
   @Test
@@ -58,12 +56,12 @@ class EtradeBusinessServiceTest {
   void aMalformedTinNeverReachesEtrade() {
     assertThatThrownBy(() -> service.getBusinessDetails("12", false))
         .isInstanceOf(BusinessException.class);
-    verify(lookup, never()).fetch(any());
+    verify(client, never()).findBusiness(any(), anyBoolean());
   }
 
   @Test
   void unknownTinIs404AndCarriesTheNormalizedTin() {
-    when(lookup.fetch("0081723672")).thenReturn(Optional.empty());
+    when(client.findBusiness(eq("0081723672"), anyBoolean())).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.getBusinessDetails("0081 723 672", false))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("0081723672");
@@ -71,18 +69,24 @@ class EtradeBusinessServiceTest {
   }
 
   @Test
-  void mapsTheRecordWithThePublicCheckerUrlAsSource() {
-    EtradeRegistrationResponse raw =
-        new EtradeRegistrationResponse("0081723672", "1", null, null, "N", null, null, null, null);
+  void passesTheNormalizedTinAndPhotoFlagToTheService() {
     EtradeBusinessDetails mapped = EtradeBusinessDetails.builder().tin("0081723672").build();
-    when(lookup.fetch("0081723672")).thenReturn(Optional.of(raw));
-    when(mapper.toDetails(
-            eq(raw), eq("https://etrade.gov.et/business-license-checker?tin=0081723672"), eq(true)))
-        .thenReturn(mapped);
+    when(client.findBusiness("0081723672", true)).thenReturn(Optional.of(mapped));
 
-    assertThat(service.getBusinessDetails("0081723672", true)).isSameAs(mapped);
-    verify(mapper, never()).toDetails(any(), any(), eq(false));
-    verify(mapper).toDetails(any(), any(), anyBoolean());
+    assertThat(service.getBusinessDetails("0081 723 672", true)).isSameAs(mapped);
+    verify(client, never()).findBusiness(any(), eq(false));
+  }
+
+  @Test
+  void disabledIntegrationNeverCallsTheService() {
+    EtradeProperties off = new EtradeProperties();
+    off.setEnabled(false);
+    EtradeBusinessService disabled =
+        new EtradeBusinessService(off, client, mock(OrganizationRepository.class));
+    assertThatThrownBy(() -> disabled.getBusinessDetails("0081723672", false))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("not enabled");
+    verify(client, never()).findBusiness(any(), anyBoolean());
   }
 
   @Test

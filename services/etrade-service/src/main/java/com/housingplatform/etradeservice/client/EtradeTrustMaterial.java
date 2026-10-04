@@ -1,4 +1,4 @@
-package com.housingplatform.etrade.client;
+package com.housingplatform.etradeservice.client;
 
 import java.io.IOException;
 import java.io.InputStream;

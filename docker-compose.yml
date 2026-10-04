@@ -59,6 +59,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Standalone eTrade (Ministry of Trade) lookup service; the backend reads
+  # ETRADE_SERVICE_URL=http://localhost:8085 by default. See services/etrade-service/README.md.
+  etrade-service:
+    build: ./services/etrade-service
+    container_name: housing-platform-etrade-service
+    environment:
+      PORT: 8085
+      # Keep in sync with the backend's ETRADE_SERVICE_API_KEY. Empty = open (local dev).
+      ETRADE_SERVICE_API_KEYS: ${ETRADE_SERVICE_API_KEYS:-}
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8085/actuator/health/liveness || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:

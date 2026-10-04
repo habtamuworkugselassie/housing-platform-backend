@@ -1,8 +1,8 @@
-package com.housingplatform.etrade.client;
+package com.housingplatform.etradeservice.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.housingplatform.etrade.EtradeProperties;
-import com.housingplatform.etrade.EtradeUnavailableException;
+import com.housingplatform.etradeservice.EtradeUnavailableException;
+import com.housingplatform.etradeservice.config.EtradeProperties;
 import java.io.IOException;
 import java.net.ProxySelector;
 import java.net.http.HttpClient;

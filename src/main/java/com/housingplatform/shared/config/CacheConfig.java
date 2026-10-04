@@ -52,15 +52,6 @@ public class CacheConfig {
             .recordStats()
             .build());
 
-    // eTrade (etrade.gov.et) registration records by TIN: slow upstream, rarely changing data.
-    cacheManager.registerCustomCache(
-        "etradeBusinesses",
-        Caffeine.newBuilder()
-            .expireAfterWrite(6, TimeUnit.HOURS)
-            .maximumSize(2000)
-            .recordStats()
-            .build());
-
     cacheManager.registerCustomCache(
         "creditProducts",
         Caffeine.newBuilder()

@@ -1,6 +1,7 @@
 package com.housingplatform.etrade.service;
 
 import com.housingplatform.etrade.EtradeProperties;
+import com.housingplatform.etrade.client.EtradeServiceClient;
 import com.housingplatform.etrade.dto.EtradeBusinessDetails;
 import com.housingplatform.etrade.dto.EtradeBusinessDetails.LicenseStatus;
 import com.housingplatform.etrade.dto.EtradeOrganizationVerification;
@@ -19,9 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Looks businesses up on eTrade by TIN and compares what an organization declared with the public
- * record. Upstream answers are cached by {@link EtradeRegistrationLookup} because the portal is
- * slow, occasionally resets connections, and its data changes rarely.
+ * Looks businesses up through the standalone etrade-service and compares what an organization
+ * declared with the public record. Caching and the eTrade upstream quirks live in that service.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,8 +32,7 @@ public class EtradeBusinessService {
   private static final Pattern TIN = Pattern.compile("\\d{10}");
 
   private final EtradeProperties properties;
-  private final EtradeRegistrationLookup lookup;
-  private final EtradeBusinessMapper mapper;
+  private final EtradeServiceClient client;
   private final OrganizationRepository organizationRepository;
 
   /**
@@ -45,9 +44,7 @@ public class EtradeBusinessService {
    */
   public EtradeBusinessDetails getBusinessDetails(String tin, boolean includePhotos) {
     String normalized = normalizeTin(tin);
-    return lookup
-        .fetch(normalized)
-        .map(r -> mapper.toDetails(r, sourceUrl(normalized), includePhotos))
+    return fetch(normalized, includePhotos)
         .orElseThrow(
             () ->
                 new ResourceNotFoundException(
@@ -56,10 +53,7 @@ public class EtradeBusinessService {
 
   /** Same as {@link #getBusinessDetails} but empty instead of 404 when unknown. */
   public Optional<EtradeBusinessDetails> findBusinessDetails(String tin, boolean includePhotos) {
-    String normalized = normalizeTin(tin);
-    return lookup
-        .fetch(normalized)
-        .map(r -> mapper.toDetails(r, sourceUrl(normalized), includePhotos));
+    return fetch(normalizeTin(tin), includePhotos);
   }
 
   /**
@@ -77,8 +71,7 @@ public class EtradeBusinessService {
       throw new BusinessException("The organization has no TIN number to verify");
     }
     String tin = normalizeTin(org.getTinNumber());
-    Optional<EtradeBusinessDetails> details =
-        lookup.fetch(tin).map(r -> mapper.toDetails(r, sourceUrl(tin), false));
+    Optional<EtradeBusinessDetails> details = fetch(tin, false);
     return EtradeOrganizationVerification.builder()
         .organizationId(org.getId())
         .tin(tin)
@@ -146,12 +139,11 @@ public class EtradeBusinessService {
     return digits;
   }
 
-  private String sourceUrl(String tin) {
-    String base = properties.getBaseUrl();
-    if (base.endsWith("/")) {
-      base = base.substring(0, base.length() - 1);
+  private Optional<EtradeBusinessDetails> fetch(String tin, boolean includePhotos) {
+    if (!properties.isEnabled()) {
+      throw new BusinessException("eTrade business lookup is not enabled on this server");
     }
-    return base + "/business-license-checker?tin=" + tin;
+    return client.findBusiness(tin, includePhotos);
   }
 
   private static boolean hasText(String s) {

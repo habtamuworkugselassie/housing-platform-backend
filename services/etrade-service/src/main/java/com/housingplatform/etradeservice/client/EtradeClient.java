@@ -1,4 +1,4 @@
-package com.housingplatform.etrade.client;
+package com.housingplatform.etradeservice.client;
 
 import java.util.Optional;
 
@@ -10,7 +10,8 @@ public interface EtradeClient {
    *
    * @param tin a normalized 10-digit TIN
    * @return the record, or empty when eTrade knows no trader with that TIN (HTTP 204)
-   * @throws com.housingplatform.etrade.EtradeUnavailableException on transport or upstream errors
+   * @throws com.housingplatform.etradeservice.EtradeUnavailableException on transport or upstream
+   *     errors
    */
   Optional<EtradeRegistrationResponse> findRegistrationByTin(String tin);
 }

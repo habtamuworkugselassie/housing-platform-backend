@@ -1,9 +1,18 @@
 # eTrade integration (business details by TIN)
 
 The Ministry of Trade's eTrade portal publishes a business licence checker at
-`https://etrade.gov.et/business-license-checker?tin=<TIN>`. This module calls the JSON API behind
-that page so the platform can show, and compare against, the official registration of an
-organization from its Tax Identification Number (TIN).
+`https://etrade.gov.et/business-license-checker?tin=<TIN>`. The platform shows, and compares
+against, the official registration of an organization from its Tax Identification Number (TIN).
+
+```
+browser ──JWT──▶ backend (/api/v1/etrade/**) ──X-API-Key──▶ etrade-service ──Referer──▶ etrade.gov.et
+                 auth, organization comparison            services/etrade-service
+                                                          cache, TLS fix, mapping
+```
+
+The **standalone `etrade-service`** (`services/etrade-service`, own README) is the only thing that
+talks to etrade.gov.et. The backend keeps the user-facing endpoints, authorization and the
+comparison with our organization records, and calls the service over HTTP.
 
 ## Our API
 
@@ -54,7 +63,7 @@ Example (`/api/v1/etrade/businesses/0081723672`):
 `EXPIRED`, `NOT_YET_VALID`, or `UNKNOWN` when eTrade gives no parseable dates (it sometimes returns
 the literal text `Data not available`; that text is kept in the matching `*Raw` field).
 
-## Upstream API (as observed, October 2026)
+## Upstream API (as observed, October 2026) — implemented in etrade-service
 
 `GET https://etrade.gov.et/api/Registration/GetRegistrationInfoByTin/{tin}/{lang}`
 
@@ -70,15 +79,15 @@ the literal text `Data not available`; that text is kept in the matching `*Raw` 
   raw shape lives in `EtradeRegistrationResponse`; everything else sees `EtradeBusinessDetails`.
 * Legal-form codes come from `GET /api/LegalStatus/{lang}`; the table is embedded in
   `EtradeLegalCondition` so we do not make a second call.
-* The server is slow (2–20 s) and occasionally resets connections. Successful lookups are cached in
-  Caffeine (`etradeBusinesses`, 6 h, 2 000 entries); misses are not cached.
+* The server is slow (2–20 s) and occasionally resets connections. The service caches successful
+  lookups in Caffeine (`ETRADE_CACHE_TTL`, default 6 h); misses are not cached.
 
 ### TLS: incomplete certificate chain
 
 etrade.gov.et sends only its leaf certificate (issued by *GlobalSign GCC R3 EV TLS CA 2025*) and
 omits the intermediate, so a stock JDK fails with `unable to find valid certification path` (curl:
-`unable to get local issuer certificate`). The intermediate is bundled at
-`src/main/resources/etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem` (fetched from the leaf's AIA URL,
+`unable to get local issuer certificate`). The intermediate is bundled in the service at
+`services/etrade-service/src/main/resources/etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem` (fetched from the leaf's AIA URL,
 `http://secure.globalsign.com/cacert/gsgccr3evtlsca2025.crt`, valid until 2027-07-16) and added as
 an extra trust anchor **for this client only**; the JVM's default trust store is unchanged and
 hostname/validity checks still apply. If the server starts sending a full chain, set
@@ -87,47 +96,60 @@ hostname/validity checks still apply. If the server starts sending a full chain,
 
 ## Configuration
 
+Backend (where the service is):
+
 ```yaml
 etrade:
   enabled: ${ETRADE_ENABLED:true}
-  base-url: ${ETRADE_BASE_URL:https://etrade.gov.et}
-  referer: ${ETRADE_REFERER:https://etrade.gov.et/business-license-checker}
-  language: ${ETRADE_LANGUAGE:en}
-  connect-timeout: ${ETRADE_CONNECT_TIMEOUT:10s}
-  read-timeout: ${ETRADE_READ_TIMEOUT:30s}
-  trust-bundled-intermediate: ${ETRADE_TRUST_BUNDLED_INTERMEDIATE:true}
-  intermediate-certificate: ${ETRADE_INTERMEDIATE_CERTIFICATE:classpath:etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem}
+  service-url: ${ETRADE_SERVICE_URL:http://localhost:8085}
+  service-api-key: ${ETRADE_SERVICE_API_KEY:}     # one of the service's ETRADE_SERVICE_API_KEYS
+  connect-timeout: ${ETRADE_CONNECT_TIMEOUT:5s}
+  read-timeout: ${ETRADE_READ_TIMEOUT:40s}
 ```
+
+Service (upstream, cache, keys): see `services/etrade-service/README.md`. `docker compose up
+etrade-service` runs it locally on 8085, which is the backend's default.
 
 ## Code map
 
 ```
-com.housingplatform.etrade
-├── EtradeProperties                 config above
+backend: com.housingplatform.etrade
+├── EtradeProperties                 service URL, API key, timeouts
 ├── EtradeUnavailableException       -> 502 (GlobalExceptionHandler)
 ├── api/EtradeController             the two endpoints
-├── client/EtradeClient              port
+├── client/EtradeServiceClient       port
+├── client/EtradeServiceRestClient   GET {service}/api/v1/businesses/{tin}; 404→empty, 400→BusinessException
+├── dto/EtradeBusinessDetails        public shape (same JSON as the service)
+├── dto/EtradeLegalCondition
+├── dto/EtradeOrganizationVerification
+└── service/EtradeBusinessService    TIN normalisation, 404/403 rules, organization comparison
+
+services/etrade-service: com.housingplatform.etradeservice
+├── api/BusinessController           GET /api/v1/businesses/{tin}
+├── config/ApiKeyFilter              X-API-Key on /api/**
+├── config/CacheConfig               Caffeine
 ├── client/EtradeRestClient          RestClient over JDK HttpClient; Referer, 204/417 handling
 ├── client/EtradeTrustMaterial       SSLContext = JDK anchors + bundled intermediate
 ├── client/EtradeRegistrationResponse upstream wire record
-├── dto/EtradeBusinessDetails        public shape (+ LicensedBusiness, Associate, Sector)
-├── dto/EtradeLegalCondition         legal-form code table (en/am)
-├── dto/EtradeOrganizationVerification
-├── service/EtradeRegistrationLookup @Cacheable fetch
-├── service/EtradeBusinessMapper     wire -> dto, date parsing, licence status
-└── service/EtradeBusinessService    TIN normalisation, 404/403 rules, organization comparison
+├── dto/…                            EtradeBusinessDetails, EtradeLegalCondition
+└── service/EtradeBusinessMapper, EtradeBusinessService (cached fetch)
 ```
 
 ## Tests
 
-* `EtradeRestClientTest` – MockRestServiceServer: parsing, Referer header, 204, 417, 5xx, HTML-200.
-* `EtradeTrustMaterialTest` – the bundled CA is the right one and still valid.
-* `EtradeBusinessMapperTest`, `EtradeBusinessServiceTest` – mapping, status, TIN rules, comparison.
-* `EtradeLiveSmokeTest` – hits the real portal; skipped unless `ETRADE_LIVE_TEST=true`:
+Backend:
 
-  ```bash
-  ETRADE_LIVE_TEST=true ./mvnw -Dtest=EtradeLiveSmokeTest test
-  ```
+* `EtradeServiceRestClientTest` – MockRestServiceServer: API key header, deserialisation, 404/400/401/502.
+* `EtradeBusinessServiceTest` – TIN rules, disabled switch, organization comparison.
+* `EtradeServiceLiveSmokeTest` – hits a running etrade-service; skipped unless
+  `ETRADE_SERVICE_LIVE_TEST=true` (`ETRADE_SERVICE_URL`, `ETRADE_SERVICE_API_KEY`).
+
+Service (`cd services/etrade-service && ./mvnw verify`):
+
+* `EtradeRestClientTest` – upstream parsing, Referer header, 204, 417, 5xx, HTML-200.
+* `EtradeTrustMaterialTest` – the bundled CA is the right one and still valid.
+* `EtradeBusinessMapperTest`, `BusinessApiTest`, `OpenAccessApiTest` – mapping, HTTP surface, auth.
+* `EtradeLiveSmokeTest` – hits etrade.gov.et; skipped unless `ETRADE_LIVE_TEST=true`.
 
 ## Frontend
 
