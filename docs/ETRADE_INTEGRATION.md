@@ -5,13 +5,13 @@ The Ministry of Trade's eTrade portal publishes a business licence checker at
 against, the official registration of an organization from its Tax Identification Number (TIN).
 
 ```
-browser ──JWT──▶ backend (/api/v1/etrade/**) ──X-API-Key──▶ etrade-service ──Referer──▶ etrade.gov.et
-                 auth, organization comparison            services/etrade-service
+browser ──JWT──▶ backend (/api/v1/etrade/**) ──X-API-Key──▶ business-etrade-validation ──Referer──▶ etrade.gov.et
+                 auth, organization comparison            (own repository)
                                                           cache, TLS fix, mapping
 ```
 
-The **standalone `etrade-service`** (`services/etrade-service`, own README) is the only thing that
-talks to etrade.gov.et. The backend keeps the user-facing endpoints, authorization and the
+The **standalone service** lives in its own repository, [https://github.com/habtamuworkugselassie/business-etrade-validation](https://github.com/habtamuworkugselassie/business-etrade-validation), and is the only thing
+that talks to etrade.gov.et. The backend keeps the user-facing endpoints, authorization and the
 comparison with our organization records, and calls the service over HTTP.
 
 ## Our API
@@ -63,7 +63,7 @@ Example (`/api/v1/etrade/businesses/0081723672`):
 `EXPIRED`, `NOT_YET_VALID`, or `UNKNOWN` when eTrade gives no parseable dates (it sometimes returns
 the literal text `Data not available`; that text is kept in the matching `*Raw` field).
 
-## Upstream API (as observed, October 2026) — implemented in etrade-service
+## Upstream API (as observed, October 2026) — implemented in business-etrade-validation
 
 `GET https://etrade.gov.et/api/Registration/GetRegistrationInfoByTin/{tin}/{lang}`
 
@@ -86,8 +86,8 @@ the literal text `Data not available`; that text is kept in the matching `*Raw` 
 
 etrade.gov.et sends only its leaf certificate (issued by *GlobalSign GCC R3 EV TLS CA 2025*) and
 omits the intermediate, so a stock JDK fails with `unable to find valid certification path` (curl:
-`unable to get local issuer certificate`). The intermediate is bundled in the service at
-`services/etrade-service/src/main/resources/etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem` (fetched from the leaf's AIA URL,
+`unable to get local issuer certificate`). The intermediate is bundled in the service repository at
+`src/main/resources/etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem` (fetched from the leaf's AIA URL,
 `http://secure.globalsign.com/cacert/gsgccr3evtlsca2025.crt`, valid until 2027-07-16) and added as
 an extra trust anchor **for this client only**; the JVM's default trust store is unchanged and
 hostname/validity checks still apply. If the server starts sending a full chain, set
@@ -107,8 +107,8 @@ etrade:
   read-timeout: ${ETRADE_READ_TIMEOUT:40s}
 ```
 
-Service (upstream, cache, keys): see `services/etrade-service/README.md`. `docker compose up
-etrade-service` runs it locally on 8085, which is the backend's default.
+Service (upstream, cache, keys): see the README in https://github.com/habtamuworkugselassie/business-etrade-validation. `docker compose up etrade-service`
+pulls its image (`ghcr.io/habtamuworkugselassie/business-etrade-validation:latest`) and runs it on 8085, which is the backend's default.
 
 ## Code map
 
@@ -124,7 +124,7 @@ backend: com.housingplatform.etrade
 ├── dto/EtradeOrganizationVerification
 └── service/EtradeBusinessService    TIN normalisation, 404/403 rules, organization comparison
 
-services/etrade-service: com.housingplatform.etradeservice
+business-etrade-validation (own repo): com.housingplatform.etradeservice
 ├── api/BusinessController           GET /api/v1/businesses/{tin}
 ├── config/ApiKeyFilter              X-API-Key on /api/**
 ├── config/CacheConfig               Caffeine
@@ -144,7 +144,7 @@ Backend:
 * `EtradeServiceLiveSmokeTest` – hits a running etrade-service; skipped unless
   `ETRADE_SERVICE_LIVE_TEST=true` (`ETRADE_SERVICE_URL`, `ETRADE_SERVICE_API_KEY`).
 
-Service (`cd services/etrade-service && ./mvnw verify`):
+Service (`./mvnw verify` in https://github.com/habtamuworkugselassie/business-etrade-validation):
 
 * `EtradeRestClientTest` – upstream parsing, Referer header, 204, 417, 5xx, HTML-200.
 * `EtradeTrustMaterialTest` – the bundled CA is the right one and still valid.

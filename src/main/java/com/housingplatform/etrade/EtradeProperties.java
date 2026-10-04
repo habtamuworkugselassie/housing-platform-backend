@@ -7,9 +7,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Connection to the standalone <b>etrade-service</b> ({@code services/etrade-service}), which wraps
- * the Ministry of Trade eTrade portal (https://etrade.gov.et). The monolith never calls
- * etrade.gov.et itself; the service owns the upstream quirks (Referer, TLS chain, caching).
+ * Connection to the standalone <b>etrade-service</b>
+ * (https://github.com/habtamuworkugselassie/business-etrade-validation), which wraps the Ministry
+ * of Trade eTrade portal (https://etrade.gov.et). The monolith never calls etrade.gov.et itself;
+ * the service owns the upstream quirks (Referer, TLS chain, caching).
  */
 @Component
 @ConfigurationProperties(prefix = "etrade")

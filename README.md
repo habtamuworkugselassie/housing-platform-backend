@@ -22,7 +22,7 @@ The backend is implemented as a **modular monolith** using Spring Boot, followin
 - **notification**: User notifications
 - **audit**: Audit logging and compliance
 - **shared**: Common utilities and configurations
-- **etrade**: Business registration / licence lookup by TIN, via the standalone **etrade-service** in `services/etrade-service` (wraps https://etrade.gov.et) — see [docs/ETRADE_INTEGRATION.md](docs/ETRADE_INTEGRATION.md)
+- **etrade**: Business registration / licence lookup by TIN, via the standalone **business-etrade-validation** service (https://github.com/habtamuworkugselassie/business-etrade-validation, wraps https://etrade.gov.et) — see [docs/ETRADE_INTEGRATION.md](docs/ETRADE_INTEGRATION.md)
 
 ## Technology Stack
 

@@ -59,10 +59,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # Standalone eTrade (Ministry of Trade) lookup service; the backend reads
-  # ETRADE_SERVICE_URL=http://localhost:8085 by default. See services/etrade-service/README.md.
+  # Standalone eTrade (Ministry of Trade) lookup service, from https://github.com/habtamuworkugselassie/business-etrade-validation.
+  # The backend reads ETRADE_SERVICE_URL=http://localhost:8085 by default.
   etrade-service:
-    build: ./services/etrade-service
+    image: ghcr.io/habtamuworkugselassie/business-etrade-validation:latest
     container_name: housing-platform-etrade-service
     environment:
       PORT: 8085

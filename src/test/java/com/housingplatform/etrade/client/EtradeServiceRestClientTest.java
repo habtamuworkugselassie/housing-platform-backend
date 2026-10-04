@@ -28,7 +28,10 @@ class EtradeServiceRestClientTest {
 
   private static final String URL = "http://etrade-service:8085/api/v1/businesses/0081723672";
 
-  /** What the standalone service returns (see services/etrade-service). */
+  /**
+   * What the standalone service returns
+   * (https://github.com/habtamuworkugselassie/business-etrade-validation).
+   */
   private static final String BODY =
       """
       {"tin":"0081723672","businessName":"FIREW WONDE BELAY",

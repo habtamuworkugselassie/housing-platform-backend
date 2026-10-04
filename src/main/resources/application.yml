@@ -235,7 +235,7 @@ chapa:
   public-api-base-url: ${PUBLIC_API_BASE_URL:https://ethiobuildconnect.et}
 
 # eTrade business lookup by TIN is served by the standalone etrade-service
-# (services/etrade-service), which wraps https://etrade.gov.et. This block only says where it is.
+# (https://github.com/habtamuworkugselassie/business-etrade-validation), which wraps https://etrade.gov.et. This block only says where it is.
 etrade:
   enabled: ${ETRADE_ENABLED:true}
   service-url: ${ETRADE_SERVICE_URL:http://localhost:8085}
