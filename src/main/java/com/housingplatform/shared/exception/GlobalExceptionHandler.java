@@ -1,5 +1,6 @@
 package com.housingplatform.shared.exception;
 
+import com.housingplatform.etrade.EtradeUnavailableException;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
@@ -98,6 +99,21 @@ public class GlobalExceptionHandler {
             .path(request.getDescription(false).replace("uri=", ""))
             .build();
     return json(error, HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(EtradeUnavailableException.class)
+  public ResponseEntity<ErrorResponse> handleEtradeUnavailable(
+      EtradeUnavailableException ex, WebRequest request) {
+    log.warn("eTrade upstream failure: {}", ex.getMessage());
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_GATEWAY.value())
+            .error("Upstream Service Unavailable")
+            .message(ex.getMessage())
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+    return json(error, HttpStatus.BAD_GATEWAY);
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

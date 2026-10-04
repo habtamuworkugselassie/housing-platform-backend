@@ -234,6 +234,22 @@ chapa:
   # Public URL of this API so Chapa can call /api/v1/payments/chapa/webhook (else configure it in the dashboard).
   public-api-base-url: ${PUBLIC_API_BASE_URL:https://ethiobuildconnect.et}
 
+# Ministry of Trade eTrade portal (https://etrade.gov.et): business registration + licence lookup
+# by TIN, the same data as https://etrade.gov.et/business-license-checker?tin=<TIN>. Public, no key.
+etrade:
+  enabled: ${ETRADE_ENABLED:true}
+  base-url: ${ETRADE_BASE_URL:https://etrade.gov.et}
+  # eTrade answers 417 "Invalid referer header" unless the Referer is one of its own pages.
+  referer: ${ETRADE_REFERER:https://etrade.gov.et/business-license-checker}
+  # "en" gives Gregorian dates; "am" gives Ethiopian-calendar dates (not parsed).
+  language: ${ETRADE_LANGUAGE:en}
+  connect-timeout: ${ETRADE_CONNECT_TIMEOUT:10s}
+  read-timeout: ${ETRADE_READ_TIMEOUT:30s}
+  # etrade.gov.et omits its GlobalSign intermediate from the TLS handshake; the bundled copy makes
+  # the chain verifiable. Turn off if the server starts sending a complete chain.
+  trust-bundled-intermediate: ${ETRADE_TRUST_BUNDLED_INTERMEDIATE:true}
+  intermediate-certificate: ${ETRADE_INTERMEDIATE_CERTIFICATE:classpath:etrade/globalsign-gcc-r3-ev-tls-ca-2025.pem}
+
 purchase:
   deposit:
     enabled: ${PURCHASE_DEPOSIT_ENABLED:true}
