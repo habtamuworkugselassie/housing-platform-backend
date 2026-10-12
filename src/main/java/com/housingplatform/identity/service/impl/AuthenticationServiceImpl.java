@@ -66,15 +66,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     User user =
         userRepository
             .findByEmail(request.getUsername())
-            .orElseGet(
-                () ->
-                    userRepository
-                        .findByPhoneNumber(request.getUsername())
-                        .orElseThrow(() -> new BusinessException("Invalid credentials")));
+            .or(() -> userRepository.findByPhoneNumber(request.getUsername()))
+            .or(() -> findByPhoneInAnyForm(request.getUsername()))
+            .orElseThrow(() -> new BusinessException("Invalid credentials"));
 
     // Verify password
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       throw new BusinessException("Invalid credentials");
+    }
+    if (!Boolean.TRUE.equals(user.getPasswordSet())) {
+      user.setPasswordSet(true); // signed in with one, so the account has a password
+      userRepository.save(user);
     }
 
     // Check if user account is valid (allow PENDING_VERIFICATION for newly
@@ -267,6 +269,22 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
   }
 
+  /**
+   * Phone numbers are stored in E.164, but people type them as 09…, and sign-in forms that prefix
+   * the country code turn that into +2510…; match those forms too.
+   */
+  private Optional<User> findByPhoneInAnyForm(String username) {
+    if (username == null || username.isBlank() || username.contains("@")) {
+      return Optional.empty();
+    }
+    String typed = username.trim().replaceAll("[\\s\\-().]", "").replaceFirst("^\\+2510", "+251");
+    try {
+      return userRepository.findByPhoneNumber(PhoneNumberNormalizer.toE164(typed));
+    } catch (BusinessException notAPhoneNumber) {
+      return Optional.empty();
+    }
+  }
+
   @Override
   public AuthResponse quickRegister(QuickRegistrationRequest request) {
     String phone = PhoneNumberNormalizer.toE164(request.getPhoneNumber());
@@ -298,6 +316,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             .firstName(names[0])
             .lastName(names[1])
             .phoneNumber(phone)
+            .passwordSet(hasPassword)
             .status(User.UserStatus.PENDING_VERIFICATION)
             .emailVerified(false)
             .phoneVerified(false)
@@ -365,6 +384,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         User.builder()
             .email(email)
             .passwordHash(passwordEncoder.encode(generateSecureToken()))
+            .passwordSet(false)
             .firstName(first)
             .lastName(last != null ? last : "")
             .status(User.UserStatus.ACTIVE)
@@ -443,6 +463,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         User.builder()
             .email(request.getEmail().toLowerCase().trim())
             .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .passwordSet(true)
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
             .phoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null)
@@ -550,6 +571,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             .orElseThrow(() -> new BusinessException("User not found"));
 
     user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+    user.setPasswordSet(true);
     userRepository.save(user);
 
     resetToken.setUsedAt(now);

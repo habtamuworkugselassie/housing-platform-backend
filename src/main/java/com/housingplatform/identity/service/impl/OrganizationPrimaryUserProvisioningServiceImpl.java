@@ -52,6 +52,7 @@ public class OrganizationPrimaryUserProvisioningServiceImpl
         User.builder()
             .email(normalized)
             .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .passwordSet(true)
             .firstName(request.getFirstName().trim())
             .lastName(request.getLastName().trim())
             .phoneNumber(resolveRegistrantPhone(org, phoneFallback))
@@ -126,6 +127,7 @@ public class OrganizationPrimaryUserProvisioningServiceImpl
       return;
     }
     user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+    user.setPasswordSet(true);
     user.setFirstName(request.getFirstName().trim());
     user.setLastName(request.getLastName().trim());
     user.setStatus(User.UserStatus.ACTIVE);

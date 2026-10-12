@@ -1,6 +1,7 @@
 package com.housingplatform.identity.dto;
 
 import com.housingplatform.identity.domain.User;
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +28,12 @@ public class UserResponse {
   private LocalDateTime updatedAt;
   private UUID organizationId;
   private String profileImageUrl;
+
+  /** False when the account has no password yet; null when unknown (older accounts). */
+  private Boolean passwordSet;
+
+  private ChapaPaymentMethod preferredPaymentMethod;
+  private String paymentPhone;
 
   // Computed property for backward compatibility with frontend
   // This will be serialized as "enabled" in JSON

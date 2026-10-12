@@ -146,6 +146,7 @@ public class UserServiceImpl implements UserService {
         User.builder()
             .email(request.getEmail().toLowerCase().trim())
             .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .passwordSet(true)
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
             .phoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null)
@@ -223,6 +224,17 @@ public class UserServiceImpl implements UserService {
   public UserResponse updateUser(UUID id, UserUpdateRequest request) {
     User user =
         userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
+
+    if (!UserContext.isAdmin()) {
+      // PUT /users/me: the mapper copies every non-null field, so without this a user could grant
+      // themselves roles, reactivate a suspended account or take over another email address.
+      request.setRoles(null);
+      request.setStatus(null);
+      request.setEnabled(null);
+      request.setEmail(null);
+      request.setOrganizationId(null);
+      request.setClearOrganization(null);
+    }
 
     if (UserContext.isAdmin() && request.getRoles() != null && request.getRoles().isEmpty()) {
       throw new BusinessException("At least one role is required");

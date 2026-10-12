@@ -34,6 +34,9 @@ public interface PropertyPurchaseOrderRepository
   boolean existsByBuyerIdAndPropertyIdAndStatusIn(
       UUID buyerId, UUID propertyId, Collection<PurchaseOrderStatus> statuses);
 
+  Optional<PropertyPurchaseOrder> findFirstByBuyerIdAndPropertyIdAndStatusInOrderByCreatedAtDesc(
+      UUID buyerId, UUID propertyId, Collection<PurchaseOrderStatus> statuses);
+
   Page<PropertyPurchaseOrder> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId, Pageable pageable);
 
   Page<PropertyPurchaseOrder> findByBuyerIdAndStatusOrderByCreatedAtDesc(

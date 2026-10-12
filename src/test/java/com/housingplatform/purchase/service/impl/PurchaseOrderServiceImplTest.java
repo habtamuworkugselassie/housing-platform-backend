@@ -360,13 +360,44 @@ class PurchaseOrderServiceImplTest {
         .hasMessageContaining("not been verified");
   }
 
+  private PropertyPurchaseOrder openOrder() {
+    PropertyPurchaseOrder open =
+        PropertyPurchaseOrder.builder()
+            .orderNumber("PPO-2026-00000001")
+            .status(PropertyPurchaseOrder.PurchaseOrderStatus.PENDING_SELLER_REVIEW)
+            .build();
+    open.setId(UUID.randomUUID());
+    return open;
+  }
+
   @Test
   void rejectsSecondOpenOrderOnSameProperty() {
-    when(orderRepository.existsByBuyerIdAndPropertyIdAndStatusIn(
-            eq(buyerId), eq(property.getId()), any()))
-        .thenReturn(true);
+    when(orderRepository.findFirstByBuyerIdAndPropertyIdAndStatusInOrderByCreatedAtDesc(
+            eq(buyerId), eq(property.getId()), eq(PropertyPurchaseOrder.PurchaseOrderStatus.OPEN)))
+        .thenReturn(Optional.of(openOrder()));
     assertThatThrownBy(() -> service.createPurchaseOrder(buyer, request(), EVIDENCE))
-        .isInstanceOf(DuplicateResourceException.class);
+        .isInstanceOf(DuplicateResourceException.class)
+        .hasMessageContaining("PPO-2026-00000001");
+    verify(orderRepository, never()).save(any());
+  }
+
+  @Test
+  void previewPointsTheBuyerToTheirOpenOrder() {
+    when(mapper.toPreview(any(), any(), any(), any()))
+        .thenAnswer(inv -> new com.housingplatform.purchase.dto.PurchasePreviewResponse());
+    PropertyPurchaseOrder open = openOrder();
+    when(orderRepository.findFirstByBuyerIdAndPropertyIdAndStatusInOrderByCreatedAtDesc(
+            eq(buyerId), eq(property.getId()), eq(PropertyPurchaseOrder.PurchaseOrderStatus.OPEN)))
+        .thenReturn(Optional.of(open));
+
+    var preview = service.preview(buyer, property.getId(), null, null);
+    assertThat(preview.getExistingOrder().getId()).isEqualTo(open.getId());
+    assertThat(preview.getExistingOrder().getOrderNumber()).isEqualTo("PPO-2026-00000001");
+
+    var anonymous =
+        service.preview(
+            new PurchaseOrderActor(null, null, null, false), property.getId(), null, null);
+    assertThat(anonymous.getExistingOrder()).isNull();
   }
 
   @Test
