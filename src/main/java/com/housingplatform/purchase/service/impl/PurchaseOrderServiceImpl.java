@@ -153,6 +153,17 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         depositService.quote(price, effective, depositCurrency);
     if (buyer != null && buyer.userId() != null) {
       preview.setDocuments(documentService.verified(property.getId()));
+      orderRepository
+          .findFirstByBuyerIdAndPropertyIdAndStatusInOrderByCreatedAtDesc(
+              buyer.userId(), property.getId(), PurchaseOrderStatus.OPEN)
+          .ifPresent(
+              o ->
+                  preview.setExistingOrder(
+                      PurchasePreviewResponse.ExistingOrder.builder()
+                          .id(o.getId())
+                          .orderNumber(o.getOrderNumber())
+                          .status(o.getStatus())
+                          .build()));
     }
     preview.setDeposit(deposit);
     PurchaseFeeSettings.Quote fees = feeSettings.quote(price);
@@ -180,11 +191,16 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     guardPurchasable(property);
     guardNotOwnListing(buyer, property);
 
-    if (orderRepository.existsByBuyerIdAndPropertyIdAndStatusIn(
-        buyer.userId(), property.getId(), PurchaseOrderStatus.OPEN)) {
-      throw new DuplicateResourceException(
-          "You already have an open purchase order for this property");
-    }
+    orderRepository
+        .findFirstByBuyerIdAndPropertyIdAndStatusInOrderByCreatedAtDesc(
+            buyer.userId(), property.getId(), PurchaseOrderStatus.OPEN)
+        .ifPresent(
+            open -> {
+              throw new DuplicateResourceException(
+                  "You already have purchase order "
+                      + open.getOrderNumber()
+                      + " for this property. Open it from My purchases instead of placing another.");
+            });
 
     Currency currency = request.getCurrency() != null ? request.getCurrency() : Currency.ETB;
     BigDecimal price = resolvePrice(property, currency);

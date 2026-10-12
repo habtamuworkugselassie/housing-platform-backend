@@ -46,6 +46,22 @@ public class PurchasePreviewResponse {
    */
   private FeeQuote fees;
 
+  /**
+   * The signed-in buyer's open order on this property, if any. A buyer has at most one open order
+   * per property, so the form shows this order instead of starting another one.
+   */
+  private ExistingOrder existingOrder;
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class ExistingOrder {
+    private UUID id;
+    private String orderNumber;
+    private PropertyPurchaseOrder.PurchaseOrderStatus status;
+  }
+
   @Data
   @Builder
   @NoArgsConstructor
