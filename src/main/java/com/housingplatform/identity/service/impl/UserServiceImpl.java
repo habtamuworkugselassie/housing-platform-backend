@@ -146,6 +146,7 @@ public class UserServiceImpl implements UserService {
         User.builder()
             .email(request.getEmail().toLowerCase().trim())
             .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .passwordSet(true)
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
             .phoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null)

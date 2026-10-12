@@ -89,6 +89,7 @@ public class OrganizationAccountServiceImpl implements OrganizationAccountServic
         User.builder()
             .email(email)
             .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .passwordSet(true)
             .firstName(request.getFirstName().trim())
             .lastName(request.getLastName().trim())
             .phoneNumber(phone)
@@ -120,6 +121,7 @@ public class OrganizationAccountServiceImpl implements OrganizationAccountServic
     User user = requireAccountOf(org, userId);
 
     user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+    user.setPasswordSet(true);
     // A password the operator handed over is usable immediately; a lead account parked in
     // PENDING_VERIFICATION would otherwise still be unable to sign in.
     if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {

@@ -1,5 +1,6 @@
 package com.housingplatform.identity.domain;
 
+import com.housingplatform.payment.chapa.ChapaPaymentMethod;
 import com.housingplatform.shared.domain.BaseAuditEntity;
 import jakarta.persistence.*;
 import java.util.HashSet;
@@ -41,6 +42,19 @@ public class User extends BaseAuditEntity {
   @Column(nullable = false)
   @Builder.Default
   private Boolean phoneVerified = false;
+
+  /**
+   * Whether the user has chosen a password: false for passwordless sign-ups (quick registration,
+   * Google), true once one is set; null for older accounts where it was never recorded.
+   */
+  private Boolean passwordSet;
+
+  /** Method preselected at checkout. Chapa hosts the payment, so no card or wallet data is kept. */
+  @Enumerated(EnumType.STRING)
+  private ChapaPaymentMethod preferredPaymentMethod;
+
+  /** Mobile-money number (E.164) handed to Chapa for wallet payments. */
+  private String paymentPhone;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "organization_id")

@@ -204,11 +204,15 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
       markFailed(d, "Previous attempt failed at the provider");
     }
 
+    User buyerUser = userRepository.findById(order.getBuyerId()).orElse(null);
     // Only a fresh checkout takes a new method; a pending one above is resumed as it was started.
+    // Without an explicit choice, the buyer's saved preference applies.
+    if (method == null && d.getPreferredMethod() == null && buyerUser != null) {
+      method = buyerUser.getPreferredPaymentMethod();
+    }
     if (method != null) {
       d.setPreferredMethod(methodFor(d.getCurrency(), method));
     }
-    User buyerUser = userRepository.findById(order.getBuyerId()).orElse(null);
     String txRef = newTxRef(order.getOrderNumber(), d.getAttempts() + 1);
     InitializeResult result =
         chapa.initialize(
@@ -221,7 +225,8 @@ public class PurchaseDepositServiceImpl implements PurchaseDepositService {
                     : (buyerUser != null ? buyerUser.getEmail() : null),
                 buyerUser != null ? buyerUser.getFirstName() : null,
                 buyerUser != null ? buyerUser.getLastName() : null,
-                order.getContactPhone(),
+                PaymentPhones.forCheckout(
+                    buyerUser, d.getPreferredMethod(), order.getContactPhone()),
                 callbackUrl(),
                 returnUrl(order),
                 "Deposit " + order.getOrderNumber(),

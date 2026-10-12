@@ -1,8 +1,11 @@
 package com.housingplatform.identity.api;
 
+import com.housingplatform.identity.dto.ChangePasswordRequest;
+import com.housingplatform.identity.dto.PaymentPreferencesRequest;
 import com.housingplatform.identity.dto.UserCreateRequest;
 import com.housingplatform.identity.dto.UserResponse;
 import com.housingplatform.identity.dto.UserUpdateRequest;
+import com.housingplatform.identity.service.AccountSettingsService;
 import com.housingplatform.identity.service.UserService;
 import com.housingplatform.shared.security.UserContext;
 import com.housingplatform.shared.security.annotation.AuthActionScope;
@@ -27,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
   private final UserService userService;
+  private final AccountSettingsService accountSettingsService;
 
   @GetMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
@@ -96,6 +100,29 @@ public class UserController {
     UUID userId = UserContext.getCurrentUserId();
     UserResponse updated = userService.updateUser(userId, userRequest);
     return ResponseEntity.ok(updated);
+  }
+
+  @PostMapping("/me/password")
+  @Operation(
+      summary = "Set or change my password",
+      description =
+          "Sets a first password on a passwordless account, or changes the current one (which must"
+              + " then be given). Lets buyers who signed up while ordering sign in with a password.")
+  public ResponseEntity<UserResponse> changeMyPassword(
+      @Valid @RequestBody ChangePasswordRequest request) {
+    return ResponseEntity.ok(
+        accountSettingsService.changePassword(UserContext.getCurrentUserId(), request));
+  }
+
+  @PutMapping("/me/payment-preferences")
+  @Operation(
+      summary = "Update my payment preferences",
+      description =
+          "The payment method preselected at checkout and the mobile-money number passed to Chapa.")
+  public ResponseEntity<UserResponse> updateMyPaymentPreferences(
+      @Valid @RequestBody PaymentPreferencesRequest request) {
+    return ResponseEntity.ok(
+        accountSettingsService.updatePaymentPreferences(UserContext.getCurrentUserId(), request));
   }
 
   @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

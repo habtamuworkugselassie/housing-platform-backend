@@ -240,12 +240,15 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
               + " each. Pay in several parts or by bank transfer");
     }
 
+    User user = userRepository.findById(order.getBuyerId()).orElse(null);
+    if (method == null && user != null) {
+      method = user.getPreferredPaymentMethod();
+    }
     ChapaPaymentMethod chosen =
         order.getCurrency() == Currency.USD ? ChapaPaymentMethod.CARD : method;
     long attempt =
         payments(order).stream().filter(x -> x.getChannel() == Channel.ONLINE).count() + 1;
     String txRef = newTxRef(order.getOrderNumber(), what == Purpose.FEES ? "F" : "B", attempt);
-    User user = userRepository.findById(order.getBuyerId()).orElse(null);
     var result =
         chapa.initialize(
             new InitializeRequest(
@@ -257,7 +260,7 @@ public class PurchaseBalanceServiceImpl implements PurchaseBalanceService {
                     : (user != null ? user.getEmail() : null),
                 user != null ? user.getFirstName() : null,
                 user != null ? user.getLastName() : null,
-                order.getContactPhone(),
+                PaymentPhones.forCheckout(user, chosen, order.getContactPhone()),
                 callbackUrl(),
                 returnUrl(order),
                 (what == Purpose.FEES ? "Fee " : "Balance ") + order.getOrderNumber(),
