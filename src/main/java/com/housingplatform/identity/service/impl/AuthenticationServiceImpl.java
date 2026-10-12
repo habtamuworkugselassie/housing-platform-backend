@@ -269,13 +269,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
   }
 
-  /** Phone numbers are stored in E.164, but people type them as 09…; match either form. */
+  /**
+   * Phone numbers are stored in E.164, but people type them as 09…, and sign-in forms that prefix
+   * the country code turn that into +2510…; match those forms too.
+   */
   private Optional<User> findByPhoneInAnyForm(String username) {
     if (username == null || username.isBlank() || username.contains("@")) {
       return Optional.empty();
     }
+    String typed = username.trim().replaceAll("[\\s\\-().]", "").replaceFirst("^\\+2510", "+251");
     try {
-      return userRepository.findByPhoneNumber(PhoneNumberNormalizer.toE164(username));
+      return userRepository.findByPhoneNumber(PhoneNumberNormalizer.toE164(typed));
     } catch (BusinessException notAPhoneNumber) {
       return Optional.empty();
     }

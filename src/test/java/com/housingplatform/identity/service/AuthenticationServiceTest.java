@@ -161,6 +161,23 @@ class AuthenticationServiceTest {
   }
 
   @Test
+  void login_acceptsALeadingZeroAfterTheCountryCode() {
+    LoginRequest request = new LoginRequest();
+    request.setUsername("+2510911111111");
+    request.setPassword("password123");
+    when(userRepository.findByEmail("+2510911111111")).thenReturn(Optional.empty());
+    when(userRepository.findByPhoneNumber("+2510911111111")).thenReturn(Optional.empty());
+    when(userRepository.findByPhoneNumber("+251911111111")).thenReturn(Optional.of(testUser));
+    when(passwordEncoder.matches("password123", testUser.getPasswordHash())).thenReturn(true);
+    when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
+        .thenReturn("access-token");
+    when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+    when(realEstateAgentRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
+
+    assertThat(authenticationService.login(request).getAccessToken()).isEqualTo("access-token");
+  }
+
+  @Test
   void testLogin_InvalidCredentials_UserNotFound() {
     // Arrange
     LoginRequest request = new LoginRequest();
