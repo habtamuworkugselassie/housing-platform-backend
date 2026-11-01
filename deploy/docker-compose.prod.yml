@@ -1,0 +1,131 @@
+# Production stack for a single droplet.
+#
+# Expects both repositories cloned as siblings, because the frontend image is built
+# from source here rather than pulled from a registry:
+#
+#   /opt/ethiobuildconnect/
+#     housing-platform-backend/    <- this file lives in deploy/
+#     housing-platform-frontend/
+#
+# Run from the backend repo root:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+#
+# Deliberately NOT here: Kafka and Zookeeper. application.yml configures them, but
+# nothing in src/main/java references Kafka at all, so running them would cost about
+# 1.5 GB of RAM to carry a dependency the code never uses. If a Kafka consumer is
+# ever added, they come back.
+#
+# Also not here: LiveKit. Live broadcasting is feature-flagged off and ships its own
+# stack in infra/livekit/ — bring that up separately if and when it is turned on.
+
+name: ethiobuildconnect
+
+services:
+  postgres:
+    # pgvector, not plain postgres: the support-chat RAG stores embeddings in a
+    # vector column, and a stock postgres image cannot create the extension.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-housing_platform}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # No ports: published. The database is reachable only on the compose network;
+    # exposing 5432 on a public droplet is how these get found and drained.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-housing_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Caching and rate limiting only — nothing here needs to survive a restart, so
+    # no volume and a hard memory ceiling rather than unbounded growth.
+    command: ["redis-server", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # The service name is load-bearing: the frontend's nginx.conf proxies to
+    # http://backend:8080 by this exact hostname.
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    env_file: [.env]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-housing_platform}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      UPLOAD_DIR: /var/lib/housing-platform/uploads
+      # Without a ceiling the JVM takes a quarter of the host's RAM, which on a 4 GB
+      # droplet starves Postgres during a traffic spike.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=25
+    volumes:
+      - uploads:/var/lib/housing-platform/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 15
+      start_period: 120s
+    mem_limit: 1800m
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ../../housing-platform-frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked in at build time, not read at runtime. VITE_PUBLIC_SITE_URL in
+        # particular must be set, or canonical URLs fall back to whichever hostname
+        # the visitor used and www/apex each claim to be canonical.
+        VITE_API_BASE_URL: /api/v1
+        VITE_PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://ethiobuildconnect.et}
+    restart: unless-stopped
+    depends_on: [backend]
+    volumes:
+      # Read-only: nginx serves uploaded media straight from disk, skipping Spring.
+      # If this is missing, every listing photo 404s while the pages still render.
+      - uploads:/var/lib/housing-platform/uploads:ro
+    networks: [internal]
+
+  caddy:
+    # TLS terminator. The frontend container listens on :80 only and its config
+    # assumes TLS is handled upstream; Caddy obtains and renews certificates for the
+    # apex and www automatically.
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [frontend]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [internal]
+
+volumes:
+  postgres-data:
+  uploads:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:
