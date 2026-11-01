@@ -34,6 +34,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # Enables the vector extension on first initialisation; see the file.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     # No ports: published. The database is reachable only on the compose network;
     # exposing 5432 on a public droplet is how these get found and drained.
     healthcheck:
