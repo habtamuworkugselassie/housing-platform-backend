@@ -3,7 +3,10 @@ name: Build and Deploy Backend
 on:
   push:
     branches:
-      - main   # or your default branch
+      - main
+  # Run by hand from the Actions tab. The first deploy to a fresh droplet needs a
+  # retry loop that does not depend on inventing commits to main.
+  workflow_dispatch:   # or your default branch
 
 env:
   # Image lives in GitHub Container Registry, authenticated with the workflow's own
