@@ -291,6 +291,73 @@ gate rolls back the image, but it cannot roll back a migration.
 
 ---
 
+## 11. Live broadcasting (LiveKit) — opt-in
+
+The live pages (`/go-live`, the live wall, replays) need a LiveKit server. It is part of
+this compose file behind the **`live` profile**: three services (`livekit`,
+`livekit-redis`, `livekit-egress`) that start only when the profile is on, so the rest of
+the stack never depends on them.
+
+**Read this first — the host is small.** This is a 1 vCPU / 2 GB droplet, the same size
+as the one LiveKit ran on before. That one **hard-rebooted twice** when recording was
+enabled in its Chromium-based mode (`infra/livekit/RUNBOOK.md`). What runs here is the
+safe shape — recording is a remux of the broadcaster's own tracks, no browser — but the
+JVM, Postgres, LiveKit and egress together still exceed 2 GB under load. Two mitigations,
+in order of preference:
+
+1. **Resize the droplet** to 2 vCPU / 4 GB (DigitalOcean → droplet → Resize → CPU and RAM
+   only; a few minutes of downtime, reversible). This is the honest fix.
+2. **At minimum, add swap** so a spike degrades instead of rebooting the box:
+
+   ```bash
+   fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+   echo '/swapfile none swap sw 0 0' >> /etc/fstab
+   sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' >> /etc/sysctl.d/99-swap.conf
+   free -h
+   ```
+
+Then:
+
+```bash
+# 1. DNS: an A record  live  ->  the droplet IP, next to @ and www (DigitalOcean → Domains).
+#    Caddy gets the certificate for it on its own once the name resolves.
+
+# 2. Firewall: media goes straight to the droplet, not through Caddy.
+ufw allow 7881/tcp     # ICE over TCP (fallback for UDP-blocked networks)
+ufw allow 7882/udp     # all WebRTC media, one muxed port
+ufw allow 3478/udp     # TURN
+
+# 3. Secrets, in deploy/.env (as deploy, or chown afterwards):
+#      COMPOSE_PROFILES=live
+#      LIVEKIT_API_KEY=ebc
+#      LIVEKIT_API_SECRET=<openssl rand -hex 32>
+#      LIVEKIT_RECORDING_ENABLED=true
+#    LIVEKIT_URL stays wss://live.ethiobuildconnect.et.
+
+# 4. Start it, restart the backend so it picks up the LiveKit settings, and have Caddy
+#    load the live.* block (a graceful reload, no downtime).
+su - deploy -c "cd /opt/ethiobuildconnect/housing-platform-backend \
+  && docker compose -f deploy/docker-compose.prod.yml up -d livekit livekit-egress backend \
+  && docker compose -f deploy/docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
+  && docker compose -f deploy/docker-compose.prod.yml ps"
+```
+
+Verify: `curl -s https://live.ethiobuildconnect.et/` prints `OK`, and in the app an
+organizer can go live from `/go-live` and see themselves on the live wall. Recordings
+appear under `/var/lib/ethiobuildconnect/uploads/live-recordings/` after a broadcast
+ends (the directory is created, owned by egress's uid 1001, by
+`migrate-volumes-to-host.sh`).
+
+Once `COMPOSE_PROFILES=live` is in `.env`, every deploy also applies changes to
+`livekit.yaml` and the egress config. Turn it all off again by removing that line and
+running `docker compose -f deploy/docker-compose.prod.yml --profile live down livekit
+livekit-egress livekit-redis` — the rest of the stack is untouched.
+
+Not included, deliberately: RTMP/WHIP ingest for professional cameras (`infra/livekit/`
+has it) — ingress transcodes on the CPU and is not viable on 1 vCPU — and TURN over TLS,
+which needs the certificate files shared from Caddy and a restart on every renewal.
+Both are a profile and a config block away once the host is bigger.
+
 ## Notes
 
 **TLS terminates at Caddy**, and the frontend container listens on `:80` only. That is

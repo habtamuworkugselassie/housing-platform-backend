@@ -126,6 +126,77 @@ services:
       - caddy-config:/config
     networks: [internal]
 
+  # ------------------------------------------------------------ live video ----
+  # Live broadcasting (Phase 5). Opt-in: these three only start when the "live" profile
+  # is active — COMPOSE_PROFILES=live in deploy/.env turns it on for every compose
+  # command. Without it the app runs and the live pages report "not configured".
+  #
+  # Sized for this droplet: recording is TrackComposite (a remux of the broadcaster's
+  # own H.264/Opus tracks, no Chromium). RoomComposite egress — HLS, social simulcast,
+  # multi-host recordings — drives a headless browser and needs ~4 vCPU / 8 GB; on a
+  # 1 vCPU / 2 GB host it rebooted the previous droplet. See deploy/README.md §11.
+
+  livekit-redis:
+    # LiveKit's room state. Separate from the app's redis, which evicts under memory
+    # pressure (allkeys-lru) — fine for a cache, fatal for a live room.
+    image: redis:7-alpine
+    profiles: [live]
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  livekit:
+    # Keep in step with the frontend's livekit-client: 1.8 could not publish video to
+    # client 2.22 ("pcManager is not ready"). Bump server and egress together.
+    image: livekit/livekit-server:v1.9
+    profiles: [live]
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    environment:
+      # "key: secret" map the server reads its credentials from.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-}: ${LIVEKIT_API_SECRET:-}"
+    ports:
+      - "7881:7881"          # ICE over TCP (UDP-blocked networks)
+      - "7882:7882/udp"      # all WebRTC media, one muxed port
+      - "3478:3478/udp"      # TURN/UDP
+      # 7880 (signaling/API) is deliberately not published: Caddy proxies it with TLS.
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    depends_on:
+      livekit-redis: { condition: service_healthy }
+    mem_limit: 512m
+    networks: [internal]
+
+  livekit-egress:
+    image: livekit/egress:v1.9
+    profiles: [live]
+    restart: unless-stopped
+    environment:
+      # Whole config inline so the key/secret come from .env, not a tracked file.
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-}
+        api_secret: ${LIVEKIT_API_SECRET:-}
+        ws_url: ws://livekit:7880
+        redis:
+          address: livekit-redis:6379
+        log_level: info
+    volumes:
+      # Recordings land in <uploads>/live-recordings, which the frontend already serves
+      # at /api/v1/uploads/live-recordings/. The backend's livekit.recording-dir is
+      # /out/live-recordings — a path inside THIS container.
+      - ${DATA_DIR:-/var/lib/ethiobuildconnect}/uploads:/out
+    depends_on:
+      livekit: { condition: service_started }
+    # No cap_add SYS_ADMIN: only the Chromium compositor (RoomComposite) needs it, and
+    # that mode is not run on this host.
+    mem_limit: 768m
+    networks: [internal]
+
 # Data on the host
 #
 # The database and uploaded media are bind mounts under DATA_DIR (default
