@@ -229,35 +229,52 @@ curl -sI https://ethiobuildconnect.et/docs/ethio-build-connect-expo-2026-brochur
   | grep -i location          # -> .../expo-2027-brochure.html
 ```
 
-## 9. Back up the database — do this on day one
+## 9. Where the data lives — and backing it up, on day one
 
-The previous database was lost. Nothing in this stack prevents that happening again.
+The database and uploaded media are **plain directories on the droplet**, bind-mounted
+into the containers:
+
+| What | Host path | Mounted in |
+|---|---|---|
+| PostgreSQL data | `/var/lib/ethiobuildconnect/postgres` | `postgres` |
+| Uploaded media (listing photos, videos, logos, documents) | `/var/lib/ethiobuildconnect/uploads` | `backend` (rw), `frontend` (ro, nginx serves them) |
+
+They are deliberately not Docker volumes. Docker only mounts a host directory — it never
+creates, owns or deletes one — so no `docker compose down -v`, `docker volume prune`,
+`docker system prune --volumes` or project rename can remove them. Deploys replace
+containers and images only. Only a person with a shell can delete these paths.
+
+(`DATA_DIR` in `deploy/.env` moves the parent directory; set it before the first start
+or not at all.) If the droplet was first set up when the stack still used named volumes,
+`deploy/migrate-volumes-to-host.sh` copies them across; the deploy workflow runs it, and
+it is a no-op once the directories have content. Remove the old volumes after verifying:
+`docker volume rm ethiobuildconnect_postgres-data ethiobuildconnect_uploads`.
+
+The previous database was lost. Nothing in this stack prevents that happening again
+except a backup somewhere other than this disk.
 
 ```bash
 mkdir -p /var/backups/ethiobuildconnect
-cat > /etc/cron.daily/ethiobuildconnect-db <<'EOF'
+cat > /etc/cron.daily/ethiobuildconnect-backup <<'EOF'
 #!/bin/sh
+set -e
 cd /opt/ethiobuildconnect/housing-platform-backend
+# Logical dump: restorable into any PostgreSQL 16 with pgvector, unlike a copy of the data dir.
 docker compose -f deploy/docker-compose.prod.yml exec -T postgres \
-  pg_dump -U housing_platform housing_platform \
+  sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
   | gzip > /var/backups/ethiobuildconnect/db-$(date +%F).sql.gz
-find /var/backups/ethiobuildconnect -name 'db-*.sql.gz' -mtime +14 -delete
+# Media is not in the database.
+tar czf /var/backups/ethiobuildconnect/uploads-$(date +%F).tar.gz \
+  -C /var/lib/ethiobuildconnect uploads
+find /var/backups/ethiobuildconnect -name '*.gz' -mtime +14 -delete
 EOF
-chmod +x /etc/cron.daily/ethiobuildconnect-db
-/etc/cron.daily/ethiobuildconnect-db && ls -lh /var/backups/ethiobuildconnect
+chmod +x /etc/cron.daily/ethiobuildconnect-backup
+/etc/cron.daily/ethiobuildconnect-backup && ls -lh /var/backups/ethiobuildconnect
 ```
 
 A backup on the same droplet does not survive losing the droplet. Copy these off the
 box — DigitalOcean Spaces, or `scp` on a schedule — and enable droplet backups in the
 DigitalOcean control panel.
-
-**Uploaded media is not in the database.** Listing photos live in the `uploads` volume.
-Back that up too:
-
-```bash
-docker run --rm -v ethiobuildconnect_uploads:/u -v /var/backups/ethiobuildconnect:/b \
-  alpine tar czf /b/uploads-$(date +%F).tar.gz -C /u .
-```
 
 ## 10. Deploying a change later
 
