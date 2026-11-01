@@ -1,14 +1,16 @@
 # Production stack for a single droplet.
 #
-# Expects both repositories cloned as siblings, because the frontend image is built
-# from source here rather than pulled from a registry:
+# This is the tracked replacement for the hand-maintained
+# ~/housing-platform/docker-compose.yml the deploy workflows used to drive — the one
+# both of them flag as "not in this repo". Keeping it here means a change to the stack
+# arrives through review and a deploy, like any other change.
 #
-#   /opt/ethiobuildconnect/
-#     housing-platform-backend/    <- this file lives in deploy/
-#     housing-platform-frontend/
+# The app images are NOT built here. .github/workflows/deploy-*.yml build them on
+# GitHub's runners, push to GHCR, and retag them on the droplet to the names below.
+# Building on the droplet instead would spend the site's own RAM on Maven and Vite.
 #
-# Run from the backend repo root:
-#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+# Run from the backend repo checkout on the droplet:
+#   docker compose -f deploy/docker-compose.prod.yml up -d
 #
 # Deliberately NOT here: Kafka and Zookeeper. application.yml configures them, but
 # nothing in src/main/java references Kafka at all, so running them would cost about
@@ -55,9 +57,13 @@ services:
     networks: [internal]
 
   backend:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    # The tag deploy-backend.yml retags the GHCR image to on the droplet. It must stay
+    # in step with DEPLOY_IMAGE there, or a deploy pushes a new image that nothing runs.
+    image: habtamuwgs/housing-platform-backend:latest
+    # Never reach for a registry: this tag only ever exists locally, created by the
+    # workflow. Without this, a missing tag sends compose to Docker Hub for a
+    # repository that is not there, and the error names the wrong problem.
+    pull_policy: never
     restart: unless-stopped
     # The service name is load-bearing: the frontend's nginx.conf proxies to
     # http://backend:8080 by this exact hostname.
@@ -88,15 +94,11 @@ services:
     networks: [internal]
 
   frontend:
-    build:
-      context: ../../housing-platform-frontend
-      dockerfile: Dockerfile
-      args:
-        # Baked in at build time, not read at runtime. VITE_PUBLIC_SITE_URL in
-        # particular must be set, or canonical URLs fall back to whichever hostname
-        # the visitor used and www/apex each claim to be canonical.
-        VITE_API_BASE_URL: /api/v1
-        VITE_PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://ethiobuildconnect.et}
+    # As above: deploy-frontend.yml creates this tag on the droplet.
+    # VITE_API_BASE_URL and VITE_PUBLIC_SITE_URL are baked in at build time on the
+    # runner, not read here — see the build-args in that workflow.
+    image: habtamuwgs/housing-platform-frontend:latest
+    pull_policy: never
     restart: unless-stopped
     depends_on: [backend]
     volumes:
