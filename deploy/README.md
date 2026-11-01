@@ -334,9 +334,11 @@ ufw allow 3478/udp     # TURN
 #      LIVEKIT_RECORDING_ENABLED=true
 #    LIVEKIT_URL stays wss://live.ethiobuildconnect.et.
 
-# 4. Start it, and restart the backend so it picks up the LiveKit settings.
+# 4. Start it, restart the backend so it picks up the LiveKit settings, and have Caddy
+#    load the live.* block (a graceful reload, no downtime).
 su - deploy -c "cd /opt/ethiobuildconnect/housing-platform-backend \
   && docker compose -f deploy/docker-compose.prod.yml up -d livekit livekit-egress backend \
+  && docker compose -f deploy/docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
   && docker compose -f deploy/docker-compose.prod.yml ps"
 ```
 
