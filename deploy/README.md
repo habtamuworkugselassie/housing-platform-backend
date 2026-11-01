@@ -196,9 +196,20 @@ UPDATE organizations SET status = 'SUSPENDED' WHERE name IN ('...', '...');
 
 ## 7. Super admin
 
-`V52__Bootstrap_super_admin.sql` creates `superadmin@ethiobuildconnect.et`. Sign in
-once and change the password immediately — the bootstrap credential is in the
-repository.
+`V52__Bootstrap_super_admin.sql` creates `superadmin@ethiobuildconnect.et`. Only the
+bcrypt hash of its password is in the repository; the plaintext is recorded nowhere, and
+the migration's own header says to treat it as compromised. So do not look for it — set
+a new one:
+
+```bash
+bash deploy/reset-password.sh                      # superadmin@ethiobuildconnect.et
+bash deploy/reset-password.sh someone@example.com  # any other account
+```
+
+It prompts for the password (never echoed or logged), hashes it inside the postgres
+container with bcrypt cost 10 — the format the app verifies — and enforces the app's
+own policy (8+ characters, upper, lower, digit) so it can be changed from the UI later.
+Run it as root or the deploy user.
 
 ## 8. Verify
 
