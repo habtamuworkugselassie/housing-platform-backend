@@ -137,6 +137,11 @@ jobs:
             # Flyway's V46 needs the pgvector extension and does not create it (on the old
             # managed database the migration user could not). The compose init script does
             # it for a fresh volume; this does it for one that already exists. Idempotent.
+            # Database and uploads live in host directories, not Docker volumes. On a droplet
+            # that still has the old named volumes this copies them across once, then is a
+            # no-op forever after. See the script for the rules.
+            bash deploy/migrate-volumes-to-host.sh
+
             $COMPOSE up -d postgres
             $COMPOSE exec -T postgres sh -c '
               until pg_isready -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 2; done
