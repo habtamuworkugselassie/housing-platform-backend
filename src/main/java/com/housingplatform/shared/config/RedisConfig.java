@@ -2,30 +2,23 @@ package com.housingplatform.shared.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+/**
+ * Redis is only needed for auth rate limiting, so {@link RedisAutoConfiguration} is excluded in
+ * {@code HousingPlatformApplication} and pulled back in here, behind the same property that enables
+ * {@code RateLimitingFilter}.
+ *
+ * <p>This class deliberately defines no beans. The auto-configuration it imports already provides
+ * {@code redisTemplate} and {@code stringRedisTemplate}; redefining {@code redisTemplate} here
+ * collided with that one under the same name, and because bean overriding is off by default the
+ * application refused to start the first time rate limiting was switched on.
+ */
 @Configuration
 @ConditionalOnProperty(
     name = "rate.limit.auth.enabled",
     havingValue = "true",
     matchIfMissing = false)
 @Import(RedisAutoConfiguration.class)
-public class RedisConfig {
-
-  @Bean
-  public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
-    RedisTemplate<String, String> template = new RedisTemplate<>();
-    template.setConnectionFactory(connectionFactory);
-    template.setKeySerializer(new StringRedisSerializer());
-    template.setValueSerializer(new StringRedisSerializer());
-    template.setHashKeySerializer(new StringRedisSerializer());
-    template.setHashValueSerializer(new StringRedisSerializer());
-    template.afterPropertiesSet();
-    return template;
-  }
-}
+public class RedisConfig {}
