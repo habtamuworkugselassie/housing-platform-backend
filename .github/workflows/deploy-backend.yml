@@ -134,7 +134,11 @@ jobs:
             docker pull "$REGISTRY_IMAGE:$SHA"
             docker tag "$REGISTRY_IMAGE:$SHA" "$DEPLOY_IMAGE:latest"
 
-            $COMPOSE up -d
+            # Only this service and what it depends on (postgres, redis). A bare `up -d` would
+            # also try to start frontend and caddy, and on a droplet the frontend workflow has
+            # not reached yet that fails with "No such image: ...frontend:latest" — correct,
+            # but it is the frontend's job, not this one's.
+            $COMPOSE up -d backend
 
             # Health gate. Poll the app's own health endpoint until it reports healthy. Flyway runs
             # at startup, so a checksum mismatch or a bad migration surfaces here as a container that
