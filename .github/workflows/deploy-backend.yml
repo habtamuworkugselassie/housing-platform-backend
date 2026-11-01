@@ -134,6 +134,15 @@ jobs:
             docker pull "$REGISTRY_IMAGE:$SHA"
             docker tag "$REGISTRY_IMAGE:$SHA" "$DEPLOY_IMAGE:latest"
 
+            # Flyway's V46 needs the pgvector extension and does not create it (on the old
+            # managed database the migration user could not). The compose init script does
+            # it for a fresh volume; this does it for one that already exists. Idempotent.
+            $COMPOSE up -d postgres
+            $COMPOSE exec -T postgres sh -c '
+              until pg_isready -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 2; done
+              psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+                -c "CREATE EXTENSION IF NOT EXISTS vector;"'
+
             # Only this service and what it depends on (postgres, redis). A bare `up -d` would
             # also try to start frontend and caddy, and on a droplet the frontend workflow has
             # not reached yet that fails with "No such image: ...frontend:latest" — correct,
