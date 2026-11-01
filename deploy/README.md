@@ -4,9 +4,9 @@ Everything on one box: Postgres, Redis, the Spring backend, the nginx frontend a
 Caddy TLS terminator. Five containers, no Kafka (see the note in the compose file),
 no external identity provider — the app signs its own JWTs.
 
-**Sizing.** 4 GB RAM is the practical floor and it is tight *during the build*, because
-Maven and Vite both want memory at once. Add swap before the first build (step 2) or
-use an 8 GB droplet. Steady-state the stack sits comfortably under 3 GB.
+**Images are built by GitHub Actions**, not on the droplet. `.github/workflows/deploy-*.yml`
+in each repo build, push to GHCR, copy the image onto the droplet and restart the stack.
+The droplet therefore never runs Maven or Vite, and 4 GB is comfortable.
 
 ---
 
@@ -25,10 +25,6 @@ Confirm from your laptop, not the droplet: `dig +short ethiobuildconnect.et`
 ## 2. Prepare the droplet
 
 ```bash
-# swap, so the first build does not get OOM-killed on a 4 GB box
-fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-
 # docker
 curl -fsSL https://get.docker.com | sh
 
@@ -37,14 +33,16 @@ curl -fsSL https://get.docker.com | sh
 ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable
 ```
 
-## 3. Clone both repositories as siblings
+## 3. Clone the backend repository
 
-The frontend image is built from source, so the compose file reaches `../../housing-platform-frontend`. This layout is required:
+Only this one is needed on the droplet: it holds `deploy/docker-compose.prod.yml`, which
+defines the whole stack. The frontend arrives as a prebuilt image. This path is the
+default both workflows expect — override it with an Actions **variable** `DEPLOY_DIR`
+if you put it elsewhere.
 
 ```bash
 mkdir -p /opt/ethiobuildconnect && cd /opt/ethiobuildconnect
 git clone https://github.com/habtamuworkugselassie/housing-platform-backend.git
-git clone https://github.com/habtamuworkugselassie/housing-platform-frontend.git
 ```
 
 ## 4. Fill in the secrets
@@ -60,15 +58,46 @@ nano deploy/.env
 Every `REQUIRED` line in that file has no usable default. `deploy/.env` is gitignored —
 keep it that way.
 
-## 5. Build and start
+## 5. First start
+
+The app images do not exist on the droplet yet — nothing has deployed. Bring up the
+infrastructure first, then let a deploy supply the rest:
 
 ```bash
-docker compose -f deploy/docker-compose.prod.yml up -d --build    # 10-20 min first time
+# postgres, redis and caddy pull from public registries and start immediately
+docker compose -f deploy/docker-compose.prod.yml up -d postgres redis caddy
+```
+
+Then run **Build and Deploy Backend** and **Build and Deploy Frontend** from the Actions
+tab of each repository (or push to `main`). Each one builds its image, copies it to the
+droplet, and starts its service.
+
+Watch the first backend deploy — Flyway runs all 70 migrations against the empty
+database on first boot:
+
+```bash
 docker compose -f deploy/docker-compose.prod.yml logs -f backend
 ```
 
-Flyway runs all 70 migrations against the empty database on first boot. Wait for
-`Successfully applied` and then a Spring `Started` line before moving on.
+### GitHub secrets the deploys need
+
+Set these in **each** repository under Settings → Secrets and variables → Actions:
+
+| Secret | Value |
+|---|---|
+| `DO_HOST` | the droplet's IP — **update this when moving to a new instance** |
+| `DO_SSH_USER` | the deploy user (see the note below about not using root) |
+| `DO_SSH_KEY` | that user's **private** key, whole file including the header line |
+
+Frontend repo also needs `BACKEND_URL` = `/api/v1` (a relative path: the browser calls
+the same origin and nginx proxies it, so this does not change per environment).
+
+Backend repo also wants `FRONTEND_BASE_URL`, `PUBLIC_API_BASE_URL`, the `CHAPA_*`
+pair and the support-chat keys — all listed in `deploy/.env.example` with what each
+one is for.
+
+The SSH key gives GitHub Actions shell on the droplet. Prefer a dedicated `deploy`
+user in the `docker` group over `root`, so a leaked key is not immediately root.
 
 ## 6. Remove the sample data — before announcing the site
 
@@ -146,15 +175,16 @@ docker run --rm -v ethiobuildconnect_uploads:/u -v /var/backups/ethiobuildconnec
 
 ## 10. Deploying a change later
 
-```bash
-cd /opt/ethiobuildconnect/housing-platform-backend && git pull
-cd ../housing-platform-frontend && git pull
-cd ../housing-platform-backend
-docker compose -f deploy/docker-compose.prod.yml up -d --build
-```
+Push to `main` in either repository. The workflow builds the image, copies it over,
+restarts that service and waits on a health check — rolling back to the previous image
+if the new one does not come up.
 
-Flyway applies any new migrations on restart. Take a backup first (step 9) — a
-migration is not reversible.
+Nothing needs doing on the droplet, including for changes to the stack itself: the
+deploy runs `git pull` in this checkout first, so an edit to
+`deploy/docker-compose.prod.yml` ships with the commit that makes it.
+
+Flyway applies new migrations on restart. **Take a backup first (step 9)** — the health
+gate rolls back the image, but it cannot roll back a migration.
 
 ---
 

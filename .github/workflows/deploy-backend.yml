@@ -10,10 +10,13 @@ env:
   # GITHUB_TOKEN. There is no personal access token to expire — an expired Docker Hub
   # PAT silently blocked every deploy from 2026-04-25 (run 50) to 2026-08-26 (run 53).
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
-  # Image name the droplet's ~/housing-platform/docker-compose.yml already references.
-  # The image pulled from GHCR is retagged to this name on the server, so the compose
-  # file (which is not in this repo) needs no change.
+  # Image name deploy/docker-compose.prod.yml references. The image pulled from GHCR
+  # is retagged to this on the droplet, so compose starts the build this run produced.
+  # Changing it here means changing it there too.
   DEPLOY_IMAGE: habtamuwgs/housing-platform-backend
+  # Where the backend repo is checked out on the droplet. Override with an Actions
+  # variable (Settings -> Secrets and variables -> Actions -> Variables) if it differs.
+  DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/ethiobuildconnect/housing-platform-backend' }}
 
 jobs:
   build:
@@ -82,6 +85,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_IMAGE: ${{ env.REGISTRY_IMAGE }}
           DEPLOY_IMAGE: ${{ env.DEPLOY_IMAGE }}
+          DEPLOY_DIR: ${{ env.DEPLOY_DIR }}
           SHA: ${{ github.sha }}
           FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
           SUPPORT_CHAT_API_BASE_URL: ${{ secrets.SUPPORT_CHAT_API_BASE_URL }}
@@ -95,10 +99,16 @@ jobs:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_SSH_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: GHCR_USER,GHCR_TOKEN,REGISTRY_IMAGE,DEPLOY_IMAGE,SHA,FRONTEND_BASE_URL,SUPPORT_CHAT_API_BASE_URL,SUPPORT_CHAT_API_KEY,SUPPORT_CHAT_MODEL,CHAPA_SECRET_KEY,CHAPA_WEBHOOK_SECRET,CHAPA_BASE_URL,PUBLIC_API_BASE_URL
+          envs: GHCR_USER,GHCR_TOKEN,REGISTRY_IMAGE,DEPLOY_IMAGE,DEPLOY_DIR,SHA,FRONTEND_BASE_URL,SUPPORT_CHAT_API_BASE_URL,SUPPORT_CHAT_API_KEY,SUPPORT_CHAT_MODEL,CHAPA_SECRET_KEY,CHAPA_WEBHOOK_SECRET,CHAPA_BASE_URL,PUBLIC_API_BASE_URL
           script: |
             set -euo pipefail
-            cd ~/housing-platform
+            cd "$DEPLOY_DIR"
+
+            # The stack definition is versioned in this repo now, so pull it before
+            # using it — otherwise a compose change merged here never reaches the
+            # droplet and the deploy silently runs the previous topology.
+            git pull --ff-only
+            COMPOSE="docker compose -f deploy/docker-compose.prod.yml"
 
             # Re-export explicitly so docker compose can interpolate them, and so an
             # unset optional secret is an empty string rather than a `set -u` failure.
@@ -121,7 +131,7 @@ jobs:
             docker pull "$REGISTRY_IMAGE:$SHA"
             docker tag "$REGISTRY_IMAGE:$SHA" "$DEPLOY_IMAGE:latest"
 
-            docker compose up -d backend
+            $COMPOSE up -d
 
             # Health gate. Poll the app's own health endpoint until it reports healthy. Flyway runs
             # at startup, so a checksum mismatch or a bad migration surfaces here as a container that
@@ -133,7 +143,7 @@ jobs:
             for i in $(seq 1 30); do
               # busybox wget exits 0 only on a 2xx response; anything else (connection refused
               # while booting, or a non-200 health status) is non-zero.
-              if docker compose exec -T backend wget -q -O /dev/null http://127.0.0.1:8080/actuator/health; then
+              if $COMPOSE exec -T backend wget -q -O /dev/null http://127.0.0.1:8080/actuator/health; then
                 healthy=true; break
               fi
               sleep 5
@@ -141,9 +151,9 @@ jobs:
 
             if [ "$healthy" != "true" ]; then
               echo "::error::Backend did not become healthy within 150s — rolling back."
-              docker compose logs --tail 60 backend || true
+              $COMPOSE logs --tail 60 backend || true
               docker tag "$DEPLOY_IMAGE:rollback-$SHA" "$DEPLOY_IMAGE:latest" 2>/dev/null \
-                && docker compose up -d backend \
+                && $COMPOSE up -d backend \
                 && echo "Rolled back to the previous image." \
                 || echo "::warning::No previous image to roll back to."
               exit 1
