@@ -1,0 +1,34 @@
+# LiveKit server for the production stack (deploy/docker-compose.prod.yml, profile "live").
+# API keys arrive through the LIVEKIT_KEYS environment variable, built by compose from
+# LIVEKIT_API_KEY / LIVEKIT_API_SECRET in deploy/.env — nothing secret lives here.
+#
+# Signaling (:7880) is not published; Caddy terminates TLS for live.ethiobuildconnect.et
+# and proxies to it on the compose network. Media goes direct to the droplet.
+
+port: 7880
+
+rtc:
+  # One muxed UDP port for all media instead of a 200-port range. Docker runs a proxy
+  # process per published port, so a range costs real memory on a small droplet; the
+  # single port is the LiveKit-recommended shape for containers.
+  udp_port: 7882
+  # ICE over TCP for networks that block UDP outright.
+  tcp_port: 7881
+  # Advertise the droplet's public address (discovered via STUN), not the container's.
+  use_external_ip: true
+
+redis:
+  # Its own redis, not the app's: that one evicts with allkeys-lru under memory pressure,
+  # and an evicted room record would end a broadcast silently.
+  address: livekit-redis:6379
+
+turn:
+  # TURN over UDP for clients behind symmetric NAT. TURN/TLS (port 5349) would need the
+  # certificate files mounted from Caddy and restarted on every renewal; not worth it
+  # until a network that blocks UDP entirely shows up in practice.
+  enabled: true
+  domain: live.ethiobuildconnect.et
+  udp_port: 3478
+
+logging:
+  level: info

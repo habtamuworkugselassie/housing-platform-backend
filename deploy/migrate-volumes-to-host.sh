@@ -53,6 +53,9 @@ copy_volume ethiobuildconnect_uploads       "$DATA_DIR/uploads"  "$SPRING_IDS"
 # Even with nothing to copy, the uploads directory must exist and be writable by the
 # backend before it starts — a fresh droplet with no old volume lands here.
 docker run --rm -v "$DATA_DIR/uploads":/dst alpine sh -c "chmod 755 /dst; [ -n '$SPRING_IDS' ] && chown $SPRING_IDS /dst || true"
+# LiveKit egress (uid 1001, gid 0) writes MP4 recordings here; a root-owned directory
+# makes it fail silently. Harmless when live video is not enabled.
+docker run --rm -v "$DATA_DIR/uploads":/dst alpine sh -c "mkdir -p /dst/live-recordings && chown 1001:0 /dst/live-recordings && chmod 775 /dst/live-recordings"
 
 # Containers created against the old volumes must be recreated, not merely started, to
 # pick up the bind mounts. frontend depends on backend depends on postgres, so this one

@@ -154,6 +154,19 @@ jobs:
             # but it is the frontend's job, not this one's.
             $COMPOSE up -d backend
 
+            # Live video is opt-in (COMPOSE_PROFILES=live in deploy/.env). When it is on,
+            # apply any change to livekit.yaml / the egress config too; otherwise leave
+            # the services alone — starting them without keys would only crash-loop.
+            if grep -qE '^COMPOSE_PROFILES=.*\blive\b' deploy/.env 2>/dev/null; then
+              $COMPOSE up -d livekit livekit-egress
+            fi
+
+            # The Caddyfile is a bind-mounted file, and compose does not recreate a container
+            # when a mounted file's content changes — so without this, an edit to it never
+            # reached the running Caddy. Graceful reload: zero downtime, no-op if unchanged.
+            $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null \
+              || echo "::warning::caddy reload skipped (caddy not running?)"
+
             # Health gate. Poll the app's own health endpoint until it reports healthy. Flyway runs
             # at startup, so a checksum mismatch or a bad migration surfaces here as a container that
             # never becomes healthy — exactly the failure that showed two green deploys while

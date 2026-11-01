@@ -39,3 +39,12 @@ ethiobuildconnect.et, www.ethiobuildconnect.et {
 		}
 	}
 }
+
+# LiveKit signaling. The browser opens wss://live.ethiobuildconnect.et; Caddy terminates
+# TLS and proxies the WebSocket to the server on the compose network. Media itself does
+# not pass through here (UDP 7882 / TCP 7881 / TURN 3478 go straight to the droplet).
+# Needs an A record for `live` and the "live" compose profile; until both exist this
+# answers 502 and the apex site is unaffected.
+live.ethiobuildconnect.et {
+	reverse_proxy livekit:7880
+}
