@@ -1,0 +1,41 @@
+# TLS termination for Ethio Build Connect.
+#
+# Caddy obtains and renews Let's Encrypt certificates automatically; both names must
+# already resolve to this droplet before the first start, or the ACME challenge fails.
+#
+# This is also where http -> https belongs. It deliberately does NOT live in the
+# frontend's nginx.conf: that container listens on :80 only, so $scheme there is
+# always "http" and redirecting on it loops forever. Caddy redirects by default.
+
+{
+	# Certificate expiry and renewal failures arrive here.
+	email ethiobuildconnect@gmail.com
+}
+
+ethiobuildconnect.et, www.ethiobuildconnect.et {
+	encode zstd gzip
+
+	# The frontend container handles www -> apex itself (a server_name-matched 301),
+	# so both names are passed through rather than redirected here. Keeping the
+	# canonical-host decision in one place avoids the two disagreeing.
+	reverse_proxy frontend:80 {
+		# nginx reads these to emit the right canonical and to know the visitor's
+		# real protocol. Without X-Forwarded-Proto it cannot tell http from https.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+		header_up Host {host}
+	}
+
+	# Uploaded media can be large; the default 100s is not enough for a slow phone
+	# upload on an Ethiopian mobile connection.
+	request_body {
+		max_size 200MB
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 20MB
+			roll_keep 5
+		}
+	}
+}

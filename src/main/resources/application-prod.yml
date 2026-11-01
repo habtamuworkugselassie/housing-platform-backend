@@ -5,7 +5,10 @@ spring:
   jpa:
     show-sql: false
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://dpg-d5n4qh75r7bs73dhebd0-a.virginia-postgres.render.com:5432/housing_platform_shvt}
+    # No default on purpose. This used to fall back to the Render database, which
+    # is now destroyed — so a deployment that forgot the variable did not fail, it
+    # quietly pointed at the wrong host. Unset, Spring now refuses to start.
+    url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME:housing_platform}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:

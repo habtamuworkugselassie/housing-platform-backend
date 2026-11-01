@@ -56,3 +56,6 @@ logs/
 tmp/
 temp/
 uploads/
+
+# Production secrets for the droplet stack — never commit.
+deploy/.env
