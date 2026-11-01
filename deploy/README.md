@@ -132,9 +132,16 @@ The app images do not exist on the droplet yet — nothing has deployed. Bring u
 infrastructure first, then let a deploy supply the rest:
 
 ```bash
-# postgres, redis and caddy pull from public registries and start immediately
-docker compose -f deploy/docker-compose.prod.yml up -d postgres redis caddy
+# postgres, redis and caddy pull from public registries and start immediately.
+# --no-deps matters: caddy depends on frontend, which depends on backend, and
+# without it compose follows that chain and fails on
+#   "No such image: habtamuwgs/housing-platform-backend:latest"
+# — the image the workflow has not delivered yet.
+docker compose -f deploy/docker-compose.prod.yml up -d --no-deps postgres redis caddy
 ```
+
+Caddy starts without a frontend behind it; it resolves `frontend:80` per request and
+answers 502 until the deploy lands.
 
 Then run **Build and Deploy Backend** and **Build and Deploy Frontend** from the Actions
 tab of each repository (or push to `main`). Each one builds its image, copies it to the
