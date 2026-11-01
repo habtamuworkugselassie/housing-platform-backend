@@ -75,12 +75,38 @@ Clone it **as the deploy user** — the workflow runs `git pull` here as that us
 a root-owned checkout makes that fail. This path is the default both workflows expect;
 override it with an Actions **variable** `DEPLOY_DIR` if you put it elsewhere.
 
+The repository is **private**, so an anonymous `https://` clone prompts for a GitHub
+username — and fails with `could not read Username ... No such device or address`
+when there is no terminal to answer it. The workflow also runs `git pull` on every
+deploy, so the droplet needs read access that persists. Give it a read-only
+**deploy key** rather than anyone's personal credentials:
+
 ```bash
+# 1. A key pair the deploy user will present to GitHub (separate from ebc_deploy,
+#    which is the key GitHub Actions presents to the droplet).
+sudo -u deploy ssh-keygen -t ed25519 -N "" -C ebc-droplet-readonly \
+  -f /home/deploy/.ssh/github_ro
+cat /home/deploy/.ssh/github_ro.pub
+```
+
+Add that `.pub` line at
+<https://github.com/habtamuworkugselassie/housing-platform-backend/settings/keys>
+→ *Add deploy key*. Leave **Allow write access** unchecked: the droplet only pulls.
+
+```bash
+# 2. Tell ssh to use it for github.com, trust GitHub's host key, and clone over SSH.
+sudo -u deploy sh -c 'printf "Host github.com\n  IdentityFile ~/.ssh/github_ro\n  IdentitiesOnly yes\n" >> ~/.ssh/config \
+  && chmod 600 ~/.ssh/config \
+  && ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null'
+
 mkdir -p /opt/ethiobuildconnect && chown deploy:deploy /opt/ethiobuildconnect
 sudo -u deploy git clone \
-  https://github.com/habtamuworkugselassie/housing-platform-backend.git \
+  git@github.com:habtamuworkugselassie/housing-platform-backend.git \
   /opt/ethiobuildconnect/housing-platform-backend
 ```
+
+The SSH remote is what makes the workflow's later `git pull --ff-only` work without
+a prompt.
 
 ## 4. Fill in the secrets
 
