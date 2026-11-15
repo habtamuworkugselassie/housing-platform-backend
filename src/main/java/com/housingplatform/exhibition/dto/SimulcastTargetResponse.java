@@ -3,9 +3,7 @@ package com.housingplatform.exhibition.dto;
 import com.housingplatform.exhibition.domain.SimulcastTarget;
 import java.util.UUID;
 
-/**
- * Admin view of a simulcast destination. The stream key is never exposed — only that one is set.
- */
+/** Admin view of a simulcast destination. The stream key is never exposed — only that one is set. */
 public record SimulcastTargetResponse(
     UUID id, String platform, String label, String rtmpUrl, boolean hasKey, boolean enabled) {
 

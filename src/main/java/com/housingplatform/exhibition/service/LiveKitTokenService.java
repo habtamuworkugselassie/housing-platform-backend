@@ -76,8 +76,7 @@ public class LiveKitTokenService {
   }
 
   /** Server-API token for the RoomService / IngressService Twirp calls (kill-switch, ingress). */
-  public String mintServerAdmin(
-      String room, boolean roomAdmin, boolean ingressAdmin, long ttlSeconds) {
+  public String mintServerAdmin(String room, boolean roomAdmin, boolean ingressAdmin, long ttlSeconds) {
     Instant now = Instant.now();
     Instant exp = now.plus(ttlSeconds, ChronoUnit.SECONDS);
     Map<String, Object> video = new LinkedHashMap<>();

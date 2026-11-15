@@ -24,8 +24,8 @@ public class LiveKitProperties {
 
   /**
    * Directory the egress container writes MP4 recordings to. This is a path *inside the egress
-   * container*, which mounts the shared uploads volume — e.g. /out/live-recordings maps to the host
-   * uploads dir served at {@link #recordingPublicBase}.
+   * container*, which mounts the shared uploads volume — e.g. /out/live-recordings maps to the
+   * host uploads dir served at {@link #recordingPublicBase}.
    */
   private String recordingDir = "/out/live-recordings";
 

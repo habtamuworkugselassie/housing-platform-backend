@@ -29,8 +29,7 @@ public class LiveBroadcastController {
   @PostMapping("/request")
   @Operation(
       summary = "Request to go live",
-      description =
-          "Creates a pending request. A publish token is issued only after an organizer approves.")
+      description = "Creates a pending request. A publish token is issued only after an organizer approves.")
   public ResponseEntity<LiveBroadcastResponse> requestGoLive(
       @Valid @RequestBody LiveGoLiveRequest request, HttpServletRequest http) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -38,9 +37,7 @@ public class LiveBroadcastController {
   }
 
   @GetMapping
-  @Operation(
-      summary = "List live broadcasts",
-      description = "Public wall of currently-live streams.")
+  @Operation(summary = "List live broadcasts", description = "Public wall of currently-live streams.")
   public ResponseEntity<List<LiveBroadcastResponse>> listLive() {
     return ResponseEntity.ok(service.listLive());
   }
@@ -54,17 +51,13 @@ public class LiveBroadcastController {
   }
 
   @GetMapping("/{id}")
-  @Operation(
-      summary = "Get a broadcast's public status",
-      description = "Used to poll for approval.")
+  @Operation(summary = "Get a broadcast's public status", description = "Used to poll for approval.")
   public ResponseEntity<LiveBroadcastResponse> get(@PathVariable UUID id) {
     return ResponseEntity.ok(service.get(id));
   }
 
   @GetMapping("/{id}/publish-token")
-  @Operation(
-      summary = "Broadcaster publish token",
-      description = "Only when the request is approved.")
+  @Operation(summary = "Broadcaster publish token", description = "Only when the request is approved.")
   public ResponseEntity<LiveTokenResponse> publishToken(
       @PathVariable UUID id, HttpServletRequest http) {
     return ResponseEntity.ok(service.publishToken(id, clientIp(http)));
@@ -88,8 +81,7 @@ public class LiveBroadcastController {
       @RequestParam(name = "audioTrackId", required = false) String audioTrackId,
       @RequestParam(name = "videoTrackId", required = false) String videoTrackId,
       HttpServletRequest http) {
-    return ResponseEntity.ok(
-        service.startRecording(id, audioTrackId, videoTrackId, clientIp(http)));
+    return ResponseEntity.ok(service.startRecording(id, audioTrackId, videoTrackId, clientIp(http)));
   }
 
   @PostMapping("/{id}/end")
@@ -105,11 +97,10 @@ public class LiveBroadcastController {
   // --- Co-hosting: approved viewers publish into the live room ----------------
 
   @PostMapping("/{id}/cohost/request")
-  @Operation(
-      summary = "Ask to co-host",
-      description = "Viewer requests to publish into a live room.")
+  @Operation(summary = "Ask to co-host", description = "Viewer requests to publish into a live room.")
   public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> requestCohost(
-      @PathVariable UUID id, @RequestParam(name = "name", required = false) String name) {
+      @PathVariable UUID id,
+      @RequestParam(name = "name", required = false) String name) {
     return ResponseEntity.status(HttpStatus.CREATED).body(service.requestCohost(id, name));
   }
 

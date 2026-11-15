@@ -65,8 +65,7 @@ public class ExhibitionVideoFeedbackServiceImpl implements ExhibitionVideoFeedba
 
     String videoUrl = mediaStorageService.save(file, VIDEO_SUBPATH);
 
-    boolean autoPublish =
-        displaySettingsService.getDisplaySettings().isExhibitionFeedbackAutoPublish();
+    boolean autoPublish = displaySettingsService.getDisplaySettings().isExhibitionFeedbackAutoPublish();
 
     ExhibitionVideoFeedback saved =
         repository.save(
@@ -98,7 +97,9 @@ public class ExhibitionVideoFeedbackServiceImpl implements ExhibitionVideoFeedba
   public Page<AdminVideoFeedbackResponse> adminList(String status, Pageable pageable) {
     FeedbackStatus parsed = parseStatus(status);
     Page<ExhibitionVideoFeedback> page =
-        parsed == null ? repository.findAll(pageable) : repository.findByStatus(parsed, pageable);
+        parsed == null
+            ? repository.findAll(pageable)
+            : repository.findByStatus(parsed, pageable);
     return page.map(AdminVideoFeedbackResponse::from);
   }
 
