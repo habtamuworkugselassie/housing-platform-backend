@@ -22,7 +22,7 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
 
   private final JavaMailSender mailSender;
 
-  @Value("${spring.mail.username:}")
+  @Value("${app.mail.from:${spring.mail.username:}}")
   private String fromEmail;
 
   /** Where the team is told about each registration; empty disables the notice. */
@@ -37,7 +37,7 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
   public void sendInterestEmails(ExhibitionInterest interest) {
     if (fromEmail == null || fromEmail.isBlank()) {
       log.warn(
-          "Mail not configured (spring.mail.username empty). Interest registration {} ({}) not acknowledged by email.",
+          "Mail not configured (no sender address). Interest registration {} ({}) not acknowledged by email.",
           interest.getEmail(),
           interest.getInterestType());
       return;
