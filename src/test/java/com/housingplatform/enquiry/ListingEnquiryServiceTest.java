@@ -65,6 +65,7 @@ class ListingEnquiryServiceTest {
                 .email("sara@example.com")
                 .phoneNumber(" ")
                 .message("Price negotiable?")
+                .locale("am-ET")
                 .build());
 
     ArgumentCaptor<ListingEnquiry> captor = ArgumentCaptor.forClass(ListingEnquiry.class);
@@ -76,6 +77,7 @@ class ListingEnquiryServiceTest {
     assertThat(saved.getName()).isEqualTo("Sara");
     assertThat(saved.getPhoneNumber()).isNull();
     assertThat(saved.getStatus()).isEqualTo(ListingEnquiry.Status.NEW);
+    assertThat(saved.getLocale()).isEqualTo("am");
     assertThat(response.getOrganizationName()).isEqualTo("Noah");
     verify(mailService).sendEnquiryEmails(saved);
   }

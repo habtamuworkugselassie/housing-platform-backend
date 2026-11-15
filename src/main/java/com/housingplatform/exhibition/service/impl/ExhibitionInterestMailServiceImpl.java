@@ -4,6 +4,7 @@ import com.housingplatform.exhibition.domain.ExhibitionInterest;
 import com.housingplatform.exhibition.service.ExhibitionInterestMailService;
 import com.housingplatform.shared.mail.BrandedMail;
 import com.housingplatform.shared.mail.BrandedMailSender;
+import com.housingplatform.shared.mail.MailLocale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,9 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
   }
 
   BrandedMail receipt(ExhibitionInterest i) {
+    if (MailLocale.isAmharic(i.getLocale())) {
+      return receiptAm(i);
+    }
     BrandedMail m =
         BrandedMail.create()
             .to(i.getEmail())
@@ -66,6 +70,33 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
         .closing(
             "Our team replies to every registration within 2 business days. Until then you can"
                 + " browse the exhibition, sponsorship packages and listings on the site.");
+  }
+
+  private BrandedMail receiptAm(ExhibitionInterest i) {
+    BrandedMail m =
+        BrandedMail.create()
+            .lang(MailLocale.AM)
+            .to(i.getEmail())
+            .replyTo(replyTo)
+            .subject("ፍላጎትዎ ደርሶናል - ኢትዮ ቢልድ ኮኔክት ኤክስፖ 2027")
+            .preheader("እንደ " + labelAm(i.getInterestType()) + " ስለተመዘገቡ እናመሰግናለን።")
+            .title("ፍላጎትዎን ስለመዘገቡ እናመሰግናለን")
+            .greeting("ሰላም፣")
+            .paragraph(
+                "ከጥር 1 እስከ 5 ቀን 2019 ዓ.ም (9-13 ጃንዋሪ 2027) በአዲስ ኮንቬንሽን ሴንተር፣ አዲስ አበባ"
+                    + " በሚካሄደው የኢትዮ ቢልድ ኮኔክት ኤክስፖ ላይ ያሳዩት ፍላጎት ደርሶናል።")
+            .detail("ፍላጎት", labelAm(i.getInterestType()))
+            .detail("ኢሜይል", i.getEmail())
+            .detail("ስልክ", i.getPhoneNumber())
+            .detail("ኩባንያ", i.getCompany());
+    if (i.getSponsorship() != null) {
+      m.detail("ጥቅል", i.getSponsorship().getName());
+    }
+    m.message("መልእክት", i.getMessage());
+    return m.cta("ኤክስፖውን ይጎብኙ", base() + "/am")
+        .closing(
+            "ቡድናችን ለእያንዳንዱ ምዝገባ በ2 የሥራ ቀናት ውስጥ ይመልሳል። እስከዚያው ኤግዚቢሽኑን፣ የስፖንሰርሺፕ"
+                + " ጥቅሎችን እና ንብረቶችን በድረ-ገጹ ላይ መመልከት ይችላሉ።");
   }
 
   BrandedMail teamNotice(ExhibitionInterest i) {
@@ -94,6 +125,15 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
 
   private String base() {
     return frontendBaseUrl.replaceAll("/$", "");
+  }
+
+  private static String labelAm(String interestType) {
+    if (interestType == null) return "ጎብኚ";
+    return switch (interestType) {
+      case "exhibitor" -> "አሳያጅ";
+      case "partner" -> "ስፖንሰር / አጋር";
+      default -> "ጎብኚ";
+    };
   }
 
   private static String label(String interestType) {

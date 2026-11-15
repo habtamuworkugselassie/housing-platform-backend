@@ -38,6 +38,10 @@ public class ListingEnquiryRequest {
   @Size(max = 1000)
   private String pageUrl;
 
+  /** Visitor's language, en or am; anything else falls back to English. */
+  @Size(max = 8)
+  private String locale;
+
   /** Honeypot: real users never fill it. A filled value is accepted but dropped. */
   private String website;
 }

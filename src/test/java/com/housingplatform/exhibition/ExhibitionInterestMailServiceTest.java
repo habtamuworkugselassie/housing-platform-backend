@@ -71,6 +71,22 @@ class ExhibitionInterestMailServiceTest {
   }
 
   @Test
+  void amharicRegistrantsGetAnAmharicReceipt() {
+    BrandedMailSender sender = mock(BrandedMailSender.class);
+    ExhibitionInterest i = interest();
+    i.setLocale("am");
+    service(sender, true, "team@ethiobuildconnect.et").sendInterestEmails(i);
+
+    ArgumentCaptor<BrandedMail> captor = ArgumentCaptor.forClass(BrandedMail.class);
+    verify(sender, times(2)).send(captor.capture());
+    BrandedMail receipt = captor.getAllValues().get(0);
+    assertThat(receipt.getLang()).isEqualTo("am");
+    assertThat(receipt.toPlainText(SITE))
+        .contains("አሳያጅ", "Ethio Build Connect - Platinum (1st tier)", SITE + "/am");
+    assertThat(captor.getAllValues().get(1).getLang()).isEqualTo("en");
+  }
+
+  @Test
   void withoutMailConfigurationSendsNothing() {
     BrandedMailSender sender = mock(BrandedMailSender.class);
     service(sender, false, "team@ethiobuildconnect.et").sendInterestEmails(interest());

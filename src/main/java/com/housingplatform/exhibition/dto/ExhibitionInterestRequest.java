@@ -52,4 +52,7 @@ public class ExhibitionInterestRequest {
 
   /** Required for exhibitors; optional for partners that already know a suitable package. */
   private UUID sponsorshipId;
+
+  /** Registrant's language, en or am; anything else falls back to English. */
+  private String locale;
 }

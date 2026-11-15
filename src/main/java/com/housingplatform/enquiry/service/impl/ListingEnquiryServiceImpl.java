@@ -12,6 +12,7 @@ import com.housingplatform.property.domain.Property;
 import com.housingplatform.property.repository.PropertyRepository;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
+import com.housingplatform.shared.mail.MailLocale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class ListingEnquiryServiceImpl implements ListingEnquiryService {
             .phoneNumber(blankToNull(request.getPhoneNumber()))
             .message(request.getMessage().trim())
             .pageUrl(blankToNull(request.getPageUrl()))
+            .locale(MailLocale.normalize(request.getLocale()))
             .status(ListingEnquiry.Status.NEW);
 
     if (request.getPropertyId() != null) {
@@ -135,6 +137,7 @@ public class ListingEnquiryServiceImpl implements ListingEnquiryService {
         .message(e.getMessage())
         .status(e.getStatus() != null ? e.getStatus().name() : null)
         .pageUrl(e.getPageUrl())
+        .locale(e.getLocale())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
         .build();

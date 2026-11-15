@@ -55,4 +55,8 @@ public class ExhibitionInterest extends BaseEntity {
   /** Set when an admin confirms the registrant email/phone (exhibition lead workflow). */
   @Column(name = "contact_verified_at")
   private LocalDateTime contactVerifiedAt;
+
+  /** Language the registrant used (en / am); the receipt is sent in it. */
+  @Column(length = 8)
+  private String locale;
 }
