@@ -47,6 +47,7 @@ class ListingEnquiryMailServiceTest {
     ListingEnquiryMailServiceImpl s = new ListingEnquiryMailServiceImpl(sender);
     ReflectionTestUtils.setField(s, "fromEmail", from);
     ReflectionTestUtils.setField(s, "notifyEmail", notify);
+    ReflectionTestUtils.setField(s, "replyTo", "team@ethiobuildconnect.et");
     ReflectionTestUtils.setField(s, "frontendBaseUrl", "https://ethiobuildconnect.et/");
     return s;
   }
@@ -64,6 +65,7 @@ class ListingEnquiryMailServiceTest {
     SimpleMailMessage team = captor.getAllValues().get(2);
 
     assertThat(receipt.getTo()).containsExactly("abebe@example.com");
+    assertThat(receipt.getReplyTo()).isEqualTo("team@ethiobuildconnect.et");
     assertThat(receipt.getSubject()).contains("2BR apartment in Bole");
     assertThat(receipt.getText()).contains("Noah Real Estate", "Hello Abebe Kebede");
 
