@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -70,7 +71,8 @@ class ScopeAuthorizationEnforcementTest extends BaseIntegrationTest {
         List.of(
             "/api/v1/admin/stats",
             "/api/v1/admin/display-settings",
-            "/api/v1/admin/exhibition-interests")) {
+            "/api/v1/admin/exhibition-interests",
+            "/api/v1/admin/enquiries")) {
       MvcResult result = mockMvc.perform(get(path)).andReturn();
       assertThat(result.getResponse().getStatus())
           .as("%s must not be reachable without a token", path)
@@ -186,6 +188,19 @@ class ScopeAuthorizationEnforcementTest extends BaseIntegrationTest {
           .as("%s is public and must stay reachable without a token", path)
           .isNotIn(401, 403);
     }
+  }
+
+  @Test
+  @DisplayName("the public enquiry form is reachable without a token and validates its body")
+  void enquiryFormIsPublic() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/enquiries")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"\",\"email\":\"not-an-email\",\"message\":\"\"}"))
+            .andReturn();
+    assertThat(result.getResponse().getStatus()).isEqualTo(400);
   }
 
   @Test

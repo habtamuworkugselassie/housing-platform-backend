@@ -47,12 +47,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     String path = request.getRequestURI();
 
-    // Apply rate limiting only to authentication endpoints
-    if (path.equals("/api/v1/auth/login")
-        || path.equals("/api/v1/auth/register")
-        || path.equals("/api/v1/auth/forgot-password")) {
+    // Apply rate limiting only to authentication endpoints and public lead forms
+    boolean authPath =
+        path.equals("/api/v1/auth/login")
+            || path.equals("/api/v1/auth/register")
+            || path.equals("/api/v1/auth/forgot-password");
+    boolean leadForm =
+        "POST".equalsIgnoreCase(request.getMethod())
+            && (path.equals("/api/v1/enquiries") || path.equals("/api/v1/exhibition/interest"));
+    if (authPath || leadForm) {
       String clientIdentifier = getClientIdentifier(request);
-      String rateLimitKey = "rate_limit:auth:" + clientIdentifier;
+      String rateLimitKey = (authPath ? "rate_limit:auth:" : "rate_limit:lead:") + clientIdentifier;
 
       if (isRateLimited(rateLimitKey)) {
         log.warn("Rate limit exceeded for client: {} on path: {}", clientIdentifier, path);
