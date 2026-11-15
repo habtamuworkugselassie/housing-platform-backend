@@ -24,6 +24,7 @@ public class ListingEnquiryResponse {
   private String message;
   private String status;
   private String pageUrl;
+  private String locale;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

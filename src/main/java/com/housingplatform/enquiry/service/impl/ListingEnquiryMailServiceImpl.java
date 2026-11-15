@@ -5,6 +5,7 @@ import com.housingplatform.enquiry.service.ListingEnquiryMailService;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.shared.mail.BrandedMail;
 import com.housingplatform.shared.mail.BrandedMailSender;
+import com.housingplatform.shared.mail.MailLocale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +58,9 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
   }
 
   BrandedMail receipt(ListingEnquiry e) {
+    if (MailLocale.isAmharic(e.getLocale())) {
+      return receiptAm(e);
+    }
     return BrandedMail.create()
         .to(e.getEmail())
         .replyTo(replyTo)
@@ -77,6 +81,28 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
         .closing(
             "If you do not hear back within 2 business days, reply to this email and our team will"
                 + " follow up for you.");
+  }
+
+  private BrandedMail receiptAm(ListingEnquiry e) {
+    return BrandedMail.create()
+        .lang(MailLocale.AM)
+        .to(e.getEmail())
+        .replyTo(replyTo)
+        .subject("ጥያቄዎ ደርሶናል - " + subject(e))
+        .preheader(companyName(e) + " መልእክትዎን ተቀብሏል፤ በኢሜይል ይመልስልዎታል።")
+        .title("ጥያቄዎ ደርሶናል")
+        .greeting("ሰላም " + e.getName() + "፣")
+        .paragraph(
+            "በኢትዮ ቢልድ ኮኔክት ላይ ስለላኩት ጥያቄ እናመሰግናለን። መልእክትዎ ለ"
+                + companyName(e)
+                + " ተልኳል፤ በቀጥታ ይመልሱልዎታል።")
+        .detail("ስለ", subject(e))
+        .detail("ገጽ", pageUrl(e))
+        .detail("ኢሜይልዎ", e.getEmail())
+        .detail("ስልክዎ", e.getPhoneNumber())
+        .message("መልእክትዎ", e.getMessage())
+        .cta("ንብረቱን ይመልከቱ", pageUrl(e))
+        .closing("በ2 የሥራ ቀናት ውስጥ መልስ ካላገኙ ለዚህ ኢሜይል መልስ ይስጡ፤ ቡድናችን ይከታተልልዎታል።");
   }
 
   BrandedMail companyNotice(ListingEnquiry e, String to) {

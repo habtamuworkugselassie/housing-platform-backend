@@ -63,4 +63,8 @@ public class ListingEnquiry extends BaseEntity {
 
   @Column(name = "page_url", length = 1000)
   private String pageUrl;
+
+  /** Language the visitor used (en / am); the receipt is sent in it. */
+  @Column(length = 8)
+  private String locale;
 }

@@ -83,6 +83,26 @@ class ListingEnquiryMailServiceTest {
   }
 
   @Test
+  void amharicVisitorsGetAnAmharicReceiptWhileNoticesStayEnglish() {
+    BrandedMailSender sender = mock(BrandedMailSender.class);
+    ListingEnquiry e = enquiry("sales@noah.et");
+    e.setLocale("am");
+    service(sender, true, "team@ethiobuildconnect.et").sendEnquiryEmails(e);
+
+    ArgumentCaptor<BrandedMail> captor = ArgumentCaptor.forClass(BrandedMail.class);
+    verify(sender, times(3)).send(captor.capture());
+    BrandedMail receipt = captor.getAllValues().get(0);
+    assertThat(receipt.getLang()).isEqualTo("am");
+    assertThat(receipt.getSubject()).startsWith("ጥያቄዎ ደርሶናል");
+    assertThat(receipt.toPlainText(SITE))
+        .contains("ሰላም Abebe Kebede", "Noah Real Estate", "አዲስ አበባ");
+    assertThat(receipt.toHtml(SITE, SITE + "/logo.png"))
+        .contains("<html lang=\"am\"", "Noto Sans Ethiopic");
+    assertThat(captor.getAllValues().get(1).getLang()).isEqualTo("en");
+    assertThat(captor.getAllValues().get(2).getSubject()).startsWith("Listing enquiry:");
+  }
+
+  @Test
   void skipsCompanyNoticeWithoutCompanyEmailAndFlagsItForTheTeam() {
     BrandedMailSender sender = mock(BrandedMailSender.class);
     service(sender, true, "team@ethiobuildconnect.et").sendEnquiryEmails(enquiry(null));

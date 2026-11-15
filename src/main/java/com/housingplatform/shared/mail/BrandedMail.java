@@ -27,11 +27,18 @@ public final class BrandedMail {
   private String ctaLabel;
   private String ctaUrl;
   private final List<String> closing = new ArrayList<>();
+  private String lang = MailLocale.EN;
 
   private BrandedMail() {}
 
   public static BrandedMail create() {
     return new BrandedMail();
+  }
+
+  /** Language of the copy: sets the html lang, the footer tagline and the font stack. */
+  public BrandedMail lang(String lang) {
+    this.lang = MailLocale.normalize(lang);
+    return this;
   }
 
   public BrandedMail to(String... addresses) {
@@ -109,13 +116,15 @@ public final class BrandedMail {
     }
     if (notBlank(ctaUrl)) sb.append(ctaLabel).append(": ").append(ctaUrl).append("\n\n");
     for (String c : closing) sb.append(c).append("\n\n");
-    sb.append("Ethio Build Connect\n").append(siteUrl).append("\nAddis Ababa, Ethiopia\n");
+    sb.append("Ethio Build Connect\n").append(siteUrl).append('\n').append(city()).append('\n');
     return sb.toString();
   }
 
   public String toHtml(String siteUrl, String logoUrl) {
     StringBuilder b = new StringBuilder(6000);
-    b.append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">")
+    b.append("<!DOCTYPE html><html lang=\"")
+        .append(lang)
+        .append("\"><head><meta charset=\"UTF-8\">")
         .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
         .append(
             "<meta name=\"color-scheme\" content=\"light\"><meta name=\"supported-color-schemes\" content=\"light\">")
@@ -123,7 +132,9 @@ public final class BrandedMail {
         .append(esc(subject))
         .append("</title></head>")
         .append(
-            "<body style=\"margin:0;padding:0;background:#f4f2fa;font-family:Roboto,'Helvetica Neue',Arial,sans-serif;color:#1f1535;\">");
+            "<body style=\"margin:0;padding:0;background:#f4f2fa;font-family:"
+                + fontStack()
+                + ";color:#1f1535;\">");
     if (notBlank(preheader)) {
       b.append("<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:#f4f2fa;\">")
           .append(esc(preheader))
@@ -198,8 +209,10 @@ public final class BrandedMail {
     b.append(
             "<tr><td style=\"background:#ffffff;border-radius:0 0 24px 24px;padding:20px 32px 28px;border-top:1px solid #e9e4f5;font-size:12px;line-height:1.6;color:#6b5f85;\">")
         .append("<strong style=\"color:#2e1065;\">Ethio Build Connect</strong><br>")
-        .append("Ethiopia's real estate &amp; construction marketplace and expo<br>")
-        .append("Addis Ababa, Ethiopia &middot; <a href=\"")
+        .append(esc(tagline()))
+        .append("<br>")
+        .append(esc(city()))
+        .append(" &middot; <a href=\"")
         .append(esc(siteUrl))
         .append("\" style=\"color:#6d28d9;text-decoration:none;\">")
         .append(esc(siteUrl.replaceFirst("^https?://", "")))
@@ -207,6 +220,22 @@ public final class BrandedMail {
         .append("</td></tr>");
     b.append("</table></td></tr></table></body></html>");
     return b.toString();
+  }
+
+  private String fontStack() {
+    return MailLocale.isAmharic(lang)
+        ? "'Noto Sans Ethiopic','Abyssinica SIL','Nyala',Roboto,'Helvetica Neue',Arial,sans-serif"
+        : "Roboto,'Helvetica Neue',Arial,sans-serif";
+  }
+
+  private String tagline() {
+    return MailLocale.isAmharic(lang)
+        ? "የኢትዮጵያ የሪል እስቴት እና የግንባታ ገበያ እና ኤግዚቢሽን"
+        : "Ethiopia's real estate & construction marketplace and expo";
+  }
+
+  private String city() {
+    return MailLocale.isAmharic(lang) ? "አዲስ አበባ፣ ኢትዮጵያ" : "Addis Ababa, Ethiopia";
   }
 
   private static String para(String text) {

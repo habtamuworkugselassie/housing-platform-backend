@@ -16,6 +16,7 @@ import com.housingplatform.identity.repository.UserRepository;
 import com.housingplatform.identity.service.OrganizationPrimaryUserProvisioningService;
 import com.housingplatform.identity.service.SponsorshipService;
 import com.housingplatform.shared.exception.BusinessException;
+import com.housingplatform.shared.mail.MailLocale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -95,6 +96,7 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
             .message(request.getMessage() != null ? request.getMessage().trim() : null)
             .organization(organization)
             .sponsorship(sponsorship)
+            .locale(MailLocale.normalize(request.getLocale()))
             .build();
     entity = repository.save(entity);
 
