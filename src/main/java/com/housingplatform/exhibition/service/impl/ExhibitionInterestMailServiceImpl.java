@@ -2,36 +2,32 @@ package com.housingplatform.exhibition.service.impl;
 
 import com.housingplatform.exhibition.domain.ExhibitionInterest;
 import com.housingplatform.exhibition.service.ExhibitionInterestMailService;
+import com.housingplatform.shared.mail.BrandedMail;
+import com.housingplatform.shared.mail.BrandedMailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
  * Sent after an interest registration is committed. Runs off the request thread so a slow or
- * failing mail server never delays or fails the registration itself; failures are logged. With no
- * mail username configured it only logs, which is what local and test runs want.
+ * failing mail server never delays or fails the registration itself; failures are logged.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMailService {
 
-  private final JavaMailSender mailSender;
-
-  @Value("${app.mail.from:${spring.mail.username:}}")
-  private String fromEmail;
-
-  /** Replies to receipts go here (the team inbox) when the sender is a no-reply address. */
-  @Value("${app.mail.reply-to:}")
-  private String replyTo;
+  private final BrandedMailSender sender;
 
   /** Where the team is told about each registration; empty disables the notice. */
   @Value("${app.exhibition.notify-email:}")
   private String notifyEmail;
+
+  /** Replies to receipts go here (the team inbox) when the sender is a no-reply address. */
+  @Value("${app.mail.reply-to:}")
+  private String replyTo;
 
   @Value("${app.frontend-base-url:http://localhost:5173}")
   private String frontendBaseUrl;
@@ -39,82 +35,65 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
   @Async
   @Override
   public void sendInterestEmails(ExhibitionInterest interest) {
-    if (fromEmail == null || fromEmail.isBlank()) {
+    if (!sender.configured()) {
       log.warn(
-          "Mail not configured (no sender address). Interest registration {} ({}) not acknowledged by email.",
+          "Mail not configured. Interest registration {} ({}) not acknowledged by email.",
           interest.getEmail(),
           interest.getInterestType());
       return;
     }
-    sendReceipt(interest);
-    sendTeamNotice(interest);
-  }
-
-  private void sendReceipt(ExhibitionInterest interest) {
-    try {
-      SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
-      message.setTo(interest.getEmail());
-      if (replyTo != null && !replyTo.isBlank()) {
-        message.setReplyTo(replyTo.trim());
-      }
-      message.setSubject("We received your interest - Ethio Build Connect Expo 2027");
-      message.setText(
-          "Thank you for registering your interest in the Ethio Build Connect Expo"
-              + " (9-13 January 2027, Addis Convention Center).\n\n"
-              + summary(interest)
-              + "\nOur team replies to every registration within 2 business days."
-              + " Until then you can browse the exhibition, sponsorship packages and listings at "
-              + frontendBaseUrl.replaceAll("/$", "")
-              + "\n\nEthio Build Connect\n"
-              + "Addis Ababa, Ethiopia");
-      mailSender.send(message);
-      log.info("Interest receipt sent to {}", interest.getEmail());
-    } catch (Exception e) {
-      log.error("Failed to send interest receipt to {}: {}", interest.getEmail(), e.getMessage());
+    sender.send(receipt(interest));
+    if (notifyEmail != null && !notifyEmail.isBlank()) {
+      sender.send(teamNotice(interest));
     }
   }
 
-  private void sendTeamNotice(ExhibitionInterest interest) {
-    if (notifyEmail == null || notifyEmail.isBlank()) {
-      return;
-    }
-    try {
-      SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
-      message.setTo(notifyEmail.split("\\s*,\\s*"));
-      message.setReplyTo(interest.getEmail());
-      message.setSubject(
-          "New expo interest: " + label(interest.getInterestType()) + " - " + interest.getEmail());
-      message.setText(
-          summary(interest)
-              + "\nReview and follow up in the admin portal: "
-              + frontendBaseUrl.replaceAll("/$", "")
-              + "/admin/exhibition-interests");
-      mailSender.send(message);
-      log.info("Interest notice sent to {}", notifyEmail);
-    } catch (Exception e) {
-      log.error("Failed to send interest notice to {}: {}", notifyEmail, e.getMessage());
-    }
+  BrandedMail receipt(ExhibitionInterest i) {
+    BrandedMail m =
+        BrandedMail.create()
+            .to(i.getEmail())
+            .replyTo(replyTo)
+            .subject("We received your interest - Ethio Build Connect Expo 2027")
+            .preheader(
+                "Thank you for registering as a " + label(i.getInterestType()).toLowerCase() + ".")
+            .title("Thank you for registering your interest")
+            .greeting("Hello,")
+            .paragraph(
+                "We received your interest in the Ethio Build Connect Expo, 9-13 January 2027 at"
+                    + " the Addis Convention Center, Addis Ababa.");
+    details(m, i);
+    return m.cta("Explore the expo", base())
+        .closing(
+            "Our team replies to every registration within 2 business days. Until then you can"
+                + " browse the exhibition, sponsorship packages and listings on the site.");
   }
 
-  private static String summary(ExhibitionInterest interest) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("Interest: ").append(label(interest.getInterestType())).append('\n');
-    sb.append("Email: ").append(interest.getEmail()).append('\n');
-    if (notBlank(interest.getPhoneNumber())) {
-      sb.append("Phone: ").append(interest.getPhoneNumber()).append('\n');
+  BrandedMail teamNotice(ExhibitionInterest i) {
+    BrandedMail m =
+        BrandedMail.create()
+            .to(notifyEmail.split("\\s*,\\s*"))
+            .replyTo(i.getEmail())
+            .subject("New expo interest: " + label(i.getInterestType()) + " - " + i.getEmail())
+            .preheader("A new " + label(i.getInterestType()).toLowerCase() + " registration.")
+            .title("New expo interest: " + label(i.getInterestType()))
+            .paragraph("A new registration came in from the exhibition page.");
+    details(m, i);
+    return m.cta("Review in admin", base() + "/admin/exhibition-interests");
+  }
+
+  private static void details(BrandedMail m, ExhibitionInterest i) {
+    m.detail("Interest", label(i.getInterestType()))
+        .detail("Email", i.getEmail())
+        .detail("Phone", i.getPhoneNumber())
+        .detail("Company", i.getCompany());
+    if (i.getSponsorship() != null) {
+      m.detail("Package", i.getSponsorship().getName());
     }
-    if (notBlank(interest.getCompany())) {
-      sb.append("Company: ").append(interest.getCompany()).append('\n');
-    }
-    if (interest.getSponsorship() != null && notBlank(interest.getSponsorship().getName())) {
-      sb.append("Package: ").append(interest.getSponsorship().getName()).append('\n');
-    }
-    if (notBlank(interest.getMessage())) {
-      sb.append("Message: ").append(interest.getMessage().trim()).append('\n');
-    }
-    return sb.toString();
+    m.message("Message", i.getMessage());
+  }
+
+  private String base() {
+    return frontendBaseUrl.replaceAll("/$", "");
   }
 
   private static String label(String interestType) {
@@ -124,9 +103,5 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
       case "partner" -> "Sponsor / partner";
       default -> "Visitor";
     };
-  }
-
-  private static boolean notBlank(String s) {
-    return s != null && !s.isBlank();
   }
 }

@@ -3,11 +3,11 @@ package com.housingplatform.enquiry.service.impl;
 import com.housingplatform.enquiry.domain.ListingEnquiry;
 import com.housingplatform.enquiry.service.ListingEnquiryMailService;
 import com.housingplatform.identity.domain.Organization;
+import com.housingplatform.shared.mail.BrandedMail;
+import com.housingplatform.shared.mail.BrandedMailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -21,18 +21,15 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService {
 
-  private final JavaMailSender mailSender;
-
-  @Value("${app.mail.from:${spring.mail.username:}}")
-  private String fromEmail;
-
-  /** Replies to receipts go here (the team inbox) when the sender is a no-reply address. */
-  @Value("${app.mail.reply-to:}")
-  private String replyTo;
+  private final BrandedMailSender sender;
 
   /** Team copy of every enquiry (same inbox as exhibition interest); empty disables it. */
   @Value("${app.exhibition.notify-email:}")
   private String notifyEmail;
+
+  /** Replies to receipts go here (the team inbox) when the sender is a no-reply address. */
+  @Value("${app.mail.reply-to:}")
+  private String replyTo;
 
   @Value("${app.frontend-base-url:http://localhost:5173}")
   private String frontendBaseUrl;
@@ -40,100 +37,103 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
   @Async
   @Override
   public void sendEnquiryEmails(ListingEnquiry enquiry) {
-    if (fromEmail == null || fromEmail.isBlank()) {
+    if (!sender.configured()) {
       log.warn(
-          "Mail not configured (no sender address). Enquiry from {} about '{}' not emailed.",
+          "Mail not configured. Enquiry from {} about '{}' not emailed.",
           enquiry.getEmail(),
           enquiry.getSubjectTitle());
       return;
     }
-    sendReceipt(enquiry);
-    sendCompanyNotice(enquiry);
-    sendTeamNotice(enquiry);
-  }
-
-  private void sendReceipt(ListingEnquiry enquiry) {
-    try {
-      SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
-      message.setTo(enquiry.getEmail());
-      if (replyTo != null && !replyTo.isBlank()) {
-        message.setReplyTo(replyTo.trim());
-      }
-      message.setSubject("We received your enquiry - " + subject(enquiry));
-      message.setText(
-          "Hello "
-              + enquiry.getName()
-              + ",\n\nThank you for your enquiry on Ethio Build Connect. "
-              + companyName(enquiry)
-              + " has been sent your message and will reply to you directly.\n\n"
-              + summary(enquiry)
-              + "\nIf you do not hear back within 2 business days, reply to this email and our"
-              + " team will follow up for you.\n\nEthio Build Connect\n"
-              + base()
-              + "\nAddis Ababa, Ethiopia");
-      mailSender.send(message);
-      log.info("Enquiry receipt sent to {}", enquiry.getEmail());
-    } catch (Exception e) {
-      log.error("Failed to send enquiry receipt to {}: {}", enquiry.getEmail(), e.getMessage());
-    }
-  }
-
-  private void sendCompanyNotice(ListingEnquiry enquiry) {
-    String to = companyEmail(enquiry);
-    if (to == null) {
+    sender.send(receipt(enquiry));
+    String companyTo = companyEmail(enquiry);
+    if (companyTo != null) {
+      sender.send(companyNotice(enquiry, companyTo));
+    } else {
       log.info("Enquiry {} has no company email; only the team copy is sent.", enquiry.getId());
-      return;
     }
-    try {
-      SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
-      message.setTo(to);
-      message.setReplyTo(enquiry.getEmail());
-      message.setSubject("New enquiry: " + subject(enquiry) + " - " + enquiry.getName());
-      message.setText(
-          "A visitor on Ethio Build Connect asked about "
-              + subject(enquiry)
-              + ".\n\n"
-              + summary(enquiry)
-              + "\nReply to this email to answer them directly.\n\nEthio Build Connect\n"
-              + base());
-      mailSender.send(message);
-      log.info("Enquiry notice sent to company {}", to);
-    } catch (Exception e) {
-      log.error("Failed to send enquiry notice to {}: {}", to, e.getMessage());
+    if (notifyEmail != null && !notifyEmail.isBlank()) {
+      sender.send(teamNotice(enquiry));
     }
   }
 
-  private void sendTeamNotice(ListingEnquiry enquiry) {
-    if (notifyEmail == null || notifyEmail.isBlank()) {
-      return;
-    }
-    try {
-      SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(fromEmail);
-      message.setTo(notifyEmail.split("\\s*,\\s*"));
-      message.setReplyTo(enquiry.getEmail());
-      message.setSubject("Listing enquiry: " + subject(enquiry) + " - " + enquiry.getEmail());
-      message.setText(
-          summary(enquiry)
-              + "Company: "
-              + companyName(enquiry)
-              + (companyEmail(enquiry) != null
-                  ? " (" + companyEmail(enquiry) + ")"
-                  : " (no email on file - please forward)")
-              + "\n\nTrack and close it in the admin portal: "
-              + base()
-              + "/admin/enquiries");
-      mailSender.send(message);
-      log.info("Enquiry copy sent to {}", notifyEmail);
-    } catch (Exception e) {
-      log.error("Failed to send enquiry copy to {}: {}", notifyEmail, e.getMessage());
-    }
+  BrandedMail receipt(ListingEnquiry e) {
+    return BrandedMail.create()
+        .to(e.getEmail())
+        .replyTo(replyTo)
+        .subject("We received your enquiry - " + subject(e))
+        .preheader(companyName(e) + " has your message and will reply by email.")
+        .title("We received your enquiry")
+        .greeting("Hello " + e.getName() + ",")
+        .paragraph(
+            "Thank you for your enquiry on Ethio Build Connect. "
+                + companyName(e)
+                + " has been sent your message and will reply to you directly.")
+        .detail("About", subject(e))
+        .detail("Page", pageUrl(e))
+        .detail("Your email", e.getEmail())
+        .detail("Your phone", e.getPhoneNumber())
+        .message("Your message", e.getMessage())
+        .cta("View the listing", pageUrl(e))
+        .closing(
+            "If you do not hear back within 2 business days, reply to this email and our team will"
+                + " follow up for you.");
+  }
+
+  BrandedMail companyNotice(ListingEnquiry e, String to) {
+    return BrandedMail.create()
+        .to(to)
+        .replyTo(e.getEmail())
+        .subject("New enquiry: " + subject(e) + " - " + e.getName())
+        .preheader(e.getName() + " asked about " + subject(e) + ". Reply to answer them.")
+        .title("New enquiry about " + subject(e))
+        .paragraph(
+            "A visitor on Ethio Build Connect asked about "
+                + subject(e)
+                + ". Reply to this email to answer them directly.")
+        .detail("Name", e.getName())
+        .detail("Email", e.getEmail())
+        .detail("Phone", e.getPhoneNumber())
+        .detail("Page", pageUrl(e))
+        .message("Message", e.getMessage())
+        .cta("Reply to " + firstName(e), "mailto:" + e.getEmail())
+        .closing("A quick, friendly reply is the best way to turn an enquiry into a visit.");
+  }
+
+  BrandedMail teamNotice(ListingEnquiry e) {
+    String company =
+        companyName(e)
+            + (companyEmail(e) != null
+                ? " (" + companyEmail(e) + ")"
+                : " (no email on file - please forward)");
+    return BrandedMail.create()
+        .to(notifyEmail.split("\\s*,\\s*"))
+        .replyTo(e.getEmail())
+        .subject("Listing enquiry: " + subject(e) + " - " + e.getEmail())
+        .preheader("Copy of an enquiry sent to " + companyName(e) + ".")
+        .title("Listing enquiry")
+        .paragraph(
+            "Copy of an enquiry sent to the listing's company. Track it in the admin portal.")
+        .detail("About", subject(e))
+        .detail("Company", company)
+        .detail("Name", e.getName())
+        .detail("Email", e.getEmail())
+        .detail("Phone", e.getPhoneNumber())
+        .detail("Page", pageUrl(e))
+        .message("Message", e.getMessage())
+        .cta("Open enquiries", base() + "/admin/enquiries");
   }
 
   private String base() {
     return frontendBaseUrl.replaceAll("/$", "");
+  }
+
+  private String pageUrl(ListingEnquiry e) {
+    if (notBlank(e.getPageUrl())) return e.getPageUrl();
+    if (e.getProperty() != null) return base() + "/properties/" + e.getProperty().getId();
+    if (e.getOrganization() != null) {
+      return base() + "/organizations/" + e.getOrganization().getId();
+    }
+    return base();
   }
 
   private static String subject(ListingEnquiry e) {
@@ -146,32 +146,17 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
     return o != null && notBlank(o.getName()) ? o.getName() : "The lister";
   }
 
+  private static String firstName(ListingEnquiry e) {
+    String n = e.getName() == null ? "" : e.getName().trim();
+    int sp = n.indexOf(' ');
+    return sp > 0 ? n.substring(0, sp) : (n.isEmpty() ? "the visitor" : n);
+  }
+
   private static String companyEmail(ListingEnquiry e) {
     Organization o = e.getOrganization();
     if (o == null || o.getContact() == null) return null;
     String email = o.getContact().getEmail();
     return notBlank(email) ? email.trim() : null;
-  }
-
-  private String summary(ListingEnquiry e) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("About: ").append(subject(e)).append('\n');
-    if (notBlank(e.getPageUrl())) {
-      sb.append("Page: ").append(e.getPageUrl()).append('\n');
-    } else if (e.getProperty() != null) {
-      sb.append("Page: ")
-          .append(base())
-          .append("/properties/")
-          .append(e.getProperty().getId())
-          .append('\n');
-    }
-    sb.append("Name: ").append(e.getName()).append('\n');
-    sb.append("Email: ").append(e.getEmail()).append('\n');
-    if (notBlank(e.getPhoneNumber())) {
-      sb.append("Phone: ").append(e.getPhoneNumber()).append('\n');
-    }
-    sb.append("Message:\n").append(e.getMessage().trim()).append('\n');
-    return sb.toString();
   }
 
   private static boolean notBlank(String s) {
