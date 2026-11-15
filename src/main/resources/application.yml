@@ -149,6 +149,9 @@ logging:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  exhibition:
+    # Comma-separated addresses told about every interest registration; empty = no notice.
+    notify-email: ${EXHIBITION_NOTIFY_EMAIL:}
   support-chat:
     enabled: ${SUPPORT_CHAT_ENABLED:true}
     # OpenAI-compatible HTTP API: OpenAI, Groq (free tier), OpenRouter, Together, local Ollama proxy, etc.

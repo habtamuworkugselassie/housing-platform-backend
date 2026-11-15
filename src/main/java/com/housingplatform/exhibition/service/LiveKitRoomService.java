@@ -47,7 +47,8 @@ public class LiveKitRoomService {
       restTemplate.postForEntity(
           properties.httpUrl() + "/twirp/livekit.RoomService/CreateRoom", req, String.class);
     } catch (Exception e) {
-      // Non-fatal: if the broadcaster connects first the room exists anyway; recording is best-effort.
+      // Non-fatal: if the broadcaster connects first the room exists anyway; recording is
+      // best-effort.
       log.warn("LiveKit CreateRoom failed for room {}: {}", room, e.getMessage());
     }
   }
