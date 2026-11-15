@@ -26,6 +26,10 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
   @Value("${app.mail.from:${spring.mail.username:}}")
   private String fromEmail;
 
+  /** Replies to receipts go here (the team inbox) when the sender is a no-reply address. */
+  @Value("${app.mail.reply-to:}")
+  private String replyTo;
+
   /** Team copy of every enquiry (same inbox as exhibition interest); empty disables it. */
   @Value("${app.exhibition.notify-email:}")
   private String notifyEmail;
@@ -53,6 +57,9 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
       SimpleMailMessage message = new SimpleMailMessage();
       message.setFrom(fromEmail);
       message.setTo(enquiry.getEmail());
+      if (replyTo != null && !replyTo.isBlank()) {
+        message.setReplyTo(replyTo.trim());
+      }
       message.setSubject("We received your enquiry - " + subject(enquiry));
       message.setText(
           "Hello "

@@ -25,6 +25,10 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
   @Value("${app.mail.from:${spring.mail.username:}}")
   private String fromEmail;
 
+  /** Replies to receipts go here (the team inbox) when the sender is a no-reply address. */
+  @Value("${app.mail.reply-to:}")
+  private String replyTo;
+
   /** Where the team is told about each registration; empty disables the notice. */
   @Value("${app.exhibition.notify-email:}")
   private String notifyEmail;
@@ -51,6 +55,9 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
       SimpleMailMessage message = new SimpleMailMessage();
       message.setFrom(fromEmail);
       message.setTo(interest.getEmail());
+      if (replyTo != null && !replyTo.isBlank()) {
+        message.setReplyTo(replyTo.trim());
+      }
       message.setSubject("We received your interest - Ethio Build Connect Expo 2027");
       message.setText(
           "Thank you for registering your interest in the Ethio Build Connect Expo"

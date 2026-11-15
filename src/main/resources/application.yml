@@ -158,6 +158,8 @@ app:
     # Sender shown on receipts and notices. Defaults to the SMTP username, which is right for
     # Gmail; relays such as Brevo/SendGrid log in with an id, so set MAIL_FROM to a verified address.
     from: ${MAIL_FROM:${MAIL_USERNAME:}}
+    # Where replies to receipts go when the sender is a no-reply address on the site's domain.
+    reply-to: ${MAIL_REPLY_TO:}
   exhibition:
     # Comma-separated addresses told about every interest registration; empty = no notice.
     notify-email: ${EXHIBITION_NOTIFY_EMAIL:}
