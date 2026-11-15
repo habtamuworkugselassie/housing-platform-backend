@@ -117,7 +117,8 @@ public final class BrandedMail {
     StringBuilder b = new StringBuilder(6000);
     b.append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">")
         .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-        .append("<meta name=\"color-scheme\" content=\"light\">")
+        .append(
+            "<meta name=\"color-scheme\" content=\"light\"><meta name=\"supported-color-schemes\" content=\"light\">")
         .append("<title>")
         .append(esc(subject))
         .append("</title></head>")
@@ -133,7 +134,8 @@ public final class BrandedMail {
         .append(
             "<table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:600px;width:100%;\">");
     // header
-    b.append("<tr><td style=\"background:#2e1065;border-radius:24px 24px 0 0;padding:26px 32px;\">")
+    b.append(
+            "<tr><td bgcolor=\"#2e1065\" style=\"background:#2e1065;background-image:linear-gradient(#2e1065,#2e1065);border-radius:24px 24px 0 0;padding:26px 32px;\">")
         .append("<a href=\"")
         .append(esc(siteUrl))
         .append("\" style=\"text-decoration:none;\"><img src=\"")
@@ -182,7 +184,7 @@ public final class BrandedMail {
     }
     if (notBlank(ctaUrl)) {
       b.append(
-              "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:4px 0 24px;\"><tr><td style=\"background:#f4c977;border-radius:999px;\">")
+              "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:4px 0 24px;\"><tr><td bgcolor=\"#f4c977\" style=\"background:#f4c977;background-image:linear-gradient(#f4c977,#f4c977);border-radius:999px;\">")
           .append("<a href=\"")
           .append(esc(ctaUrl))
           .append(

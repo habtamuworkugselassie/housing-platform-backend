@@ -41,13 +41,13 @@ class BrandedMailTest {
     String html = sample().toHtml(SITE, LOGO);
     assertThat(html)
         .contains("<img src=\"" + LOGO + "\"")
-        .contains("background:#2e1065")
+        .contains("background-image:linear-gradient(#2e1065,#2e1065)")
         .contains("We received your enquiry - 2BR &lt;Bole&gt;")
         .contains("Thank you &amp; welcome.")
         .contains("<a href=\"" + SITE + "/properties/1\" style=\"color:#6d28d9;\">")
         .contains("mailto:abebe@example.com")
         .contains("Line one\nLine two &lt;b&gt;")
-        .contains("background:#f4c977")
+        .contains("background-image:linear-gradient(#f4c977,#f4c977)")
         .contains(">View the listing</a>")
         .doesNotContain("Phone");
   }
