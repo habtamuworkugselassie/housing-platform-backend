@@ -2,22 +2,24 @@ package com.housingplatform.exhibition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.housingplatform.exhibition.domain.ExhibitionInterest;
 import com.housingplatform.exhibition.service.impl.ExhibitionInterestMailServiceImpl;
 import com.housingplatform.identity.domain.Sponsorship;
+import com.housingplatform.shared.mail.BrandedMail;
+import com.housingplatform.shared.mail.BrandedMailSender;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ExhibitionInterestMailServiceTest {
+
+  private static final String SITE = "https://ethiobuildconnect.et";
 
   private static ExhibitionInterest interest() {
     Sponsorship pkg = new Sponsorship();
@@ -33,30 +35,29 @@ class ExhibitionInterestMailServiceTest {
   }
 
   private static ExhibitionInterestMailServiceImpl service(
-      JavaMailSender sender, String from, String notify) {
+      BrandedMailSender sender, boolean configured, String notify) {
+    when(sender.configured()).thenReturn(configured);
     ExhibitionInterestMailServiceImpl s = new ExhibitionInterestMailServiceImpl(sender);
-    ReflectionTestUtils.setField(s, "fromEmail", from);
     ReflectionTestUtils.setField(s, "notifyEmail", notify);
-    ReflectionTestUtils.setField(s, "frontendBaseUrl", "https://ethiobuildconnect.et/");
+    ReflectionTestUtils.setField(s, "replyTo", "team@ethiobuildconnect.et");
+    ReflectionTestUtils.setField(s, "frontendBaseUrl", SITE + "/");
     return s;
   }
 
   @Test
   void sendsReceiptToRegistrantAndNoticeToTeam() {
-    JavaMailSender sender = mock(JavaMailSender.class);
-    service(
-            sender,
-            "noreply@ethiobuildconnect.et",
-            "team@ethiobuildconnect.et, sales@ethiobuildconnect.et")
+    BrandedMailSender sender = mock(BrandedMailSender.class);
+    service(sender, true, "team@ethiobuildconnect.et, sales@ethiobuildconnect.et")
         .sendInterestEmails(interest());
 
-    ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+    ArgumentCaptor<BrandedMail> captor = ArgumentCaptor.forClass(BrandedMail.class);
     verify(sender, times(2)).send(captor.capture());
-    SimpleMailMessage receipt = captor.getAllValues().get(0);
-    SimpleMailMessage notice = captor.getAllValues().get(1);
+    BrandedMail receipt = captor.getAllValues().get(0);
+    BrandedMail notice = captor.getAllValues().get(1);
 
     assertThat(receipt.getTo()).containsExactly("buyer@example.com");
-    assertThat(receipt.getText())
+    assertThat(receipt.getReplyTo()).isEqualTo("team@ethiobuildconnect.et");
+    assertThat(receipt.toPlainText(SITE))
         .contains(
             "Package: Ethio Build Connect - Platinum (1st tier)",
             "Acme Builders",
@@ -65,22 +66,21 @@ class ExhibitionInterestMailServiceTest {
         .containsExactly("team@ethiobuildconnect.et", "sales@ethiobuildconnect.et");
     assertThat(notice.getReplyTo()).isEqualTo("buyer@example.com");
     assertThat(notice.getSubject()).contains("Exhibitor", "buyer@example.com");
-    assertThat(notice.getText())
+    assertThat(notice.toPlainText(SITE))
         .contains("/admin/exhibition-interests", "Call me in the afternoon");
   }
 
   @Test
   void withoutMailConfigurationSendsNothing() {
-    JavaMailSender sender = mock(JavaMailSender.class);
-    service(sender, "", "team@ethiobuildconnect.et").sendInterestEmails(interest());
-    verify(sender, never()).send(any(SimpleMailMessage.class));
+    BrandedMailSender sender = mock(BrandedMailSender.class);
+    service(sender, false, "team@ethiobuildconnect.et").sendInterestEmails(interest());
+    verify(sender, never()).send(any(BrandedMail.class));
   }
 
   @Test
-  void aFailingMailServerIsLoggedNotThrown() {
-    JavaMailSender sender = mock(JavaMailSender.class);
-    doThrow(new RuntimeException("smtp down")).when(sender).send(any(SimpleMailMessage.class));
-    service(sender, "noreply@ethiobuildconnect.et", "").sendInterestEmails(interest());
-    verify(sender, times(1)).send(any(SimpleMailMessage.class));
+  void withoutNotifyAddressOnlyTheReceiptGoesOut() {
+    BrandedMailSender sender = mock(BrandedMailSender.class);
+    service(sender, true, "").sendInterestEmails(interest());
+    verify(sender, times(1)).send(any(BrandedMail.class));
   }
 }
