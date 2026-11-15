@@ -23,7 +23,7 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
 
   private final JavaMailSender mailSender;
 
-  @Value("${spring.mail.username:}")
+  @Value("${app.mail.from:${spring.mail.username:}}")
   private String fromEmail;
 
   /** Team copy of every enquiry (same inbox as exhibition interest); empty disables it. */
@@ -38,7 +38,7 @@ public class ListingEnquiryMailServiceImpl implements ListingEnquiryMailService 
   public void sendEnquiryEmails(ListingEnquiry enquiry) {
     if (fromEmail == null || fromEmail.isBlank()) {
       log.warn(
-          "Mail not configured (spring.mail.username empty). Enquiry from {} about '{}' not emailed.",
+          "Mail not configured (no sender address). Enquiry from {} about '{}' not emailed.",
           enquiry.getEmail(),
           enquiry.getSubjectTitle());
       return;

@@ -80,7 +80,12 @@ spring:
           auth: true
           starttls:
             enable: true
-  
+          # Fail fast instead of blocking an async thread for minutes when the
+          # host is unreachable (DigitalOcean blocks outbound 25/465/587 by default).
+          connectiontimeout: 10000
+          timeout: 15000
+          writetimeout: 15000
+
   security:
     oauth2:
       resourceserver:
@@ -149,6 +154,10 @@ logging:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  mail:
+    # Sender shown on receipts and notices. Defaults to the SMTP username, which is right for
+    # Gmail; relays such as Brevo/SendGrid log in with an id, so set MAIL_FROM to a verified address.
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
   exhibition:
     # Comma-separated addresses told about every interest registration; empty = no notice.
     notify-email: ${EXHIBITION_NOTIFY_EMAIL:}
