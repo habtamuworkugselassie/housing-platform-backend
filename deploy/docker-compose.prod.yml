@@ -121,7 +121,10 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The directory, not the file: git pull replaces a changed file with a new inode, and a
+      # single-file bind mount keeps pointing at the old one, so the container never saw
+      # edits and `caddy reload` was a no-op. A directory mount sees the new file.
+      - ./caddy:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
     networks: [internal]

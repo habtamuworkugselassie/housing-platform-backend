@@ -161,11 +161,19 @@ jobs:
               $COMPOSE up -d livekit livekit-egress
             fi
 
-            # The Caddyfile is a bind-mounted file, and compose does not recreate a container
-            # when a mounted file's content changes — so without this, an edit to it never
-            # reached the running Caddy. Graceful reload: zero downtime, no-op if unchanged.
-            $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null \
-              || echo "::warning::caddy reload skipped (caddy not running?)"
+            # Compose does not recreate a container when a mounted file changes, so the new
+            # Caddyfile is applied with a graceful reload (zero downtime, no-op if unchanged).
+            # deploy/caddy/ is mounted as a directory so the container sees the pulled file.
+            if ! $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile; then
+              echo "::warning::caddy reload failed; recreating the caddy container"
+              $COMPOSE up -d --force-recreate --no-deps caddy
+            fi
+            sleep 2
+            if curl -fsSI https://ethiobuildconnect.et/ | grep -qi '^strict-transport-security'; then
+              echo "Caddy serving the current Caddyfile (security headers present)."
+            else
+              echo "::warning::security headers not seen on https://ethiobuildconnect.et/ after reload"
+            fi
 
             # Health gate. Poll the app's own health endpoint until it reports healthy. Flyway runs
             # at startup, so a checksum mismatch or a bad migration surfaces here as a container that
