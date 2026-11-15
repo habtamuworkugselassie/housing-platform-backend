@@ -2,7 +2,7 @@
 
 Operational notes for the self-hosted LiveKit stack on the DigitalOcean droplet
 (`209.38.204.219`, compose at `/root/livekit/docker-compose.livekit.yml`, reverse
-proxy at `/root/housing-platform/Caddyfile`). Keep this in sync with reality.
+proxy at `/opt/ethiobuildconnect/housing-platform-backend/deploy/caddy/Caddyfile`). Keep this in sync with reality.
 
 ## Topology (production)
 
