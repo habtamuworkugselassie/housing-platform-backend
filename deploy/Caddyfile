@@ -15,6 +15,23 @@
 ethiobuildconnect.et, www.ethiobuildconnect.et {
 	encode zstd gzip
 
+	# Browser security headers. Set here, at the TLS edge, so they cover every response
+	# (SPA, static files, API) the same way. The CSP allows exactly the third parties
+	# the site uses: Google Analytics, Google sign-in, Chapa checkout, OpenStreetMap
+	# tiles and geocoding, unpkg (map marker images), the footer QR service, YouTube and
+	# TikTok embeds, cdnjs (download page QR), Google Fonts (download page), and the
+	# LiveKit signaling host. Add a host here when a new integration needs one.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=(self), payment=(self \"https://checkout.chapa.co\"), usb=(), interest-cohort=()"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self' https://checkout.chapa.co https://accounts.google.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://accounts.google.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://accounts.google.com https://nominatim.openstreetmap.org https://*.tile.openstreetmap.org https://unpkg.com https://live.ethiobuildconnect.et wss://live.ethiobuildconnect.et https://checkout.chapa.co; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.tiktok.com https://accounts.google.com https://checkout.chapa.co https://www.google.com; worker-src 'self' blob:; upgrade-insecure-requests"
+		# Caddy adds this itself; nothing to leak either way.
+		-Server
+	}
+
 	# The frontend container handles www -> apex itself (a server_name-matched 301),
 	# so both names are passed through rather than redirected here. Keeping the
 	# canonical-host decision in one place avoids the two disagreeing.

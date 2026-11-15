@@ -4,6 +4,7 @@ import com.housingplatform.exhibition.domain.ExhibitionInterest;
 import com.housingplatform.exhibition.dto.ExhibitionInterestRequest;
 import com.housingplatform.exhibition.dto.ExhibitionInterestResponse;
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
+import com.housingplatform.exhibition.service.ExhibitionInterestMailService;
 import com.housingplatform.exhibition.service.ExhibitionInterestService;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.OrganizationContact;
@@ -19,6 +20,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +33,7 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
   private final SponsorshipService sponsorshipService;
   private final UserRepository userRepository;
   private final OrganizationPrimaryUserProvisioningService primaryUserProvisioningService;
+  private final ExhibitionInterestMailService mailService;
 
   @Override
   @Transactional
@@ -103,6 +107,20 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
           sponsorshipIdForPendingApplication,
           request.getMessage(),
           interestType);
+    }
+
+    // Mail only once the registration is committed, so a rollback never produces a receipt.
+    final ExhibitionInterest saved = entity;
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              mailService.sendInterestEmails(saved);
+            }
+          });
+    } else {
+      mailService.sendInterestEmails(saved);
     }
 
     return toResponse(entity);
