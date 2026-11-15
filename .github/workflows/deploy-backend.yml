@@ -164,6 +164,9 @@ jobs:
             # Compose does not recreate a container when a mounted file changes, so the new
             # Caddyfile is applied with a graceful reload (zero downtime, no-op if unchanged).
             # deploy/caddy/ is mounted as a directory so the container sees the pulled file.
+            # Apply compose-level changes to the caddy service (image, mounts, ports) first:
+            # a no-op when nothing changed, a recreate when something did.
+            $COMPOSE up -d --no-deps caddy
             if ! $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile; then
               echo "::warning::caddy reload failed; recreating the caddy container"
               $COMPOSE up -d --force-recreate --no-deps caddy
