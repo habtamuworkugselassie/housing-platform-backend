@@ -148,11 +148,12 @@ jobs:
               psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
                 -c "CREATE EXTENSION IF NOT EXISTS vector;"'
 
-            # Only this service and what it depends on (postgres, redis). A bare `up -d` would
-            # also try to start frontend and caddy, and on a droplet the frontend workflow has
-            # not reached yet that fails with "No such image: ...frontend:latest" — correct,
-            # but it is the frontend's job, not this one's.
-            $COMPOSE up -d backend
+            # Zero-downtime rollout: start the idle API slot (backend-blue / backend-green)
+            # on the new image, wait for its health check, then stop the old slot. Flyway runs
+            # in the new slot before it reports healthy, so a bad migration never takes over
+            # traffic: the script leaves the old slot serving and exits non-zero. See the script.
+            rollout_ok=true
+            bash deploy/rollout-backend.sh || rollout_ok=false
 
             # Live video is opt-in (COMPOSE_PROFILES=live in deploy/.env). When it is on,
             # apply any change to livekit.yaml / the egress config too; otherwise leave
@@ -178,31 +179,18 @@ jobs:
               echo "::warning::security headers not seen on https://ethiobuildconnect.et/ after reload"
             fi
 
-            # Health gate. Poll the app's own health endpoint until it reports healthy. Flyway runs
-            # at startup, so a checksum mismatch or a bad migration surfaces here as a container that
-            # never becomes healthy — exactly the failure that showed two green deploys while
-            # production was down. On timeout, roll back to the image that was serving before and
-            # fail the job so the deploy goes red.
-            echo "Waiting for backend to become healthy..."
-            healthy=false
-            for i in $(seq 1 30); do
-              # busybox wget exits 0 only on a 2xx response; anything else (connection refused
-              # while booting, or a non-200 health status) is non-zero.
-              if $COMPOSE exec -T backend wget -q -O /dev/null http://127.0.0.1:8080/actuator/health; then
-                healthy=true; break
+            if [ "$rollout_ok" != "true" ]; then
+              echo "::error::Backend rollout failed — restoring the previous image tag."
+              docker tag "$DEPLOY_IMAGE:rollback-$SHA" "$DEPLOY_IMAGE:latest" 2>/dev/null || true
+              # The old slot normally kept serving. If nothing is up (first rollout on a host
+              # without enough memory for two slots), bring the previous release back.
+              if ! docker ps --filter label=com.docker.compose.project=ethiobuildconnect \
+                     --format '{{.Label "com.docker.compose.service"}}' | grep -q '^backend'; then
+                bash deploy/rollout-backend.sh && echo "Rolled back to the previous image." \
+                  || echo "::warning::Rollback did not come up either; check the logs above."
               fi
-              sleep 5
-            done
-
-            if [ "$healthy" != "true" ]; then
-              echo "::error::Backend did not become healthy within 150s — rolling back."
-              $COMPOSE logs --tail 60 backend || true
-              docker tag "$DEPLOY_IMAGE:rollback-$SHA" "$DEPLOY_IMAGE:latest" 2>/dev/null \
-                && $COMPOSE up -d backend \
-                && echo "Rolled back to the previous image." \
-                || echo "::warning::No previous image to roll back to."
               exit 1
             fi
-            echo "Backend is healthy."
+            echo "Backend is healthy and serving."
 
             docker image prune -f

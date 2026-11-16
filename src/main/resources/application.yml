@@ -1,4 +1,6 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
   application:
     name: ethio-build-connect
   
@@ -96,6 +98,9 @@ spring:
 server:
   port: ${PORT:${SERVER_PORT:8080}}
   address: 0.0.0.0
+  # Finish in-flight requests before exiting; a blue/green rollout stops the old slot
+  # while the new one already serves, so nothing is dropped mid-request.
+  shutdown: graceful
   error:
     include-message: always
     include-binding-errors: always

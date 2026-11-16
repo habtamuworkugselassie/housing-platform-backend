@@ -151,7 +151,8 @@ Watch the first backend deploy — Flyway runs all 70 migrations against the emp
 database on first boot:
 
 ```bash
-docker compose -f deploy/docker-compose.prod.yml logs -f backend
+# The API runs in one of two slots, backend-blue or backend-green (see step 10).
+docker compose -f deploy/docker-compose.prod.yml logs -f backend-blue backend-green
 ```
 
 ### GitHub secrets the deploys need
@@ -279,8 +280,17 @@ DigitalOcean control panel.
 ## 10. Deploying a change later
 
 Push to `main` in either repository. The workflow builds the image, copies it over,
-restarts that service and waits on a health check — rolling back to the previous image
+starts the new release and waits on a health check — rolling back to the previous image
 if the new one does not come up.
+
+The API deploy is zero-downtime. The compose file defines two identical slots,
+`backend-blue` and `backend-green`, that both answer to the hostname `backend`.
+`deploy/rollout-backend.sh` starts the idle slot on the new image, waits for it to be
+healthy (Flyway has run by then), and only then stops the slot that was serving; the
+frontend's nginx resolves `backend` per request, so traffic moves over without a gap.
+If the host has too little free memory for two JVMs, the script says so and falls back
+to stop-then-start. To restart the API by hand, run the script rather than
+`up -d backend-blue`, so the right slot is chosen.
 
 Nothing needs doing on the droplet, including for changes to the stack itself: the
 deploy runs `git pull` in this checkout first, so an edit to
@@ -337,7 +347,8 @@ ufw allow 3478/udp     # TURN
 # 4. Start it, restart the backend so it picks up the LiveKit settings, and have Caddy
 #    load the live.* block (a graceful reload, no downtime).
 su - deploy -c "cd /opt/ethiobuildconnect/housing-platform-backend \
-  && docker compose -f deploy/docker-compose.prod.yml up -d livekit livekit-egress backend \
+  && docker compose -f deploy/docker-compose.prod.yml up -d livekit livekit-egress \
+  && bash deploy/rollout-backend.sh \
   && docker compose -f deploy/docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
   && docker compose -f deploy/docker-compose.prod.yml ps"
 ```

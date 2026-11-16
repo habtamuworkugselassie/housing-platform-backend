@@ -34,7 +34,7 @@ copy_volume() {
     echo "$dest already has content — leaving it alone (volume $volume untouched)"; return 0
   fi
   echo "stopping services that use $volume"
-  $COMPOSE stop backend frontend postgres >/dev/null; STOPPED=1
+  $COMPOSE stop backend-blue backend-green frontend postgres >/dev/null 2>&1 || true; STOPPED=1
   echo "copying $volume -> $dest"
   # cp -a keeps numeric uid/gid, so postgres' files stay postgres' (uid 999) as they were.
   docker run --rm -v "$volume":/src:ro -v "$dest":/dst alpine sh -c 'cp -a /src/. /dst/'
