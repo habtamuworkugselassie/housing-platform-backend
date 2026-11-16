@@ -43,7 +43,8 @@ public class NotificationController {
       summary = "Get notification by ID",
       description = "Retrieve notification information by ID")
   public ResponseEntity<NotificationResponse> getNotificationById(@PathVariable UUID id) {
-    NotificationResponse notification = notificationService.getNotificationById(id);
+    NotificationResponse notification =
+        notificationService.getNotificationById(UserContext.getCurrentUserId(), id);
     return ResponseEntity.ok(notification);
   }
 

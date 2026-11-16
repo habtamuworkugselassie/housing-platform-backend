@@ -39,10 +39,12 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   @Transactional(readOnly = true)
-  public NotificationResponse getNotificationById(UUID id) {
+  public NotificationResponse getNotificationById(UUID userId, UUID id) {
     Notification notification =
         notificationRepository
             .findById(id)
+            // Someone else's notification answers exactly like a missing one.
+            .filter(n -> n.getUserId() != null && n.getUserId().equals(userId))
             .orElseThrow(() -> new ResourceNotFoundException("Notification", id));
     return notificationMapper.toResponse(notification);
   }

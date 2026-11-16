@@ -8,7 +8,8 @@ import org.springframework.data.domain.Pageable;
 public interface NotificationService {
   Page<NotificationResponse> getUserNotifications(UUID userId, Boolean isRead, Pageable pageable);
 
-  NotificationResponse getNotificationById(UUID id);
+  /** The notification, only if it belongs to {@code userId} (404 otherwise). */
+  NotificationResponse getNotificationById(UUID userId, UUID id);
 
   void markAsRead(UUID userId, UUID notificationId);
 
