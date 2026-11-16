@@ -45,9 +45,13 @@ public interface AuthenticationService {
   /** Resets password using the token from the email link. Invalidates the token after use. */
   void resetPassword(ResetPasswordRequest request);
 
-  void markPhoneAsVerified(String phoneNumber);
+  /**
+   * Records what a correct one-time code proved for the account registered with this phone: the
+   * phone itself (code went by SMS/WhatsApp) and/or its email address (code went by email).
+   */
+  void markContactVerified(String phoneNumber, boolean phoneProven, boolean emailProven);
 
-  void requestOtpLogin(String phoneNumber);
+  void requestOtpLogin(String phoneNumber, String lang);
 
   AuthResponse confirmOtpLogin(String phoneNumber, String code);
 }

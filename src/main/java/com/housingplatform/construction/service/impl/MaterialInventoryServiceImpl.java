@@ -5,12 +5,14 @@ import com.housingplatform.construction.dto.MaterialInventoryRequest;
 import com.housingplatform.construction.dto.MaterialInventoryResponse;
 import com.housingplatform.construction.repository.MaterialInventoryRepository;
 import com.housingplatform.construction.repository.MaterialRepository;
+import com.housingplatform.construction.service.ConstructionAccessGuard;
 import com.housingplatform.construction.service.MaterialInventoryMapper;
 import com.housingplatform.construction.service.MaterialInventoryService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +29,43 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   private final MaterialInventoryRepository inventoryRepository;
   private final MaterialRepository materialRepository;
   private final MaterialInventoryMapper inventoryMapper;
+  private final ConstructionAccessGuard accessGuard;
+
+  /**
+   * Loads inventory the caller may access, or throws not-found. Project inventory follows project
+   * access; warehouse inventory (no projectId) is admin-only — see {@link
+   * ConstructionAccessGuard#canAccessInventory}.
+   */
+  private MaterialInventory requireInventory(UUID id) {
+    MaterialInventory inventory =
+        inventoryRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    accessGuard.checkInventory(inventory);
+    return inventory;
+  }
+
+  /** Non-admins only see inventory belonging to projects they can access. */
+  private List<MaterialInventory> scoped(List<MaterialInventory> items) {
+    if (accessGuard.isAdmin()) {
+      return items;
+    }
+    Set<UUID> projectIds = accessGuard.accessibleProjectIds();
+    return items.stream()
+        .filter(i -> i.getProjectId() != null && projectIds.contains(i.getProjectId()))
+        .collect(Collectors.toList());
+  }
 
   @Override
   public MaterialInventoryResponse createInventory(MaterialInventoryRequest request) {
+    // Project inventory requires project access; warehouse inventory (no project) is admin-only
+    // because it has no owner the caller could later be matched against.
+    if (request.getProjectId() != null) {
+      accessGuard.requireProject(request.getProjectId());
+    } else if (!accessGuard.isAdmin()) {
+      throw new BusinessException("Inventory must be assigned to a construction project");
+    }
+
     // Validate material exists
     materialRepository
         .findById(request.getMaterialId())
@@ -81,10 +117,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Override
   @Transactional(readOnly = true)
   public MaterialInventoryResponse getInventoryById(UUID id) {
-    MaterialInventory inventory =
-        inventoryRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    MaterialInventory inventory = requireInventory(id);
     return enrichInventoryResponse(inventory);
   }
 
@@ -92,6 +125,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Transactional(readOnly = true)
   public MaterialInventoryResponse getInventoryByMaterialAndProject(
       UUID materialId, UUID projectId) {
+    accessGuard.requireProject(projectId);
     MaterialInventory inventory =
         inventoryRepository
             .findByMaterialIdAndProjectId(materialId, projectId)
@@ -106,7 +140,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Override
   @Transactional(readOnly = true)
   public List<MaterialInventoryResponse> getInventoryByMaterial(UUID materialId) {
-    return inventoryRepository.findByMaterialId(materialId).stream()
+    return scoped(inventoryRepository.findByMaterialId(materialId)).stream()
         .map(this::enrichInventoryResponse)
         .collect(Collectors.toList());
   }
@@ -114,6 +148,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Override
   @Transactional(readOnly = true)
   public List<MaterialInventoryResponse> getInventoryByProject(UUID projectId) {
+    accessGuard.requireProject(projectId);
     return inventoryRepository.findByProjectId(projectId).stream()
         .map(this::enrichInventoryResponse)
         .collect(Collectors.toList());
@@ -123,15 +158,26 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Transactional(readOnly = true)
   public Page<MaterialInventoryResponse> getInventoryByStatus(
       MaterialInventory.InventoryStatus status, Pageable pageable) {
-    return inventoryRepository.findByStatus(status, pageable).map(this::enrichInventoryResponse);
+    if (accessGuard.isAdmin()) {
+      return inventoryRepository.findByStatus(status, pageable).map(this::enrichInventoryResponse);
+    }
+    Set<UUID> projectIds = accessGuard.accessibleProjectIds();
+    if (projectIds.isEmpty()) {
+      return Page.empty(pageable);
+    }
+    return inventoryRepository
+        .findByStatusAndProjectIdIn(status, projectIds, pageable)
+        .map(this::enrichInventoryResponse);
   }
 
   @Override
   public MaterialInventoryResponse updateInventory(UUID id, MaterialInventoryRequest request) {
-    MaterialInventory inventory =
-        inventoryRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    MaterialInventory inventory = requireInventory(id);
+    // Moving inventory to another project requires access to the target project too.
+    if (request.getProjectId() != null
+        && !request.getProjectId().equals(inventory.getProjectId())) {
+      accessGuard.requireProject(request.getProjectId());
+    }
 
     inventoryMapper.updateEntity(inventory, request);
 
@@ -154,10 +200,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Override
   public MaterialInventoryResponse adjustInventory(
       UUID id, BigDecimal quantityChange, String reason) {
-    MaterialInventory inventory =
-        inventoryRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    MaterialInventory inventory = requireInventory(id);
 
     BigDecimal newQuantity = inventory.getQuantity().add(quantityChange);
     if (newQuantity.compareTo(BigDecimal.ZERO) < 0) {
@@ -184,10 +227,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
 
   @Override
   public MaterialInventoryResponse reserveInventory(UUID id, BigDecimal quantity) {
-    MaterialInventory inventory =
-        inventoryRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    MaterialInventory inventory = requireInventory(id);
 
     BigDecimal newReserved = inventory.getReservedQuantity().add(quantity);
     BigDecimal available = inventory.getQuantity().subtract(newReserved);
@@ -206,10 +246,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
 
   @Override
   public MaterialInventoryResponse releaseReservation(UUID id, BigDecimal quantity) {
-    MaterialInventory inventory =
-        inventoryRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    MaterialInventory inventory = requireInventory(id);
 
     BigDecimal newReserved = inventory.getReservedQuantity().subtract(quantity);
     if (newReserved.compareTo(BigDecimal.ZERO) < 0) {
@@ -228,17 +265,14 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService {
   @Override
   @Transactional(readOnly = true)
   public List<MaterialInventoryResponse> getLowStockItems() {
-    return inventoryRepository.findLowStockItems().stream()
+    return scoped(inventoryRepository.findLowStockItems()).stream()
         .map(this::enrichInventoryResponse)
         .collect(Collectors.toList());
   }
 
   @Override
   public void deleteInventory(UUID id) {
-    MaterialInventory inventory =
-        inventoryRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Inventory", id));
+    MaterialInventory inventory = requireInventory(id);
 
     if (inventory.getQuantity().compareTo(BigDecimal.ZERO) > 0) {
       throw new BusinessException("Cannot delete inventory with remaining quantity");

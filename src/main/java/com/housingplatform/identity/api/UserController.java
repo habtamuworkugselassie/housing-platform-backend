@@ -76,8 +76,16 @@ public class UserController {
   }
 
   @GetMapping("/{id}")
-  @Operation(summary = "Get user by ID", description = "Retrieve user information by ID")
+  @Operation(
+      summary = "Get user by ID",
+      description = "Your own account, or any account for admins. Others get 404.")
   public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
+    // The response carries email, phone and roles: never hand it to other signed-in users.
+    if (!id.equals(UserContext.getCurrentUserIdOrNull())
+        && !UserContext.isAdmin()
+        && !UserContext.isSuperAdmin()) {
+      throw new com.housingplatform.shared.exception.ResourceNotFoundException("User", id);
+    }
     UserResponse user = userService.getUserById(id);
     return ResponseEntity.ok(user);
   }

@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +23,35 @@ public class MediaStorageServiceImpl implements MediaStorageService {
   private static final Logger log = LoggerFactory.getLogger(MediaStorageServiceImpl.class);
   private static final String UPLOADS_PREFIX = "/api/v1/uploads/";
   private static final String FALLBACK_SUBDIR = "ethio-build-connect-uploads";
+
+  /**
+   * Extensions a stored upload may carry. Uploads are served from the site's own origin (nginx
+   * serves this directory directly), so anything a browser would execute or render as a document -
+   * .html, .svg, .js, .xml and friends - must never be written here.
+   */
+  static final Set<String> ALLOWED_EXTENSIONS =
+      Set.of(
+          ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".avif", ".mp4", ".webm",
+          ".mov", ".m4v", ".3gp", ".pdf", ".doc", ".docx");
+
+  /** Fallback extension when the client name has none (or a disallowed one) but a known type. */
+  private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE =
+      Map.ofEntries(
+          Map.entry("image/jpeg", ".jpg"),
+          Map.entry("image/png", ".png"),
+          Map.entry("image/gif", ".gif"),
+          Map.entry("image/webp", ".webp"),
+          Map.entry("image/heic", ".heic"),
+          Map.entry("image/heif", ".heif"),
+          Map.entry("image/avif", ".avif"),
+          Map.entry("video/mp4", ".mp4"),
+          Map.entry("video/webm", ".webm"),
+          Map.entry("video/quicktime", ".mov"),
+          Map.entry("video/3gpp", ".3gp"),
+          Map.entry("application/pdf", ".pdf"),
+          Map.entry("application/msword", ".doc"),
+          Map.entry(
+              "application/vnd.openxmlformats-officedocument.wordprocessorml.document", ".docx"));
 
   private final Path uploadDir;
 
@@ -56,11 +88,7 @@ public class MediaStorageServiceImpl implements MediaStorageService {
     if (file == null || file.isEmpty()) {
       throw new BusinessException("File is empty");
     }
-    String originalName = file.getOriginalFilename();
-    String ext =
-        originalName != null && originalName.contains(".")
-            ? originalName.substring(originalName.lastIndexOf('.'))
-            : "";
+    String ext = safeExtension(file.getOriginalFilename(), file.getContentType());
     String filename = UUID.randomUUID() + ext;
     Path targetDir = uploadDir.resolve(relativeSubPath).normalize();
     if (!targetDir.startsWith(uploadDir)) {
@@ -74,6 +102,32 @@ public class MediaStorageServiceImpl implements MediaStorageService {
     } catch (IOException e) {
       throw new BusinessException("Failed to save file: " + e.getMessage());
     }
+  }
+
+  /**
+   * Picks the stored file's extension from an allowlist, never trusting the client name blindly.
+   * Package-private for tests.
+   */
+  static String safeExtension(String originalName, String contentType) {
+    if (originalName != null) {
+      int dot = originalName.lastIndexOf('.');
+      if (dot >= 0) {
+        String ext = originalName.substring(dot).toLowerCase(Locale.ROOT);
+        if (ALLOWED_EXTENSIONS.contains(ext)) {
+          return ext;
+        }
+      }
+    }
+    if (contentType != null) {
+      String byType =
+          EXTENSION_BY_CONTENT_TYPE.get(contentType.split(";")[0].trim().toLowerCase(Locale.ROOT));
+      if (byType != null) {
+        return byType;
+      }
+    }
+    throw new BusinessException(
+        "Unsupported file type. Allowed: images (JPG, PNG, GIF, WebP, HEIC), videos (MP4, WebM,"
+            + " MOV), PDF and Word documents.");
   }
 
   @Override

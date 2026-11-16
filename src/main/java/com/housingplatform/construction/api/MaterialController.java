@@ -57,7 +57,11 @@ public class MaterialController {
       description = "Create a new material listing (supplier only)")
   public ResponseEntity<MaterialResponse> createMaterial(
       @Valid @RequestBody MaterialRequest materialRequest) {
-    UUID supplierId = UserContext.getCurrentUserId();
+    // Materials are owned by the supplier organization (the same id material orders and
+    // /suppliers/{supplierId}/materials use). Fall back to the user id only for supplier accounts
+    // without an organization, matching the previous behaviour.
+    UUID supplierId =
+        UserContext.getCurrentUserOrganizationId().orElseGet(UserContext::getCurrentUserId);
     MaterialResponse created = materialService.createMaterial(supplierId, materialRequest);
     return ResponseEntity.status(HttpStatus.CREATED).body(created);
   }

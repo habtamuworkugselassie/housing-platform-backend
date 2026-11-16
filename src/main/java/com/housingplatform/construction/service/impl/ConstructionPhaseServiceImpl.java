@@ -6,6 +6,7 @@ import com.housingplatform.construction.dto.ConstructionPhaseRequest;
 import com.housingplatform.construction.dto.ConstructionPhaseResponse;
 import com.housingplatform.construction.repository.ConstructionPhaseRepository;
 import com.housingplatform.construction.repository.ConstructionProjectRepository;
+import com.housingplatform.construction.service.ConstructionAccessGuard;
 import com.housingplatform.construction.service.ConstructionPhaseMapper;
 import com.housingplatform.construction.service.ConstructionPhaseService;
 import com.housingplatform.shared.exception.BusinessException;
@@ -26,13 +27,21 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
   private final ConstructionPhaseRepository phaseRepository;
   private final ConstructionProjectRepository projectRepository;
   private final ConstructionPhaseMapper phaseMapper;
+  private final ConstructionAccessGuard accessGuard;
+
+  /** Loads a phase whose owning project the caller can access, or throws not-found. */
+  private ConstructionPhase requirePhase(UUID phaseId) {
+    ConstructionPhase phase =
+        phaseRepository
+            .findById(phaseId)
+            .orElseThrow(() -> new ResourceNotFoundException("Construction Phase", phaseId));
+    accessGuard.checkProject(phase.getProject(), "Construction Phase", phaseId);
+    return phase;
+  }
 
   @Override
   public ConstructionPhaseResponse createPhase(UUID projectId, ConstructionPhaseRequest request) {
-    ConstructionProject project =
-        projectRepository
-            .findById(projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
+    ConstructionProject project = accessGuard.requireProject(projectId);
 
     if (!request.getProjectId().equals(projectId)) {
       throw new BusinessException("Phase project ID does not match the provided project ID");
@@ -50,16 +59,14 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
   @Override
   @Transactional(readOnly = true)
   public ConstructionPhaseResponse getPhaseById(UUID id) {
-    ConstructionPhase phase =
-        phaseRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Phase", id));
+    ConstructionPhase phase = requirePhase(id);
     return phaseMapper.toResponse(phase);
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<ConstructionPhaseResponse> getPhasesByProject(UUID projectId) {
+    accessGuard.requireProject(projectId);
     return phaseRepository.findByProjectIdOrderBySequenceAsc(projectId).stream()
         .map(phaseMapper::toResponse)
         .collect(Collectors.toList());
@@ -68,10 +75,7 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
   @Override
   public ConstructionPhaseResponse updatePhase(
       UUID projectId, UUID phaseId, ConstructionPhaseRequest request) {
-    ConstructionPhase phase =
-        phaseRepository
-            .findById(phaseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Phase", phaseId));
+    ConstructionPhase phase = requirePhase(phaseId);
 
     if (!phase.getProject().getId().equals(projectId)) {
       throw new BusinessException("Phase does not belong to the specified project");
@@ -85,10 +89,7 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
   @Override
   public ConstructionPhaseResponse updatePhaseStatus(
       UUID phaseId, ConstructionPhase.PhaseStatus status) {
-    ConstructionPhase phase =
-        phaseRepository
-            .findById(phaseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Phase", phaseId));
+    ConstructionPhase phase = requirePhase(phaseId);
 
     phase.setStatus(status);
 
@@ -113,10 +114,7 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
       throw new BusinessException("Completion percentage must be between 0 and 100");
     }
 
-    ConstructionPhase phase =
-        phaseRepository
-            .findById(phaseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Phase", phaseId));
+    ConstructionPhase phase = requirePhase(phaseId);
 
     phase.setCompletionPercentage(completionPercentage);
 
@@ -139,10 +137,7 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
 
   @Override
   public void deletePhase(UUID projectId, UUID phaseId) {
-    ConstructionPhase phase =
-        phaseRepository
-            .findById(phaseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Phase", phaseId));
+    ConstructionPhase phase = requirePhase(phaseId);
 
     if (!phase.getProject().getId().equals(projectId)) {
       throw new BusinessException("Phase does not belong to the specified project");
@@ -153,6 +148,7 @@ public class ConstructionPhaseServiceImpl implements ConstructionPhaseService {
 
   @Override
   public void reorderPhases(UUID projectId, List<UUID> phaseIdsInOrder) {
+    accessGuard.requireProject(projectId);
     List<ConstructionPhase> phases = phaseRepository.findByProjectIdOrderBySequenceAsc(projectId);
 
     if (phases.size() != phaseIdsInOrder.size()) {

@@ -144,36 +144,41 @@ public class AuthController {
 
   @PostMapping("/verify/send")
   @Operation(
-      summary = "Send WhatsApp OTP",
+      summary = "Send OTP",
       description =
-          "Dispatches a 6-digit one-time password to the user's registered WhatsApp number.")
+          "Dispatches a 6-digit one-time password by SMS (Brevo), and by email to the account"
+              + " registered with this phone number, over whichever channels are configured.")
   public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody SendOtpRequest request) {
-    verificationService.sendWhatsAppOtp(request.getPhoneNumber());
+    verificationService.sendOtp(request.getPhoneNumber(), request.getLang());
     return ResponseEntity.ok().build();
   }
 
   @PostMapping("/verify/confirm")
   @Operation(
-      summary = "Confirm WhatsApp OTP",
-      description = "Validates the 6-digit OTP and marks the user's phone as verified.")
+      summary = "Confirm OTP",
+      description =
+          "Validates the 6-digit OTP and marks the user's phone as verified. Only a code that"
+              + " reached the phone (SMS or WhatsApp) verifies it; an emailed code verifies the"
+              + " email address instead.")
   public ResponseEntity<Void> confirmVerificationCode(
       @Valid @RequestBody VerifyOtpRequest request) {
-    boolean isValid = verificationService.verifyOtp(request.getPhoneNumber(), request.getCode());
-    if (isValid) {
-      authenticationService.markPhoneAsVerified(request.getPhoneNumber());
-      return ResponseEntity.ok().build();
-    } else {
+    VerificationService.OtpVerification result =
+        verificationService.verify(request.getPhoneNumber(), request.getCode());
+    if (!result.valid()) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
+    authenticationService.markContactVerified(
+        request.getPhoneNumber(), result.phoneProven(), result.emailProven());
+    return ResponseEntity.ok().build();
   }
 
   @PostMapping("/login/otp/send")
   @Operation(
       summary = "Request OTP for Login",
       description =
-          "Sends a 6-digit one-time password to the user's registered WhatsApp number for login.")
+          "Sends a 6-digit one-time password for login by SMS and email (whichever are configured).")
   public ResponseEntity<Void> requestOtpLogin(@Valid @RequestBody SendOtpRequest request) {
-    authenticationService.requestOtpLogin(request.getPhoneNumber());
+    authenticationService.requestOtpLogin(request.getPhoneNumber(), request.getLang());
     return ResponseEntity.ok().build();
   }
 

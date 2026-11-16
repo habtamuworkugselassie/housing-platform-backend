@@ -35,12 +35,14 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   private static final int MAX_PENDING_COHOSTS = 20;
 
   private final LiveBroadcastRepository repository;
-  private final com.housingplatform.exhibition.repository.LiveCohostRequestRepository cohostRepository;
+  private final com.housingplatform.exhibition.repository.LiveCohostRequestRepository
+      cohostRepository;
   private final LiveKitTokenService tokenService;
   private final LiveKitRoomService roomService;
   private final com.housingplatform.exhibition.service.LiveKitIngressService ingressService;
   private final com.housingplatform.exhibition.service.LiveKitEgressService egressService;
-  private final com.housingplatform.exhibition.repository.SimulcastTargetRepository targetRepository;
+  private final com.housingplatform.exhibition.repository.SimulcastTargetRepository
+      targetRepository;
   private final com.housingplatform.shared.service.DisplaySettingsService displaySettingsService;
   private final LiveKitProperties properties;
 
@@ -70,7 +72,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     // Visitors may be anonymous; exhibitors need a signed-in account; organizer broadcasting is
     // reserved for admins / super-admins (the event staff).
     BroadcasterRole role = parseRole(request.role());
-    java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
+    java.util.UUID userId =
+        com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
     if (role == BroadcasterRole.ORGANIZER) {
       boolean isAdmin =
           userId != null
@@ -91,6 +94,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     BroadcastStatus initialStatus =
         role == BroadcasterRole.ORGANIZER ? BroadcastStatus.APPROVED : BroadcastStatus.REQUESTED;
 
+    String manageKey = newManageKey();
     LiveBroadcast saved =
         repository.save(
             LiveBroadcast.builder()
@@ -103,26 +107,19 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
                 .companyName(company)
                 .status(initialStatus)
                 .requesterIp(ip)
+                .manageKeyHash(sha256Hex(manageKey))
                 .build());
-    return LiveBroadcastResponse.from(saved);
+    return LiveBroadcastResponse.withManageKey(saved, manageKey);
   }
 
   @Override
   @Transactional
-  public LiveTokenResponse publishToken(UUID id, String ip) {
+  public LiveTokenResponse publishToken(UUID id, String manageKey) {
     LiveBroadcast b = find(id);
     if (b.getStatus() != BroadcastStatus.APPROVED && b.getStatus() != BroadcastStatus.LIVE) {
       throw new BusinessException("This broadcast has not been approved to go live.");
     }
-    // For secured roles, only the signed-in owner may publish this stream.
-    if (b.getBroadcasterRole() == BroadcasterRole.EXHIBITOR
-        || b.getBroadcasterRole() == BroadcasterRole.ORGANIZER) {
-      java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
-      if (userId == null
-          || (b.getBroadcasterUserId() != null && !b.getBroadcasterUserId().equals(userId))) {
-        throw new BusinessException("You are not allowed to broadcast this stream.");
-      }
-    }
+    assertBroadcaster(b, manageKey, false, "You are not allowed to broadcast this stream.");
     if (b.getStatus() == BroadcastStatus.APPROVED) {
       b.setStatus(BroadcastStatus.LIVE);
       repository.save(b);
@@ -132,7 +129,12 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
     }
     String token =
         tokenService.mint(
-            "pub-" + b.getId(), b.getBroadcasterName(), b.getRoom(), true, false, PUBLISH_TTL_SECONDS);
+            "pub-" + b.getId(),
+            b.getBroadcasterName(),
+            b.getRoom(),
+            true,
+            false,
+            PUBLISH_TTL_SECONDS);
     return new LiveTokenResponse(properties.getUrl(), token, b.getRoom(), b.getHlsUrl());
   }
 
@@ -154,8 +156,7 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       name = "Guest " + suffix.substring(0, 4);
     }
     String token =
-        tokenService.mint(
-            "view-" + suffix, name, b.getRoom(), false, false, VIEWER_TTL_SECONDS);
+        tokenService.mint("view-" + suffix, name, b.getRoom(), false, false, VIEWER_TTL_SECONDS);
     return new LiveTokenResponse(properties.getUrl(), token, b.getRoom(), b.getHlsUrl());
   }
 
@@ -227,7 +228,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
             .filter(u -> u != null && !u.isBlank() && !u.endsWith("/"))
             .toList();
     if (urls.isEmpty()) {
-      throw new BusinessException("No enabled social destinations with a stream key were selected.");
+      throw new BusinessException(
+          "No enabled social destinations with a stream key were selected.");
     }
     String egressId = egressService.startRtmp(b.getRoom(), urls);
     b.setEgressId(egressId);
@@ -282,9 +284,9 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
 
   @Override
   @Transactional
-  public LiveBroadcastResponse endByBroadcaster(UUID id, String ip) {
+  public LiveBroadcastResponse endByBroadcaster(UUID id, String manageKey) {
     LiveBroadcast b = find(id);
-    assertBroadcasterAllowed(b, "You are not allowed to end this stream.");
+    assertBroadcaster(b, manageKey, true, "You are not allowed to end this stream.");
     // Idempotent: ending an already-ended/rejected broadcast is a no-op.
     if (b.getStatus() == BroadcastStatus.ENDED || b.getStatus() == BroadcastStatus.REJECTED) {
       return LiveBroadcastResponse.from(b);
@@ -359,7 +361,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
       display = "Guest " + UUID.randomUUID().toString().substring(0, 4);
     }
     if (cohostRepository.countByBroadcastIdAndStatus(
-            broadcastId, com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
+            broadcastId,
+            com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
         >= MAX_PENDING_COHOSTS) {
       throw new BusinessException("Too many pending join requests. Please try again shortly.");
     }
@@ -369,7 +372,8 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
                 .broadcastId(broadcastId)
                 .displayName(display)
                 .participantIdentity("cohost-" + UUID.randomUUID().toString().substring(0, 8))
-                .status(com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
+                .status(
+                    com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
                 .requesterUserId(
                     com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull())
                 .build());
@@ -379,10 +383,13 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   @Override
   @Transactional(readOnly = true)
   public List<com.housingplatform.exhibition.dto.CohostRequestResponse> listPendingCohosts(
-      UUID broadcastId) {
+      UUID broadcastId, String manageKey) {
+    assertBroadcaster(
+        find(broadcastId), manageKey, true, "Only the broadcaster can see co-host requests.");
     return cohostRepository
         .findByBroadcastIdAndStatusOrderByCreatedAtAsc(
-            broadcastId, com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
+            broadcastId,
+            com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.PENDING)
         .stream()
         .map(com.housingplatform.exhibition.dto.CohostRequestResponse::from)
         .toList();
@@ -391,20 +398,20 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
   @Override
   @Transactional
   public com.housingplatform.exhibition.dto.CohostRequestResponse decideCohost(
-      UUID broadcastId, UUID requestId, boolean approve, String ip) {
+      UUID broadcastId, UUID requestId, boolean approve, String manageKey) {
     LiveBroadcast b = find(broadcastId);
-    // Only the broadcaster (owner for secured roles; id-holder for visitor streams) moderates.
-    assertBroadcasterAllowed(b, "Only the broadcaster can approve co-hosts.");
+    // Only the broadcaster (signed-in owner, or the holder of the manage key) or staff moderates.
+    assertBroadcaster(b, manageKey, true, "Only the broadcaster can approve co-hosts.");
     var req =
         cohostRepository
             .findByIdAndBroadcastId(requestId, broadcastId)
-            .orElseThrow(
-                () -> new ResourceNotFoundException("Co-host request", requestId));
+            .orElseThrow(() -> new ResourceNotFoundException("Co-host request", requestId));
     req.setStatus(
         approve
             ? com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.APPROVED
             : com.housingplatform.exhibition.domain.LiveCohostRequest.CohostStatus.DENIED);
-    return com.housingplatform.exhibition.dto.CohostRequestResponse.from(cohostRepository.save(req));
+    return com.housingplatform.exhibition.dto.CohostRequestResponse.from(
+        cohostRepository.save(req));
   }
 
   @Override
@@ -438,14 +445,70 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
    * Authorize an action as "the broadcaster". Secured roles (exhibitor/organizer) require the
    * signed-in owner; anonymous visitor streams treat the broadcast id as the capability.
    */
-  private void assertBroadcasterAllowed(LiveBroadcast b, String message) {
+  /**
+   * Who may act as the broadcaster of {@code b}:
+   *
+   * <ul>
+   *   <li>Exhibitor / organizer streams: the signed-in account that requested it.
+   *   <li>Visitor streams: whoever holds the manage key returned by the go-live request. Streams
+   *       created before keys existed have no hash and keep the old (open) behaviour.
+   *   <li>Staff (admin / super-admin) for moderation actions ({@code staffMayAct}), so an organizer
+   *       can always end or moderate a stream.
+   * </ul>
+   */
+  void assertBroadcaster(LiveBroadcast b, String manageKey, boolean staffMayAct, String message) {
+    if (staffMayAct && isStaff()) {
+      return;
+    }
     if (b.getBroadcasterRole() == BroadcasterRole.EXHIBITOR
         || b.getBroadcasterRole() == BroadcasterRole.ORGANIZER) {
-      java.util.UUID userId = com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
+      java.util.UUID userId =
+          com.housingplatform.shared.security.UserContext.getCurrentUserIdOrNull();
       if (userId == null
           || (b.getBroadcasterUserId() != null && !b.getBroadcasterUserId().equals(userId))) {
         throw new BusinessException(message);
       }
+      return;
+    }
+    if (b.getManageKeyHash() == null) {
+      return; // legacy visitor stream
+    }
+    if (manageKey == null
+        || manageKey.isBlank()
+        || !java.security.MessageDigest.isEqual(
+            b.getManageKeyHash().getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+            sha256Hex(manageKey.trim()).getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
+      throw new BusinessException(message);
+    }
+  }
+
+  private static boolean isStaff() {
+    var auth =
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .getAuthentication();
+    if (auth == null) {
+      return false;
+    }
+    return com.housingplatform.shared.security.UserContext.isAdmin()
+        || com.housingplatform.shared.security.UserContext.isSuperAdmin();
+  }
+
+  private static final java.security.SecureRandom KEY_RANDOM = new java.security.SecureRandom();
+
+  static String newManageKey() {
+    byte[] bytes = new byte[32];
+    KEY_RANDOM.nextBytes(bytes);
+    return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+  }
+
+  static String sha256Hex(String value) {
+    try {
+      byte[] digest =
+          java.security.MessageDigest.getInstance("SHA-256")
+              .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      return java.util.HexFormat.of().formatHex(digest);
+    } catch (java.security.NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
     }
   }
 
@@ -456,14 +519,15 @@ public class LiveBroadcastServiceImpl implements LiveBroadcastService {
    * replay URL is derived from the deterministic filename and finalized when the stream ends.
    *
    * <p>Note: records the broadcaster only. Compositing co-hosts into one file needs RoomComposite
-   * (~4 vCPU) — see {@link com.housingplatform.exhibition.service.LiveKitEgressService#startTrackComposite}.
+   * (~4 vCPU) — see {@link
+   * com.housingplatform.exhibition.service.LiveKitEgressService#startTrackComposite}.
    */
   @Override
   @Transactional
   public LiveBroadcastResponse startRecording(
-      UUID id, String audioTrackId, String videoTrackId, String ip) {
+      UUID id, String audioTrackId, String videoTrackId, String manageKey) {
     LiveBroadcast b = find(id);
-    assertBroadcasterAllowed(b, "You are not allowed to record this stream.");
+    assertBroadcaster(b, manageKey, false, "You are not allowed to record this stream.");
     // No-op (not an error) when recording is disabled, the stream isn't live, or one is already
     // running — the client calls this unconditionally after publishing.
     if (!properties.isRecordingEnabled()

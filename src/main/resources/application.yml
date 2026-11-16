@@ -245,6 +245,24 @@ twilio:
   auth-token: ${TWILIO_AUTH_TOKEN:}
   whatsapp-from-number: ${TWILIO_WHATSAPP_FROM_NUMBER:}
 
+# Brevo transactional SMS for one-time codes. SMS is off until both values are set.
+# The sender must be registered in Brevo for each destination country (max 11 letters).
+brevo:
+  api-key: ${BREVO_API_KEY:}
+  base-url: ${BREVO_BASE_URL:https://api.brevo.com/v3}
+  sms:
+    sender: ${BREVO_SMS_SENDER:}
+
+# One-time sign-in codes. State lives in Redis when RATE_LIMIT_AUTH_ENABLED=true, else in memory.
+otp:
+  max-sends-per-phone-per-day: ${OTP_MAX_SENDS_PER_PHONE_PER_DAY:8}
+  sms:
+    # Site-wide SMS ceiling per hour - the backstop against SMS-pumping fraud. Above it, codes go
+    # by email only and an ERROR is logged.
+    max-per-hour: ${OTP_SMS_MAX_PER_HOUR:60}
+    # Calling codes SMS may go to (comma separated). Ethiopia only by default.
+    allowed-country-codes: ${OTP_SMS_ALLOWED_COUNTRY_CODES:251}
+
 # Property purchase orders. The provider is the legal counterparty to every buyer agreement.
 # Chapa hosted checkout for reservation deposits (card data never touches this server).
 chapa:

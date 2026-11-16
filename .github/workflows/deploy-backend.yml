@@ -22,7 +22,12 @@ env:
   DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/ethiobuildconnect/housing-platform-backend' }}
 
 jobs:
+  # Same checks as pull requests (ci.yml); the image is only built when they pass.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read

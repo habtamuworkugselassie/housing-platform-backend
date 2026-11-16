@@ -32,4 +32,13 @@ public interface ConstructionProjectRepository extends JpaRepository<Constructio
   @Query("SELECT p FROM ConstructionProject p WHERE p.projectManagerId = :managerId")
   Page<ConstructionProject> findByProjectManagerId(
       @Param("managerId") UUID managerId, Pageable pageable);
+
+  Page<ConstructionProject> findByProjectManagerIdAndRealEstateCompanyId(
+      UUID managerId, UUID companyId, Pageable pageable);
+
+  @Query("SELECT p.id FROM ConstructionProject p WHERE p.realEstateCompanyId = :companyId")
+  List<UUID> findIdsByCompanyId(@Param("companyId") UUID companyId);
+
+  @Query("SELECT p.id FROM ConstructionProject p WHERE p.projectManagerId = :managerId")
+  List<UUID> findIdsByProjectManagerId(@Param("managerId") UUID managerId);
 }

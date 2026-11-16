@@ -4,6 +4,7 @@ import com.housingplatform.construction.domain.Material;
 import com.housingplatform.construction.dto.MaterialRequest;
 import com.housingplatform.construction.dto.MaterialResponse;
 import com.housingplatform.construction.repository.MaterialRepository;
+import com.housingplatform.construction.service.ConstructionAccessGuard;
 import com.housingplatform.construction.service.MaterialMapper;
 import com.housingplatform.construction.service.MaterialService;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
@@ -22,6 +23,7 @@ public class MaterialServiceImpl implements MaterialService {
 
   private final MaterialRepository materialRepository;
   private final MaterialMapper materialMapper;
+  private final ConstructionAccessGuard accessGuard;
 
   @Override
   public MaterialResponse createMaterial(UUID supplierId, MaterialRequest request) {
@@ -67,9 +69,9 @@ public class MaterialServiceImpl implements MaterialService {
             .findById(materialId)
             .orElseThrow(() -> new ResourceNotFoundException("Material", materialId));
 
-    if (!material.getSupplierId().equals(supplierId)) {
-      throw new IllegalArgumentException("Material does not belong to the specified supplier");
-    }
+    // Only the owning supplier organization (or an admin) may change catalog entries; anyone else
+    // gets not-found.
+    accessGuard.checkMaterialOwner(material);
 
     materialMapper.updateEntity(material, request);
     Material updated = materialRepository.save(material);
@@ -83,9 +85,9 @@ public class MaterialServiceImpl implements MaterialService {
             .findById(materialId)
             .orElseThrow(() -> new ResourceNotFoundException("Material", materialId));
 
-    if (!material.getSupplierId().equals(supplierId)) {
-      throw new IllegalArgumentException("Material does not belong to the specified supplier");
-    }
+    // Only the owning supplier organization (or an admin) may change catalog entries; anyone else
+    // gets not-found.
+    accessGuard.checkMaterialOwner(material);
 
     materialRepository.delete(material);
   }
