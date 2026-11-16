@@ -68,6 +68,10 @@ public class LiveBroadcast extends BaseEntity {
   @Column(name = "requester_ip", length = 64)
   private String requesterIp;
 
+  /** SHA-256 hex of the broadcaster's manage key; the key itself is only ever shown once. */
+  @Column(name = "manage_key_hash", length = 64)
+  private String manageKeyHash;
+
   public enum BroadcasterRole {
     VISITOR,
     EXHIBITOR,
