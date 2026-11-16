@@ -75,7 +75,9 @@ public class UserServiceImpl implements UserService {
   public void deleteOwnAccount() {
     UUID userId = UserContext.getCurrentUserId();
     User user =
-        userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
     if (user.getStatus() == User.UserStatus.DELETED) {
       return; // already deleted — idempotent
     }
@@ -378,6 +380,12 @@ public class UserServiceImpl implements UserService {
             .findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
+    String contentType = file == null ? null : file.getContentType();
+    if (contentType == null
+        || !PROFILE_IMAGE_TYPES.contains(contentType.toLowerCase(java.util.Locale.ROOT))) {
+      throw new BusinessException("Profile image must be a JPG, PNG, GIF or WebP image.");
+    }
+
     List<MediaAttachment> existing =
         mediaAttachmentRepository.findByUserIdOrderByDisplayOrderAsc(userId);
     for (MediaAttachment att : existing) {
@@ -415,10 +423,8 @@ public class UserServiceImpl implements UserService {
       try (var in = mediaStorageService.getInputStream(imageUrl)) {
         byte[] body = in.readAllBytes();
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(
-            attachment.getContentType() != null
-                ? MediaType.parseMediaType(attachment.getContentType())
-                : MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentType(MediaType.parseMediaType(safeImageType(attachment)));
+        headers.set("X-Content-Type-Options", "nosniff");
         headers.setContentLength(body.length);
         return ResponseEntity.ok().headers(headers).body(body);
       } catch (IOException e) {
@@ -431,11 +437,24 @@ public class UserServiceImpl implements UserService {
     }
 
     return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_TYPE,
-            attachment.getContentType() != null
-                ? attachment.getContentType()
-                : "application/octet-stream")
+        .header(HttpHeaders.CONTENT_TYPE, safeImageType(attachment))
+        .header("X-Content-Type-Options", "nosniff")
         .body(attachment.getFileData());
+  }
+
+  static final java.util.Set<String> PROFILE_IMAGE_TYPES =
+      java.util.Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
+
+  /**
+   * The stored content type came from the uploader. Echo it back only when it is a plain raster
+   * image; anything else (text/html, image/svg+xml, ...) is served as an opaque download.
+   */
+  static String safeImageType(MediaAttachment attachment) {
+    String type = attachment.getContentType();
+    if (type == null) {
+      return "application/octet-stream";
+    }
+    String lower = type.toLowerCase(java.util.Locale.ROOT);
+    return PROFILE_IMAGE_TYPES.contains(lower) ? lower : "application/octet-stream";
   }
 }

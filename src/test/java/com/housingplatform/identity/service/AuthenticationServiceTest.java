@@ -371,7 +371,7 @@ class AuthenticationServiceTest {
     assertThat(user.getPasswordSet()).isFalse();
     assertThat(response.getAccessToken()).isEqualTo("access");
     assertThat(response.getRoles()).containsExactly("BUYER");
-    verify(verificationService).sendWhatsAppOtp("+251911223344");
+    verify(verificationService).sendOtp("+251911223344", null);
   }
 
   @Test
@@ -419,7 +419,7 @@ class AuthenticationServiceTest {
   void quickRegister_stillSucceedsWhenTheVerificationCodeCannotBeSent() {
     when(passwordEncoder.encode(anyString())).thenReturn("hash");
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-    doThrow(new BusinessException("Twilio down")).when(verificationService).sendWhatsAppOtp(any());
+    doThrow(new BusinessException("Twilio down")).when(verificationService).sendOtp(any(), any());
 
     AuthResponse response = authenticationService.quickRegister(quickRequest());
     assertThat(response).isNotNull();

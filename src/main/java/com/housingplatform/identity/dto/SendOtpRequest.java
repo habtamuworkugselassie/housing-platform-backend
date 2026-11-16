@@ -17,4 +17,9 @@ public class SendOtpRequest {
   @NotBlank(message = "Phone number is required")
   @Schema(description = "User's phone number in E.164 format", example = "+251911234567")
   private String phoneNumber;
+
+  @Schema(
+      description = "Language for the emailed code: \"am\" for Amharic, otherwise English",
+      example = "en")
+  private String lang;
 }

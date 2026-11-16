@@ -47,7 +47,7 @@ public interface AuthenticationService {
 
   void markPhoneAsVerified(String phoneNumber);
 
-  void requestOtpLogin(String phoneNumber);
+  void requestOtpLogin(String phoneNumber, String lang);
 
   AuthResponse confirmOtpLogin(String phoneNumber, String code);
 }

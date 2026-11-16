@@ -327,7 +327,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     // Best effort: the code lets the buyer confirm the phone later; a delivery problem must not
     // block the purchase they came to make.
     try {
-      verificationService.sendWhatsAppOtp(phone);
+      verificationService.sendOtp(phone, null);
     } catch (RuntimeException e) {
       log.warn("Could not send verification code to {} after quick registration", phone, e);
     }
@@ -605,8 +605,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   }
 
   @Override
-  public void requestOtpLogin(String phoneNumber) {
-    verificationService.sendWhatsAppOtp(phoneNumber);
+  public void requestOtpLogin(String phoneNumber, String lang) {
+    verificationService.sendOtp(phoneNumber, lang);
   }
 
   @Override

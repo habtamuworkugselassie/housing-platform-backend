@@ -240,6 +240,14 @@ twilio:
   auth-token: ${TWILIO_AUTH_TOKEN:}
   whatsapp-from-number: ${TWILIO_WHATSAPP_FROM_NUMBER:}
 
+# Brevo transactional SMS for one-time codes. SMS is off until both values are set.
+# The sender must be registered in Brevo for each destination country (max 11 letters).
+brevo:
+  api-key: ${BREVO_API_KEY:}
+  base-url: ${BREVO_BASE_URL:https://api.brevo.com/v3}
+  sms:
+    sender: ${BREVO_SMS_SENDER:}
+
 # Property purchase orders. The provider is the legal counterparty to every buyer agreement.
 # Chapa hosted checkout for reservation deposits (card data never touches this server).
 chapa:

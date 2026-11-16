@@ -144,17 +144,18 @@ public class AuthController {
 
   @PostMapping("/verify/send")
   @Operation(
-      summary = "Send WhatsApp OTP",
+      summary = "Send OTP",
       description =
-          "Dispatches a 6-digit one-time password to the user's registered WhatsApp number.")
+          "Dispatches a 6-digit one-time password by SMS (Brevo), and by email to the account"
+              + " registered with this phone number, over whichever channels are configured.")
   public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody SendOtpRequest request) {
-    verificationService.sendWhatsAppOtp(request.getPhoneNumber());
+    verificationService.sendOtp(request.getPhoneNumber(), request.getLang());
     return ResponseEntity.ok().build();
   }
 
   @PostMapping("/verify/confirm")
   @Operation(
-      summary = "Confirm WhatsApp OTP",
+      summary = "Confirm OTP",
       description = "Validates the 6-digit OTP and marks the user's phone as verified.")
   public ResponseEntity<Void> confirmVerificationCode(
       @Valid @RequestBody VerifyOtpRequest request) {
@@ -171,9 +172,9 @@ public class AuthController {
   @Operation(
       summary = "Request OTP for Login",
       description =
-          "Sends a 6-digit one-time password to the user's registered WhatsApp number for login.")
+          "Sends a 6-digit one-time password for login by SMS and email (whichever are configured).")
   public ResponseEntity<Void> requestOtpLogin(@Valid @RequestBody SendOtpRequest request) {
-    authenticationService.requestOtpLogin(request.getPhoneNumber());
+    authenticationService.requestOtpLogin(request.getPhoneNumber(), request.getLang());
     return ResponseEntity.ok().build();
   }
 
