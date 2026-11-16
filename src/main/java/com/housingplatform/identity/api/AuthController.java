@@ -156,16 +156,20 @@ public class AuthController {
   @PostMapping("/verify/confirm")
   @Operation(
       summary = "Confirm OTP",
-      description = "Validates the 6-digit OTP and marks the user's phone as verified.")
+      description =
+          "Validates the 6-digit OTP and marks the user's phone as verified. Only a code that"
+              + " reached the phone (SMS or WhatsApp) verifies it; an emailed code verifies the"
+              + " email address instead.")
   public ResponseEntity<Void> confirmVerificationCode(
       @Valid @RequestBody VerifyOtpRequest request) {
-    boolean isValid = verificationService.verifyOtp(request.getPhoneNumber(), request.getCode());
-    if (isValid) {
-      authenticationService.markPhoneAsVerified(request.getPhoneNumber());
-      return ResponseEntity.ok().build();
-    } else {
+    VerificationService.OtpVerification result =
+        verificationService.verify(request.getPhoneNumber(), request.getCode());
+    if (!result.valid()) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
+    authenticationService.markContactVerified(
+        request.getPhoneNumber(), result.phoneProven(), result.emailProven());
+    return ResponseEntity.ok().build();
   }
 
   @PostMapping("/login/otp/send")

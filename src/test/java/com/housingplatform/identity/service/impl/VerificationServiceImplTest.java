@@ -3,12 +3,17 @@ package com.housingplatform.identity.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.repository.UserRepository;
+import com.housingplatform.identity.service.VerificationService.OtpVerification;
+import com.housingplatform.identity.service.otp.InMemoryOtpStore;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.mail.BrandedMail;
 import com.housingplatform.shared.mail.BrandedMailSender;
@@ -16,6 +21,7 @@ import com.housingplatform.shared.sms.SmsSender;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,13 +46,16 @@ class VerificationServiceImplTest {
 
   private VerificationServiceImpl service;
   private MutableClock clock;
+  private User user;
 
   @BeforeEach
   void setUp() {
-    service = new VerificationServiceImpl(userRepository, mailSender, smsSender);
     clock = new MutableClock(Instant.parse("2026-11-16T10:00:00Z"));
+    service =
+        new VerificationServiceImpl(
+            userRepository, mailSender, smsSender, new InMemoryOtpStore(clock));
     service.setClock(clock);
-    User user = new User();
+    user = new User();
     user.setId(UUID.randomUUID());
     user.setEmail("buyer@example.com");
     user.setFirstName("Abebe");
@@ -55,61 +64,139 @@ class VerificationServiceImplTest {
     when(mailSender.send(any())).thenReturn(true);
   }
 
-  private String sendAndCaptureCode() {
-    service.sendOtp(PHONE, "en");
+  private void enableSms(boolean delivers) {
+    when(smsSender.configured()).thenReturn(true);
+    when(smsSender.send(any(), any())).thenReturn(delivers);
+  }
+
+  private String emailedCode() {
     ArgumentCaptor<BrandedMail> mail = ArgumentCaptor.forClass(BrandedMail.class);
-    verify(mailSender, org.mockito.Mockito.atLeastOnce()).send(mail.capture());
-    BrandedMail sent = mail.getValue();
-    assertThat(sent.getTo()).containsExactly("buyer@example.com");
-    return sent.getDetails().get(0).value();
+    verify(mailSender, atLeastOnce()).send(mail.capture());
+    assertThat(mail.getValue().getTo()).containsExactly("buyer@example.com");
+    return mail.getValue().getDetails().get(0).value();
+  }
+
+  private String textedCode() {
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(smsSender, atLeastOnce()).send(eq(PHONE), text.capture());
+    return text.getValue().replaceAll("\\D*(\\d{6}).*", "$1");
+  }
+
+  private void nextMinute() {
+    clock.advance(VerificationServiceImpl.RESEND_COOLDOWN.plusSeconds(1));
   }
 
   @Test
-  void emailsTheCodeToTheAccountOwnerAndAcceptsItOnce() {
-    String code = sendAndCaptureCode();
+  void emailedCodeIsSingleUseAndProvesOnlyTheEmail() {
+    service.sendOtp(PHONE, "en");
+    String code = emailedCode();
     assertThat(code).matches("\\d{6}");
-    assertThat(service.verifyOtp(PHONE, code)).isTrue();
-    assertThat(service.verifyOtp(PHONE, code)).isFalse();
+
+    OtpVerification result = service.verify(PHONE, code);
+    assertThat(result).isEqualTo(new OtpVerification(true, false, true));
+    assertThat(service.verify(PHONE, code).valid()).isFalse();
+  }
+
+  @Test
+  void textedCodeProvesThePhone() {
+    enableSms(true);
+    service.sendOtp(PHONE, "en");
+    OtpVerification result = service.verify(PHONE, textedCode());
+    assertThat(result.valid()).isTrue();
+    assertThat(result.phoneProven()).isTrue();
   }
 
   @Test
   void codeExpiresAfterTtl() {
-    String code = sendAndCaptureCode();
+    service.sendOtp(PHONE, "en");
+    String code = emailedCode();
     clock.advance(VerificationServiceImpl.OTP_TTL.plusSeconds(1));
-    assertThat(service.verifyOtp(PHONE, code)).isFalse();
+    assertThat(service.verify(PHONE, code).valid()).isFalse();
   }
 
   @Test
   void codeIsBurnedAfterTooManyWrongGuesses() {
-    String code = sendAndCaptureCode();
+    service.sendOtp(PHONE, "en");
+    String code = emailedCode();
     String wrong = code.equals("000000") ? "111111" : "000000";
     for (int i = 0; i < VerificationServiceImpl.MAX_ATTEMPTS; i++) {
-      assertThat(service.verifyOtp(PHONE, wrong)).isFalse();
+      assertThat(service.verify(PHONE, wrong).valid()).isFalse();
     }
-    assertThat(service.verifyOtp(PHONE, code)).isFalse();
+    assertThat(service.verify(PHONE, code).valid()).isFalse();
   }
 
   @Test
   void resendIsThrottled() {
     service.sendOtp(PHONE, "en");
     assertThatThrownBy(() -> service.sendOtp(PHONE, "en")).isInstanceOf(BusinessException.class);
-    clock.advance(VerificationServiceImpl.RESEND_COOLDOWN.plusSeconds(1));
+    nextMinute();
     service.sendOtp(PHONE, "en");
   }
 
   @Test
-  void failedDeliveryIsReportedAndCanBeRetriedImmediately() {
-    when(mailSender.send(any())).thenReturn(false);
-    assertThatThrownBy(() -> service.sendOtp(PHONE, "en")).isInstanceOf(BusinessException.class);
-    when(mailSender.send(any())).thenReturn(true);
+  void dailyCapPerPhone() {
+    service.setLimits(2, 60, "251");
     service.sendOtp(PHONE, "en");
+    nextMinute();
+    service.sendOtp(PHONE, "en");
+    nextMinute();
+    assertThatThrownBy(() -> service.sendOtp(PHONE, "en"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("today");
   }
 
   @Test
-  void unknownNumberDoesNotRevealThatItIsUnregistered() {
+  void unregisteredNumbersGetNothingButTheSameAnswer() {
+    enableSms(true);
     when(userRepository.findByPhoneNumber("+251900000000")).thenReturn(Optional.empty());
     service.sendOtp("+251900000000", "en");
+    verify(smsSender, never()).send(any(), any());
     verify(mailSender, never()).send(any());
+  }
+
+  @Test
+  void smsOnlyGoesToAllowedCountries() {
+    enableSms(true);
+    when(userRepository.findByPhoneNumber("+447700900123")).thenReturn(Optional.of(user));
+    service.sendOtp("+447700900123", "en");
+    verify(smsSender, never()).send(any(), any());
+    verify(mailSender).send(any());
+  }
+
+  @Test
+  void hourlySmsCeilingFallsBackToEmail() {
+    enableSms(true);
+    service.setLimits(8, 1, "251");
+    service.sendOtp(PHONE, "en");
+    nextMinute();
+    service.sendOtp(PHONE, "en");
+    verify(smsSender, times(1)).send(any(), any());
+    verify(mailSender, times(2)).send(any());
+  }
+
+  @Test
+  void smsAloneIsEnoughWhenTheAccountHasNoEmail() {
+    enableSms(true);
+    user.setEmail(null);
+    service.sendOtp(PHONE, "am");
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(smsSender).send(eq(PHONE), text.capture());
+    assertThat(text.getValue()).startsWith("Ethio Build Connect code: ").hasSizeLessThan(160);
+    verify(mailSender, never()).send(any());
+  }
+
+  @Test
+  void emailStillDeliversWhenSmsFails() {
+    enableSms(false);
+    service.sendOtp(PHONE, "en");
+    assertThat(service.verify(PHONE, emailedCode()).valid()).isTrue();
+  }
+
+  @Test
+  void failsWhenEveryConfiguredChannelFails() {
+    enableSms(false);
+    when(mailSender.send(any())).thenReturn(false);
+    assertThatThrownBy(() -> service.sendOtp(PHONE, "en")).isInstanceOf(BusinessException.class);
   }
 
   @Test
@@ -118,38 +205,6 @@ class VerificationServiceImplTest {
     ArgumentCaptor<BrandedMail> mail = ArgumentCaptor.forClass(BrandedMail.class);
     verify(mailSender).send(mail.capture());
     assertThat(mail.getValue().getLang()).isEqualTo("am");
-  }
-
-  @Test
-  void smsDeliversTheCodeEvenWithoutAnEmailOnTheAccount() {
-    when(smsSender.configured()).thenReturn(true);
-    when(smsSender.send(any(), any())).thenReturn(true);
-    when(userRepository.findByPhoneNumber("+251922000000")).thenReturn(Optional.empty());
-
-    service.sendOtp("+251922000000", "am");
-
-    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-    verify(smsSender).send(org.mockito.ArgumentMatchers.eq("+251922000000"), text.capture());
-    assertThat(text.getValue()).matches("Ethio Build Connect code: \\d{6}\\..*");
-    assertThat(text.getValue()).hasSizeLessThanOrEqualTo(160);
-    String code = text.getValue().replaceAll("\\D*(\\d{6}).*", "$1");
-    assertThat(service.verifyOtp("+251922000000", code)).isTrue();
-  }
-
-  @Test
-  void emailStillDeliversWhenSmsFails() {
-    when(smsSender.configured()).thenReturn(true);
-    when(smsSender.send(any(), any())).thenReturn(false);
-    service.sendOtp(PHONE, "en");
-    verify(mailSender).send(any());
-  }
-
-  @Test
-  void failsWhenEveryConfiguredChannelFails() {
-    when(smsSender.configured()).thenReturn(true);
-    when(smsSender.send(any(), any())).thenReturn(false);
-    when(mailSender.send(any())).thenReturn(false);
-    assertThatThrownBy(() -> service.sendOtp(PHONE, "en")).isInstanceOf(BusinessException.class);
   }
 
   private static final class MutableClock extends Clock {
@@ -164,12 +219,12 @@ class VerificationServiceImplTest {
     }
 
     @Override
-    public java.time.ZoneId getZone() {
+    public ZoneId getZone() {
       return ZoneOffset.UTC;
     }
 
     @Override
-    public Clock withZone(java.time.ZoneId zone) {
+    public Clock withZone(ZoneId zone) {
       return this;
     }
 
