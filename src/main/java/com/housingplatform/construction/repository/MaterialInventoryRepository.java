@@ -1,6 +1,7 @@
 package com.housingplatform.construction.repository;
 
 import com.housingplatform.construction.domain.MaterialInventory;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +25,9 @@ public interface MaterialInventoryRepository extends JpaRepository<MaterialInven
   List<MaterialInventory> findByProjectId(UUID projectId);
 
   Page<MaterialInventory> findByStatus(MaterialInventory.InventoryStatus status, Pageable pageable);
+
+  Page<MaterialInventory> findByStatusAndProjectIdIn(
+      MaterialInventory.InventoryStatus status, Collection<UUID> projectIds, Pageable pageable);
 
   @Query(
       "SELECT i FROM MaterialInventory i WHERE i.availableQuantity <= i.minimumStockLevel AND i.status != 'OUT_OF_STOCK'")

@@ -12,12 +12,14 @@ import com.housingplatform.construction.repository.MaterialInventoryRepository;
 import com.housingplatform.construction.repository.MaterialOrderRepository;
 import com.housingplatform.construction.repository.MaterialRepository;
 import com.housingplatform.construction.repository.MaterialUsageRepository;
+import com.housingplatform.construction.service.ConstructionAccessGuard;
 import com.housingplatform.construction.service.MaterialUsageMapper;
 import com.housingplatform.construction.service.MaterialUsageService;
 import com.housingplatform.shared.exception.BusinessException;
 import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -38,16 +40,22 @@ public class MaterialUsageServiceImpl implements MaterialUsageService {
   private final MaterialRepository materialRepository;
   private final MaterialInventoryRepository inventoryRepository;
   private final MaterialOrderRepository orderRepository;
+  private final ConstructionAccessGuard accessGuard;
+
+  /** Loads a usage record whose project the caller can access, or throws not-found. */
+  private MaterialUsage requireUsage(UUID id) {
+    MaterialUsage usage =
+        usageRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Material Usage", id));
+    accessGuard.checkProjectId(usage.getProjectId(), "Material Usage", id);
+    return usage;
+  }
 
   @Override
   public MaterialUsageResponse recordUsage(UUID userId, MaterialUsageRequest request) {
     // Validate project exists
-    ConstructionProject project =
-        projectRepository
-            .findById(request.getProjectId())
-            .orElseThrow(
-                () ->
-                    new ResourceNotFoundException("Construction Project", request.getProjectId()));
+    ConstructionProject project = accessGuard.requireProject(request.getProjectId());
 
     // Validate phase if provided
     ConstructionPhase phase = null;
@@ -77,6 +85,8 @@ public class MaterialUsageServiceImpl implements MaterialUsageService {
                   () ->
                       new ResourceNotFoundException(
                           "Material Inventory", request.getInventoryId()));
+      // Must not be able to draw down stock the caller cannot see (e.g. another company's).
+      accessGuard.checkInventory(inventory);
 
       // Check if enough quantity is available
       if (inventory.getAvailableQuantity().compareTo(request.getQuantity()) < 0) {
@@ -98,6 +108,7 @@ public class MaterialUsageServiceImpl implements MaterialUsageService {
     if (request.getOrderId() != null) {
       orderRepository
           .findById(request.getOrderId())
+          .filter(accessGuard::canAccessOrder)
           .orElseThrow(() -> new ResourceNotFoundException("Material Order", request.getOrderId()));
     }
 
@@ -139,16 +150,13 @@ public class MaterialUsageServiceImpl implements MaterialUsageService {
   @Override
   @Transactional(readOnly = true)
   public MaterialUsageResponse getUsageById(UUID id) {
-    MaterialUsage usage =
-        usageRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Usage", id));
-    return enrichUsageResponse(usage);
+    return enrichUsageResponse(requireUsage(id));
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<MaterialUsageResponse> getUsageByProject(UUID projectId) {
+    accessGuard.requireProject(projectId);
     return usageRepository.findByProjectId(projectId).stream()
         .map(this::enrichUsageResponse)
         .collect(Collectors.toList());
@@ -157,6 +165,10 @@ public class MaterialUsageServiceImpl implements MaterialUsageService {
   @Override
   @Transactional(readOnly = true)
   public List<MaterialUsageResponse> getUsageByPhase(UUID phaseId) {
+    phaseRepository
+        .findById(phaseId)
+        .ifPresent(
+            phase -> accessGuard.checkProject(phase.getProject(), "Construction Phase", phaseId));
     return usageRepository.findByPhaseId(phaseId).stream()
         .map(this::enrichUsageResponse)
         .collect(Collectors.toList());
@@ -165,30 +177,34 @@ public class MaterialUsageServiceImpl implements MaterialUsageService {
   @Override
   @Transactional(readOnly = true)
   public List<MaterialUsageResponse> getUsageByMaterial(UUID materialId) {
-    return usageRepository.findByMaterialId(materialId).stream()
-        .map(this::enrichUsageResponse)
-        .collect(Collectors.toList());
+    // Materials are a shared catalog, so usage of one spans many companies: non-admins only get
+    // records from projects they can access.
+    List<MaterialUsage> usages = usageRepository.findByMaterialId(materialId);
+    if (!accessGuard.isAdmin()) {
+      Set<UUID> projectIds = accessGuard.accessibleProjectIds();
+      usages = usages.stream().filter(u -> projectIds.contains(u.getProjectId())).toList();
+    }
+    return usages.stream().map(this::enrichUsageResponse).collect(Collectors.toList());
   }
 
   @Override
   @Transactional(readOnly = true)
   public Page<MaterialUsageResponse> getUsageByProject(UUID projectId, Pageable pageable) {
+    accessGuard.requireProject(projectId);
     return usageRepository.findByProjectId(projectId, pageable).map(this::enrichUsageResponse);
   }
 
   @Override
   @Transactional(readOnly = true)
   public BigDecimal getTotalUsageByMaterialAndProject(UUID materialId, UUID projectId) {
+    accessGuard.requireProject(projectId);
     BigDecimal total = usageRepository.getTotalUsageByMaterialAndProject(materialId, projectId);
     return total != null ? total : BigDecimal.ZERO;
   }
 
   @Override
   public void deleteUsage(UUID id) {
-    MaterialUsage usage =
-        usageRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Usage", id));
+    MaterialUsage usage = requireUsage(id);
 
     // Reverse inventory adjustment if applicable
     if (usage.getInventoryId() != null) {
