@@ -31,7 +31,7 @@ live page (**Past broadcasts**, `GET /api/v1/exhibition/live/replays`).
 Recording is off by default and needs all three of:
 
 1. **Enable it** on the backend: `LIVEKIT_RECORDING_ENABLED=true`, then
-   `docker compose up -d backend`.
+   `bash deploy/rollout-backend.sh` (restarts the API without downtime).
 2. **Egress must write into the served uploads volume.** The egress service
    mounts `/var/lib/housing-platform/uploads:/out` (see the compose file) so
    files land in `/out/live-recordings`, which the frontend serves at
