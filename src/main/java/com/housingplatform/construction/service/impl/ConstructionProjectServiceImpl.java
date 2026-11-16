@@ -7,6 +7,7 @@ import com.housingplatform.construction.dto.ConstructionProjectRequest;
 import com.housingplatform.construction.dto.ConstructionProjectResponse;
 import com.housingplatform.construction.repository.ConstructionPhaseRepository;
 import com.housingplatform.construction.repository.ConstructionProjectRepository;
+import com.housingplatform.construction.service.ConstructionAccessGuard;
 import com.housingplatform.construction.service.ConstructionPhaseMapper;
 import com.housingplatform.construction.service.ConstructionProjectMapper;
 import com.housingplatform.construction.service.ConstructionProjectService;
@@ -33,6 +34,7 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
   private final ConstructionProjectMapper projectMapper;
   private final ConstructionPhaseMapper phaseMapper;
   private final OrganizationRepository organizationRepository;
+  private final ConstructionAccessGuard accessGuard;
 
   @Override
   public ConstructionProjectResponse createProject(
@@ -57,11 +59,7 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
   @Override
   @Transactional(readOnly = true)
   public ConstructionProjectResponse getProjectById(UUID id) {
-    ConstructionProject project =
-        projectRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Project", id));
-    return enrichProjectResponse(project);
+    return enrichProjectResponse(accessGuard.requireProject(id));
   }
 
   @Override
@@ -80,7 +78,9 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
   @Override
   @Transactional(readOnly = true)
   public List<ConstructionProjectResponse> getProjectsByProperty(UUID propertyId) {
+    // Scoped: only projects the caller can access (admins see all).
     return projectRepository.findByPropertyId(propertyId).stream()
+        .filter(accessGuard::canAccessProject)
         .map(this::enrichProjectResponse)
         .collect(Collectors.toList());
   }
@@ -88,7 +88,9 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
   @Override
   @Transactional(readOnly = true)
   public List<ConstructionProjectResponse> getProjectsByBuilding(UUID buildingId) {
+    // Scoped: only projects the caller can access (admins see all).
     return projectRepository.findByBuildingId(buildingId).stream()
+        .filter(accessGuard::canAccessProject)
         .map(this::enrichProjectResponse)
         .collect(Collectors.toList());
   }
@@ -96,26 +98,39 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
   @Override
   @Transactional(readOnly = true)
   public Page<ConstructionProjectResponse> getProjectsByManager(UUID managerId, Pageable pageable) {
-    return projectRepository
-        .findByProjectManagerId(managerId, pageable)
-        .map(this::enrichProjectResponse);
+    // Admins and the manager themself see every project they manage; anyone else only sees that
+    // manager's projects owned by the caller's own organization.
+    if (accessGuard.isAdmin() || managerId.equals(accessGuard.currentUserId())) {
+      return projectRepository
+          .findByProjectManagerId(managerId, pageable)
+          .map(this::enrichProjectResponse);
+    }
+    return accessGuard
+        .currentOrganizationId()
+        .map(
+            org ->
+                projectRepository
+                    .findByProjectManagerIdAndRealEstateCompanyId(managerId, org, pageable)
+                    .map(this::enrichProjectResponse))
+        .orElseGet(() -> Page.empty(pageable));
   }
 
   @Override
   public ConstructionProjectResponse updateProject(
       UUID companyId, UUID projectId, ConstructionProjectRequest request) {
-    ConstructionProject project =
-        projectRepository
-            .findById(projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
+    ConstructionProject project = accessGuard.requireProject(projectId);
 
-    // Skip ownership check if admin
-    if (!com.housingplatform.shared.security.UserContext.isAdmin()
-        && !project.getRealEstateCompanyId().equals(companyId)) {
+    // Editing project details stays with the owning organization (or an admin), as before.
+    if (!accessGuard.isAdmin() && !project.getRealEstateCompanyId().equals(companyId)) {
       throw new BusinessException("Project does not belong to the specified company");
     }
 
+    UUID owningCompanyId = project.getRealEstateCompanyId();
     projectMapper.updateEntity(project, request);
+    // The request carries realEstateCompanyId; only admins may move a project to another company.
+    if (!accessGuard.isAdmin()) {
+      project.setRealEstateCompanyId(owningCompanyId);
+    }
     ConstructionProject updated = projectRepository.save(project);
     return enrichProjectResponse(updated);
   }
@@ -123,10 +138,7 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
   @Override
   public ConstructionProjectResponse updateProjectStatus(
       UUID projectId, ConstructionProject.ProjectStatus status) {
-    ConstructionProject project =
-        projectRepository
-            .findById(projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
+    ConstructionProject project = accessGuard.requireProject(projectId);
 
     project.setStatus(status);
 
@@ -141,14 +153,11 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
 
   @Override
   public void deleteProject(UUID companyId, UUID projectId) {
-    ConstructionProject project =
-        projectRepository
-            .findById(projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
+    ConstructionProject project = accessGuard.requireProject(projectId);
 
-    // Skip ownership check if admin
-    if (!com.housingplatform.shared.security.UserContext.isAdmin()
-        && !project.getRealEstateCompanyId().equals(companyId)) {
+    // Deleting a project is reserved for the owning organization (or an admin); managers and
+    // team members can work on it but not remove it.
+    if (!accessGuard.isAdmin() && !project.getRealEstateCompanyId().equals(companyId)) {
       throw new BusinessException("Project does not belong to the specified company");
     }
 
@@ -157,10 +166,7 @@ public class ConstructionProjectServiceImpl implements ConstructionProjectServic
 
   @Override
   public ConstructionProjectResponse calculateProjectCosts(UUID projectId) {
-    ConstructionProject project =
-        projectRepository
-            .findById(projectId)
-            .orElseThrow(() -> new ResourceNotFoundException("Construction Project", projectId));
+    ConstructionProject project = accessGuard.requireProject(projectId);
 
     // Calculate total cost from phases
     List<ConstructionPhase> phases = phaseRepository.findByProjectIdOrderBySequenceAsc(projectId);

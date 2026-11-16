@@ -371,7 +371,7 @@ class AuthenticationServiceTest {
     assertThat(user.getPasswordSet()).isFalse();
     assertThat(response.getAccessToken()).isEqualTo("access");
     assertThat(response.getRoles()).containsExactly("BUYER");
-    verify(verificationService).sendWhatsAppOtp("+251911223344");
+    verify(verificationService).sendOtp("+251911223344", null);
   }
 
   @Test
@@ -419,7 +419,7 @@ class AuthenticationServiceTest {
   void quickRegister_stillSucceedsWhenTheVerificationCodeCannotBeSent() {
     when(passwordEncoder.encode(anyString())).thenReturn("hash");
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-    doThrow(new BusinessException("Twilio down")).when(verificationService).sendWhatsAppOtp(any());
+    doThrow(new BusinessException("Twilio down")).when(verificationService).sendOtp(any(), any());
 
     AuthResponse response = authenticationService.quickRegister(quickRequest());
     assertThat(response).isNotNull();
@@ -501,5 +501,48 @@ class AuthenticationServiceTest {
     assertThatThrownBy(() -> authenticationService.loginWithGoogle(googleRequest()))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("disabled");
+  }
+
+  @Test
+  void confirmOtpLogin_emailedCodeSignsInWithoutClaimingThePhone() {
+    testUser.setPhoneVerified(false);
+    testUser.setEmailVerified(false);
+    testUser.setStatus(User.UserStatus.PENDING_VERIFICATION);
+    when(verificationService.verify("+251911111111", "123456"))
+        .thenReturn(new VerificationService.OtpVerification(true, false, true));
+    when(userRepository.findByPhoneNumber("+251911111111")).thenReturn(Optional.of(testUser));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
+        .thenReturn("access-token");
+
+    AuthResponse response = authenticationService.confirmOtpLogin("+251911111111", "123456");
+
+    assertEquals("access-token", response.getAccessToken());
+    assertThat(testUser.getPhoneVerified()).isFalse();
+    assertThat(testUser.getEmailVerified()).isTrue();
+    assertThat(testUser.getStatus()).isEqualTo(User.UserStatus.ACTIVE);
+  }
+
+  @Test
+  void confirmOtpLogin_textedCodeVerifiesThePhone() {
+    when(verificationService.verify("+251911111111", "123456"))
+        .thenReturn(new VerificationService.OtpVerification(true, true, false));
+    when(userRepository.findByPhoneNumber("+251911111111")).thenReturn(Optional.of(testUser));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(jwtTokenProvider.generateToken(any(UUID.class), anyString(), any(), any(), any()))
+        .thenReturn("access-token");
+
+    authenticationService.confirmOtpLogin("+251911111111", "123456");
+
+    assertThat(testUser.getPhoneVerified()).isTrue();
+  }
+
+  @Test
+  void confirmOtpLogin_rejectsAWrongCode() {
+    when(verificationService.verify("+251911111111", "000000"))
+        .thenReturn(VerificationService.OtpVerification.INVALID);
+    assertThatThrownBy(() -> authenticationService.confirmOtpLogin("+251911111111", "000000"))
+        .isInstanceOf(BusinessException.class);
+    verify(userRepository, never()).save(any());
   }
 }

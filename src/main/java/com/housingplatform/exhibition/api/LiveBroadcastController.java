@@ -24,12 +24,16 @@ import org.springframework.web.bind.annotation.*;
 @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
 public class LiveBroadcastController {
 
+  /** Proof of ownership for visitor streams; see {@code LiveBroadcastResponse#manageKey}. */
+  static final String KEY_HEADER = "X-Broadcast-Key";
+
   private final LiveBroadcastService service;
 
   @PostMapping("/request")
   @Operation(
       summary = "Request to go live",
-      description = "Creates a pending request. A publish token is issued only after an organizer approves.")
+      description =
+          "Creates a pending request. A publish token is issued only after an organizer approves.")
   public ResponseEntity<LiveBroadcastResponse> requestGoLive(
       @Valid @RequestBody LiveGoLiveRequest request, HttpServletRequest http) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -37,7 +41,9 @@ public class LiveBroadcastController {
   }
 
   @GetMapping
-  @Operation(summary = "List live broadcasts", description = "Public wall of currently-live streams.")
+  @Operation(
+      summary = "List live broadcasts",
+      description = "Public wall of currently-live streams.")
   public ResponseEntity<List<LiveBroadcastResponse>> listLive() {
     return ResponseEntity.ok(service.listLive());
   }
@@ -51,16 +57,20 @@ public class LiveBroadcastController {
   }
 
   @GetMapping("/{id}")
-  @Operation(summary = "Get a broadcast's public status", description = "Used to poll for approval.")
+  @Operation(
+      summary = "Get a broadcast's public status",
+      description = "Used to poll for approval.")
   public ResponseEntity<LiveBroadcastResponse> get(@PathVariable UUID id) {
     return ResponseEntity.ok(service.get(id));
   }
 
   @GetMapping("/{id}/publish-token")
-  @Operation(summary = "Broadcaster publish token", description = "Only when the request is approved.")
+  @Operation(
+      summary = "Broadcaster publish token",
+      description = "Only when the request is approved.")
   public ResponseEntity<LiveTokenResponse> publishToken(
-      @PathVariable UUID id, HttpServletRequest http) {
-    return ResponseEntity.ok(service.publishToken(id, clientIp(http)));
+      @PathVariable UUID id, @RequestHeader(name = KEY_HEADER, required = false) String manageKey) {
+    return ResponseEntity.ok(service.publishToken(id, manageKey));
   }
 
   @GetMapping("/{id}/viewer-token")
@@ -80,8 +90,8 @@ public class LiveBroadcastController {
       @PathVariable UUID id,
       @RequestParam(name = "audioTrackId", required = false) String audioTrackId,
       @RequestParam(name = "videoTrackId", required = false) String videoTrackId,
-      HttpServletRequest http) {
-    return ResponseEntity.ok(service.startRecording(id, audioTrackId, videoTrackId, clientIp(http)));
+      @RequestHeader(name = KEY_HEADER, required = false) String manageKey) {
+    return ResponseEntity.ok(service.startRecording(id, audioTrackId, videoTrackId, manageKey));
   }
 
   @PostMapping("/{id}/end")
@@ -90,39 +100,51 @@ public class LiveBroadcastController {
       description =
           "Stops recording + simulcast, closes the room and marks it ENDED. Called on Stop"
               + " broadcasting or when the broadcaster's tab closes (sendBeacon). Idempotent.")
-  public ResponseEntity<LiveBroadcastResponse> end(@PathVariable UUID id, HttpServletRequest http) {
-    return ResponseEntity.ok(service.endByBroadcaster(id, clientIp(http)));
+  public ResponseEntity<LiveBroadcastResponse> end(
+      @PathVariable UUID id,
+      @RequestHeader(name = KEY_HEADER, required = false) String manageKey,
+      // sendBeacon cannot set headers, so the unload path passes the key as a query parameter.
+      @RequestParam(name = "key", required = false) String manageKeyParam) {
+    return ResponseEntity.ok(
+        service.endByBroadcaster(id, manageKey != null ? manageKey : manageKeyParam));
   }
 
   // --- Co-hosting: approved viewers publish into the live room ----------------
 
   @PostMapping("/{id}/cohost/request")
-  @Operation(summary = "Ask to co-host", description = "Viewer requests to publish into a live room.")
+  @Operation(
+      summary = "Ask to co-host",
+      description = "Viewer requests to publish into a live room.")
   public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> requestCohost(
-      @PathVariable UUID id,
-      @RequestParam(name = "name", required = false) String name) {
+      @PathVariable UUID id, @RequestParam(name = "name", required = false) String name) {
     return ResponseEntity.status(HttpStatus.CREATED).body(service.requestCohost(id, name));
   }
 
   @GetMapping("/{id}/cohost/requests")
   @Operation(summary = "Pending co-host requests", description = "Broadcaster's moderation queue.")
   public ResponseEntity<List<com.housingplatform.exhibition.dto.CohostRequestResponse>>
-      listCohostRequests(@PathVariable UUID id) {
-    return ResponseEntity.ok(service.listPendingCohosts(id));
+      listCohostRequests(
+          @PathVariable UUID id,
+          @RequestHeader(name = KEY_HEADER, required = false) String manageKey) {
+    return ResponseEntity.ok(service.listPendingCohosts(id, manageKey));
   }
 
   @PostMapping("/{id}/cohost/{requestId}/approve")
   @Operation(summary = "Approve a co-host", description = "Broadcaster admits a viewer to publish.")
   public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> approveCohost(
-      @PathVariable UUID id, @PathVariable UUID requestId, HttpServletRequest http) {
-    return ResponseEntity.ok(service.decideCohost(id, requestId, true, clientIp(http)));
+      @PathVariable UUID id,
+      @PathVariable UUID requestId,
+      @RequestHeader(name = KEY_HEADER, required = false) String manageKey) {
+    return ResponseEntity.ok(service.decideCohost(id, requestId, true, manageKey));
   }
 
   @PostMapping("/{id}/cohost/{requestId}/deny")
   @Operation(summary = "Deny a co-host", description = "Broadcaster rejects a join request.")
   public ResponseEntity<com.housingplatform.exhibition.dto.CohostRequestResponse> denyCohost(
-      @PathVariable UUID id, @PathVariable UUID requestId, HttpServletRequest http) {
-    return ResponseEntity.ok(service.decideCohost(id, requestId, false, clientIp(http)));
+      @PathVariable UUID id,
+      @PathVariable UUID requestId,
+      @RequestHeader(name = KEY_HEADER, required = false) String manageKey) {
+    return ResponseEntity.ok(service.decideCohost(id, requestId, false, manageKey));
   }
 
   @GetMapping("/{id}/cohost/{requestId}/token")

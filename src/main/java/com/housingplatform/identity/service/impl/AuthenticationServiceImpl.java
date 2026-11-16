@@ -327,7 +327,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     // Best effort: the code lets the buyer confirm the phone later; a delivery problem must not
     // block the purchase they came to make.
     try {
-      verificationService.sendWhatsAppOtp(phone);
+      verificationService.sendOtp(phone, null);
     } catch (RuntimeException e) {
       log.warn("Could not send verification code to {} after quick registration", phone, e);
     }
@@ -586,7 +586,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   }
 
   @Override
-  public void markPhoneAsVerified(String phoneNumber) {
+  public void markContactVerified(String phoneNumber, boolean phoneProven, boolean emailProven) {
     if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
       return;
     }
@@ -595,24 +595,41 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             .findByPhoneNumber(phoneNumber)
             .orElseThrow(
                 () -> new BusinessException("User not found for phone number: " + phoneNumber));
-
-    user.setPhoneVerified(true);
-    // If we consider WhatsApp sufficient for activation, we can update status:
-    if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
-      user.setStatus(User.UserStatus.ACTIVE);
+    if (applyProof(user, phoneProven, emailProven)) {
+      userRepository.save(user);
     }
-    userRepository.save(user);
+  }
+
+  /**
+   * Marks what a correct one-time code proved and activates a pending account, since either proof
+   * shows the person controls a contact on it. Returns whether anything changed.
+   */
+  private static boolean applyProof(User user, boolean phoneProven, boolean emailProven) {
+    boolean changed = false;
+    if (phoneProven && !Boolean.TRUE.equals(user.getPhoneVerified())) {
+      user.setPhoneVerified(true);
+      changed = true;
+    }
+    if (emailProven && !Boolean.TRUE.equals(user.getEmailVerified())) {
+      user.setEmailVerified(true);
+      changed = true;
+    }
+    if ((phoneProven || emailProven) && user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
+      user.setStatus(User.UserStatus.ACTIVE);
+      changed = true;
+    }
+    return changed;
   }
 
   @Override
-  public void requestOtpLogin(String phoneNumber) {
-    verificationService.sendWhatsAppOtp(phoneNumber);
+  public void requestOtpLogin(String phoneNumber, String lang) {
+    verificationService.sendOtp(phoneNumber, lang);
   }
 
   @Override
   public AuthResponse confirmOtpLogin(String phoneNumber, String code) {
-    boolean isValid = verificationService.verifyOtp(phoneNumber, code);
-    if (!isValid) {
+    VerificationService.OtpVerification proof = verificationService.verify(phoneNumber, code);
+    if (!proof.valid()) {
       throw new BusinessException("Invalid or expired verification code");
     }
 
@@ -629,11 +646,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       throw new BusinessException("User account is disabled");
     }
 
-    if (!user.getPhoneVerified()) {
-      user.setPhoneVerified(true);
-      if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
-        user.setStatus(User.UserStatus.ACTIVE);
-      }
+    if (applyProof(user, proof.phoneProven(), proof.emailProven())) {
       user = userRepository.save(user);
     }
 

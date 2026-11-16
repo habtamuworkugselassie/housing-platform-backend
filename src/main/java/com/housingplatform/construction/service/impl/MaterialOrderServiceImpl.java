@@ -9,6 +9,7 @@ import com.housingplatform.construction.dto.MaterialOrderResponse;
 import com.housingplatform.construction.repository.ConstructionProjectRepository;
 import com.housingplatform.construction.repository.MaterialOrderItemRepository;
 import com.housingplatform.construction.repository.MaterialOrderRepository;
+import com.housingplatform.construction.service.ConstructionAccessGuard;
 import com.housingplatform.construction.service.MaterialOrderMapper;
 import com.housingplatform.construction.service.MaterialOrderService;
 import com.housingplatform.identity.repository.OrganizationRepository;
@@ -17,7 +18,9 @@ import com.housingplatform.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +39,41 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
   private final MaterialOrderMapper orderMapper;
   private final OrganizationRepository organizationRepository;
   private final ConstructionProjectRepository projectRepository;
+  private final ConstructionAccessGuard accessGuard;
+
+  /**
+   * Statuses the supplier an order was placed with may set: accept/fulfil the order, record that it
+   * was delivered, or decline it.
+   */
+  private static final Set<MaterialOrder.OrderStatus> SUPPLIER_STATUSES =
+      EnumSet.of(
+          MaterialOrder.OrderStatus.CONFIRMED,
+          MaterialOrder.OrderStatus.PROCESSING,
+          MaterialOrder.OrderStatus.SHIPPED,
+          MaterialOrder.OrderStatus.DELIVERED,
+          MaterialOrder.OrderStatus.CANCELLED);
+
+  /**
+   * Statuses the buying side (project access, or the user who placed a project-less order) may set:
+   * draft/submit, cancel, confirm receipt, or return.
+   */
+  private static final Set<MaterialOrder.OrderStatus> BUYER_STATUSES =
+      EnumSet.of(
+          MaterialOrder.OrderStatus.DRAFT,
+          MaterialOrder.OrderStatus.PENDING,
+          MaterialOrder.OrderStatus.CANCELLED,
+          MaterialOrder.OrderStatus.DELIVERED,
+          MaterialOrder.OrderStatus.RETURNED);
+
+  /** Loads an order visible to the caller (buyer side, supplier, or admin), or throws not-found. */
+  private MaterialOrder requireOrder(UUID orderId) {
+    MaterialOrder order =
+        orderRepository
+            .findById(orderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Material Order", orderId));
+    accessGuard.checkOrder(order, orderId);
+    return order;
+  }
 
   @Override
   public MaterialOrderResponse createOrder(UUID userId, MaterialOrderRequest request) {
@@ -51,13 +89,7 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
     // Validate project if provided
     ConstructionProject project = null;
     if (request.getProjectId() != null) {
-      project =
-          projectRepository
-              .findById(request.getProjectId())
-              .orElseThrow(
-                  () ->
-                      new ResourceNotFoundException(
-                          "Construction Project", request.getProjectId()));
+      project = accessGuard.requireProject(request.getProjectId());
     }
 
     MaterialOrder order = orderMapper.toEntity(request);
@@ -102,11 +134,7 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
   @Override
   @Transactional(readOnly = true)
   public MaterialOrderResponse getOrderById(UUID id) {
-    MaterialOrder order =
-        orderRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Order", id));
-    return enrichOrderResponse(order);
+    return enrichOrderResponse(requireOrder(id));
   }
 
   @Override
@@ -116,6 +144,7 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
         orderRepository
             .findByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResourceNotFoundException("Material Order", orderNumber));
+    accessGuard.checkOrder(order, orderNumber);
     return enrichOrderResponse(order);
   }
 
@@ -123,6 +152,11 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
   @Transactional(readOnly = true)
   public Page<MaterialOrderResponse> getOrdersBySupplier(
       UUID supplierId, MaterialOrder.OrderStatus status, Pageable pageable) {
+    // A supplier's order book is visible only to that supplier organization (and admins). Anyone
+    // else filtering by a foreign supplierId gets an empty page rather than its orders.
+    if (!accessGuard.isAdmin() && !accessGuard.isCurrentOrganization(supplierId)) {
+      return Page.empty(pageable);
+    }
     Page<MaterialOrder> orders;
     if (status != null) {
       orders = orderRepository.findBySupplierAndStatus(supplierId, status, pageable);
@@ -135,15 +169,18 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
   @Override
   @Transactional(readOnly = true)
   public Page<MaterialOrderResponse> getOrdersByProject(UUID projectId, Pageable pageable) {
+    accessGuard.requireProject(projectId);
     return orderRepository.findByProjectId(projectId, pageable).map(this::enrichOrderResponse);
   }
 
   @Override
   public MaterialOrderResponse updateOrderStatus(UUID orderId, MaterialOrder.OrderStatus status) {
-    MaterialOrder order =
-        orderRepository
-            .findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Order", orderId));
+    MaterialOrder order = requireOrder(orderId);
+    if (!accessGuard.isAdmin()
+        && !(accessGuard.isOrderSupplier(order) && SUPPLIER_STATUSES.contains(status))
+        && !(accessGuard.isOrderBuyer(order) && BUYER_STATUSES.contains(status))) {
+      throw new BusinessException("You are not allowed to set this order to " + status);
+    }
 
     order.setStatus(status);
 
@@ -157,10 +194,9 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
 
   @Override
   public MaterialOrderResponse updateOrderDelivery(UUID orderId, LocalDate deliveryDate) {
-    MaterialOrder order =
-        orderRepository
-            .findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Order", orderId));
+    // Both the supplier (recording dispatch/delivery) and the buyer (confirming receipt) may do
+    // this.
+    MaterialOrder order = requireOrder(orderId);
 
     order.setActualDeliveryDate(deliveryDate);
     if (order.getStatus() != MaterialOrder.OrderStatus.DELIVERED) {
@@ -174,10 +210,11 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
   @Override
   public MaterialOrderResponse receiveOrderItems(
       UUID orderId, UUID itemId, BigDecimal receivedQuantity) {
-    MaterialOrder order =
-        orderRepository
-            .findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Order", orderId));
+    MaterialOrder order = requireOrder(orderId);
+    // Receiving goods is a buyer-side action.
+    if (!accessGuard.isAdmin() && !accessGuard.isOrderBuyer(order)) {
+      throw new BusinessException("Only the ordering side can record received quantities");
+    }
 
     MaterialOrderItem item =
         orderItemRepository
@@ -216,10 +253,7 @@ public class MaterialOrderServiceImpl implements MaterialOrderService {
 
   @Override
   public void deleteOrder(UUID userId, UUID orderId) {
-    MaterialOrder order =
-        orderRepository
-            .findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Material Order", orderId));
+    MaterialOrder order = requireOrder(orderId);
 
     if (!order.getOrderedBy().equals(userId)) {
       throw new BusinessException("Order can only be deleted by the user who created it");

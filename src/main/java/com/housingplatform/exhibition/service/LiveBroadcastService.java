@@ -15,7 +15,7 @@ public interface LiveBroadcastService {
   LiveBroadcastResponse requestGoLive(LiveGoLiveRequest request, String ip);
 
   /** Broadcaster publish token — issued only when the request is APPROVED (or already LIVE). */
-  LiveTokenResponse publishToken(UUID id, String ip);
+  LiveTokenResponse publishToken(UUID id, String manageKey);
 
   /** Subscribe-only viewer token for a LIVE broadcast (plus HLS url when available). */
   LiveTokenResponse viewerToken(UUID id, String viewerName);
@@ -31,7 +31,9 @@ public interface LiveBroadcastService {
 
   Page<AdminLiveBroadcastResponse> adminList(String status, Pageable pageable);
 
-  /** Provision an RTMP/WHIP ingress for a broadcast so an external encoder (pro camera) can feed it. */
+  /**
+   * Provision an RTMP/WHIP ingress for a broadcast so an external encoder (pro camera) can feed it.
+   */
   com.housingplatform.exhibition.dto.IngressResponse createIngress(UUID id, String type);
 
   /** Start a real-time RTMP simulcast of a LIVE broadcast to the given targets (or all enabled). */
@@ -51,19 +53,21 @@ public interface LiveBroadcastService {
    * Broadcaster ends their own stream (Stop broadcasting / tab close): finalizes the recording,
    * stops simulcast, closes the room and marks it ENDED. Idempotent.
    */
-  LiveBroadcastResponse endByBroadcaster(UUID id, String ip);
+  LiveBroadcastResponse endByBroadcaster(UUID id, String manageKey);
 
   // --- Co-hosting: approved viewers publish into the same live room -----------
 
   /** A viewer asks to co-host a LIVE broadcast; held PENDING until the broadcaster approves. */
-  com.housingplatform.exhibition.dto.CohostRequestResponse requestCohost(UUID broadcastId, String name);
+  com.housingplatform.exhibition.dto.CohostRequestResponse requestCohost(
+      UUID broadcastId, String name);
 
   /** Pending co-host requests for a broadcast (the broadcaster's moderation queue). */
-  List<com.housingplatform.exhibition.dto.CohostRequestResponse> listPendingCohosts(UUID broadcastId);
+  List<com.housingplatform.exhibition.dto.CohostRequestResponse> listPendingCohosts(
+      UUID broadcastId, String manageKey);
 
   /** Broadcaster approves/denies a co-host request. */
   com.housingplatform.exhibition.dto.CohostRequestResponse decideCohost(
-      UUID broadcastId, UUID requestId, boolean approve, String ip);
+      UUID broadcastId, UUID requestId, boolean approve, String manageKey);
 
   /** Co-host publish token — issued only once the request is APPROVED (viewer polls for it). */
   LiveTokenResponse cohostToken(UUID broadcastId, UUID requestId);
@@ -74,5 +78,5 @@ public interface LiveBroadcastService {
    * disabled, the stream isn't live, or a recording is already running.
    */
   LiveBroadcastResponse startRecording(
-      UUID id, String audioTrackId, String videoTrackId, String ip);
+      UUID id, String audioTrackId, String videoTrackId, String manageKey);
 }

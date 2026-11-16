@@ -51,7 +51,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     boolean authPath =
         path.equals("/api/v1/auth/login")
             || path.equals("/api/v1/auth/register")
-            || path.equals("/api/v1/auth/forgot-password");
+            || path.equals("/api/v1/auth/quick-register")
+            || path.equals("/api/v1/auth/forgot-password")
+            || path.equals("/api/v1/auth/reset-password")
+            // Phone codes are 6 digits; without a per-IP cap they can be enumerated.
+            || path.startsWith("/api/v1/auth/verify/")
+            || path.startsWith("/api/v1/auth/login/otp/");
     boolean leadForm =
         "POST".equalsIgnoreCase(request.getMethod())
             && (path.equals("/api/v1/enquiries") || path.equals("/api/v1/exhibition/interest"));

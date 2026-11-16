@@ -1,0 +1,38 @@
+name: CI
+
+# Unit tests on every pull request, and as the first job of every deploy
+# (deploy-backend.yml calls this workflow), so a red test never reaches the droplet.
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # Spotless is not gated yet: ~20 files on main predate the formatter. Run
+      # `mvn spotless:apply` once on main, then drop -Dspotless.check.skip and use `verify`.
+      - name: Unit tests
+        run: ./mvnw -B -ntp test -Dspotless.check.skip=true
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
