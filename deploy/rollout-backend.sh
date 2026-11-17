@@ -8,8 +8,9 @@
 # (resolver 127.0.0.11, valid=10s) and retries the next address on a connection error,
 # so traffic moves to the new slot without a gap.
 #
-# Memory: both slots run side by side for a minute or two. On a host that cannot hold
-# two JVMs (less than MIN_FREE_MB available with the old slot still up) it falls back to
+# Memory: both slots run side by side for a minute or two. A slot needs about 400 MB
+# while it boots (512 MB heap ceiling, 1 GB hard cap). On a host with less than
+# MIN_FREE_MB available while the old slot is still up, it falls back to
 # stop-then-start and says so, rather than letting the kernel pick a process to kill.
 #
 # Usage: bash deploy/rollout-backend.sh            (from the backend checkout)
@@ -19,7 +20,7 @@ set -euo pipefail
 # Both profiles on, so ps/stop/rm/logs can name either slot; `up -d --no-deps <slot>`
 # still starts only the slot named.
 COMPOSE=${COMPOSE:-"docker compose --profile blue --profile green -f deploy/docker-compose.prod.yml"}
-MIN_FREE_MB=${MIN_FREE_MB:-1100}
+MIN_FREE_MB=${MIN_FREE_MB:-550}
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-240}
 
 running() { # running <service> -> prints container id if the slot is up
@@ -58,6 +59,9 @@ echo "Rollout: ${old:-nothing} -> $new"
 overlap=true
 if [ -n "$old" ]; then
   avail=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+  echo "Memory available before rollout: ${avail} MB (need ${MIN_FREE_MB} MB to overlap)"
+  free -m | sed -n '1,3p'
+  docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' 2>/dev/null | sed -n '1,25p' || true
   if [ "$avail" -lt "$MIN_FREE_MB" ]; then
     echo "::warning::Only ${avail} MB available; not enough for two API slots. Stopping $old first (brief downtime)."
     stop_old "$old"

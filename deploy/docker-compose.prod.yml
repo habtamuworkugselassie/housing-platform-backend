@@ -43,9 +43,11 @@ x-backend: &backend
     REDIS_HOST: redis
     REDIS_PORT: 6379
     UPLOAD_DIR: /var/lib/housing-platform/uploads
-    # Without a ceiling the JVM takes a quarter of the host's RAM, which on a 4 GB
-    # droplet starves Postgres during a traffic spike.
-    JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=25
+    # Sized for a 2 GB droplet that also hosts another stack: the app idles around
+    # 300 MB, so a 512 MB heap ceiling and a small initial heap keep two slots (a
+    # blue/green rollout) under 1 GB together. -XX:+UseSerialGC is the leanest
+    # collector for a 1 vCPU host. Raise these if the droplet grows.
+    JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=10 -XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -Xss512k
   volumes:
     - ${DATA_DIR:-/var/lib/ethiobuildconnect}/uploads:/var/lib/housing-platform/uploads
   healthcheck:
@@ -56,7 +58,8 @@ x-backend: &backend
     start_period: 90s
   # Spring shuts down gracefully (server.shutdown=graceful, 25 s); give it that long.
   stop_grace_period: 30s
-  mem_limit: 1800m
+  # Hard cap per slot; the heap ceiling above is half of this.
+  mem_limit: 1024m
 
 services:
   postgres:
