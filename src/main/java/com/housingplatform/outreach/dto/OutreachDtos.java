@@ -140,6 +140,17 @@ public final class OutreachDtos {
     private int step = 1;
   }
 
+  /** Scheduler switch and caps; null fields are left unchanged. */
+  @Data
+  public static class SettingsRequest {
+    private Boolean enabled;
+    private Integer dailyCap;
+    private Integer hourlyCap;
+    private Integer sendWindowStart;
+    private Integer sendWindowEnd;
+    private Integer followUpAfterDays;
+  }
+
   /** Admin-composed email: the preview, edited as needed, sent now. */
   @Data
   public static class SendNowRequest {

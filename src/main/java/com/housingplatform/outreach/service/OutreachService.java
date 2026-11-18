@@ -51,6 +51,7 @@ public class OutreachService {
   private final OutreachMessageRepository messages;
   private final OutreachTemplateRenderer renderer;
   private final OutreachMailer mailer;
+  private final OutreachSettingsService settings;
 
   // ------------------------------------------------------------------ import
 
@@ -384,7 +385,7 @@ public class OutreachService {
   }
 
   private int followUpAfterDays() {
-    return renderer.props().getFollowUpAfterDays();
+    return settings.current().getFollowUpAfterDays();
   }
 
   // ------------------------------------------------------------------ templates

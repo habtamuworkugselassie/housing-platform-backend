@@ -4,6 +4,7 @@ import com.housingplatform.outreach.domain.OutreachContact;
 import com.housingplatform.outreach.dto.OutreachDtos.*;
 import com.housingplatform.outreach.service.OutreachScheduler;
 import com.housingplatform.outreach.service.OutreachService;
+import com.housingplatform.outreach.service.OutreachSettingsService;
 import com.housingplatform.shared.security.annotation.AuthPolicyScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,9 +31,17 @@ public class AdminOutreachController {
 
   private final OutreachService service;
   private final OutreachScheduler scheduler;
+  private final OutreachSettingsService settings;
 
   @GetMapping("/stats")
   public ResponseEntity<Stats> stats() {
+    return ResponseEntity.ok(scheduler.stats());
+  }
+
+  @PutMapping("/settings")
+  @Operation(summary = "Switch the scheduler on or off and set caps and window")
+  public ResponseEntity<Stats> updateSettings(@RequestBody SettingsRequest body) {
+    settings.update(body);
     return ResponseEntity.ok(scheduler.stats());
   }
 

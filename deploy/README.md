@@ -408,4 +408,7 @@ Setup, once:
    detection create a Gmail app password for the reply-to mailbox and put it in
    `OUTREACH_IMAP_PASSWORD`. Roll out.
 3. In admin > Outreach: import the CSV, preview a few emails, send yourself a test, then
-   send individually or queue a batch and set `OUTREACH_ENABLED=true`.
+   send individually or queue a batch and switch **Scheduled sending** on in the page
+   header. The switch, caps, send window and follow-up delay are stored in the database
+   (`outreach_settings`), so changing them needs no restart; the `OUTREACH_*` values in
+   `.env` only seed the first row.
