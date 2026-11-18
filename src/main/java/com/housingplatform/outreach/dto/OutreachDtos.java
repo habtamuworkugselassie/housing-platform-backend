@@ -74,8 +74,18 @@ public final class OutreachDtos {
     private String to;
     private String subject;
     private String body;
+    private String html;
     private String templateKey;
     private String locale;
+    private List<String> attachments;
+  }
+
+  /** Re-render the HTML for text the admin has edited (live preview). */
+  @Data
+  public static class RenderRequest {
+    private String subject;
+    private String body;
+    private boolean includePackages = true;
   }
 
   @Data

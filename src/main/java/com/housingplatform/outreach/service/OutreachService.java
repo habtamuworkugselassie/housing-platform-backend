@@ -191,14 +191,36 @@ public class OutreachService {
   public PreviewResponse preview(UUID id, int step) {
     OutreachContact c = load(id);
     OutreachTemplateRenderer.Rendered r = render(c, step);
+    boolean first = step != 2;
+    OutreachMailer.Options o =
+        first ? OutreachMailer.Options.firstEmail() : OutreachMailer.Options.followUp();
     return PreviewResponse.builder()
         .to(c.getEmail())
         .subject(r.subject())
         .body(r.body())
+        .html(
+            mailer.html(
+                r.subject(), r.body(), c.getLocale(), o.includePackages(), renderer.registerUrl(c)))
         .templateKey(
-            (step == 2 ? TemplateKey.FOLLOW_UP : OutreachTemplateRenderer.effectiveKey(c)).name())
+            (first ? OutreachTemplateRenderer.effectiveKey(c) : TemplateKey.FOLLOW_UP).name())
         .locale(c.getLocale())
+        .attachments(
+            OutreachMailer.attachmentNames(c.getLocale(), o).stream()
+                .map(OutreachMailer::displayName)
+                .toList())
         .build();
+  }
+
+  /** HTML for text the admin edited in the drawer. */
+  @Transactional(readOnly = true)
+  public String renderHtml(UUID id, RenderRequest r) {
+    OutreachContact c = load(id);
+    return mailer.html(
+        r.getSubject() == null ? "" : r.getSubject(),
+        r.getBody() == null ? "" : r.getBody(),
+        c.getLocale(),
+        r.isIncludePackages(),
+        renderer.registerUrl(c));
   }
 
   public OutreachTemplateRenderer.Rendered render(OutreachContact c, int step) {

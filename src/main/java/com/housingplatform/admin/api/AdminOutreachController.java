@@ -80,6 +80,12 @@ public class AdminOutreachController {
     return ResponseEntity.ok(service.preview(id, step));
   }
 
+  @PostMapping(value = "/contacts/{id}/render", produces = MediaType.TEXT_HTML_VALUE)
+  @Operation(summary = "Render the branded HTML for edited text (live preview)")
+  public ResponseEntity<String> render(@PathVariable UUID id, @RequestBody RenderRequest body) {
+    return ResponseEntity.ok(service.renderHtml(id, body));
+  }
+
   @GetMapping("/contacts/{id}/messages")
   public ResponseEntity<List<MessageResponse>> messagesFor(@PathVariable UUID id) {
     return ResponseEntity.ok(service.messagesFor(id));

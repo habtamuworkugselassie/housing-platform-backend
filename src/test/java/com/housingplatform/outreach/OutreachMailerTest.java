@@ -24,23 +24,33 @@ class OutreachMailerTest {
   void htmlCarriesTheTextThePackagesAndTheRegisterButton() {
     String html =
         OutreachHtml.render(
-            "Dear Noah team,\n\nI saw your Atlas launch & liked it.\n\nSee https://ethiobuildconnect.et/#sponsorship",
+            "Noah at the expo",
+            "Dear Noah team,\n\nI saw your Atlas launch & liked it.\n\n- Exhibit: a stand\n- List now: free\n\nSee https://ethiobuildconnect.et/#sponsorship\n\nKind regards,\nHabtamu\n\nIf you would rather not hear from us, reply no thanks.",
             "en",
             true,
             "https://ethiobuildconnect.et/?interest=exhibitor",
             "https://ethiobuildconnect.et",
             "https://x/logo.png");
     assertThat(html)
-        .contains("<p style=\"margin:0 0 14px;white-space:pre-line;\">Dear Noah team,</p>")
+        .contains(">Noah at the expo</h1>")
+        .contains(">Dear Noah team,</p>")
         .contains("Atlas launch &amp; liked it")
+        .contains("&#9670;</td>")
+        .contains("Exhibit: a stand")
         .contains("<a href=\"https://ethiobuildconnect.et/#sponsorship\"")
+        .contains("9–13 January 2027")
+        .contains("Addis International Convention Center")
         .contains("Sponsorship packages")
         .contains("ETB 5,000,000")
         .contains("54 m² booth")
         .contains("Special Participant Package")
-        .contains(">Register on the portal</a>");
+        .contains(">Register on the portal</a>")
+        .contains("Kind regards,\nHabtamu")
+        .contains(
+            "<span style=\"color:#8b7fa6;\">If you would rather not hear from us, reply no thanks.</span>");
     String am =
         OutreachHtml.render(
+            "ርዕስ",
             "ሰላም",
             "am",
             true,
