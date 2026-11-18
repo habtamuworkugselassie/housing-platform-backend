@@ -189,6 +189,8 @@ app:
     sender-email: ${OUTREACH_SENDER_EMAIL:}
     # Where replies land; empty = app.mail.reply-to (the expo mailbox).
     reply-to: ${OUTREACH_REPLY_TO:}
+    # Gets a blind copy of every email sent to a contact; empty = reply-to.
+    copy-to: ${OUTREACH_COPY_TO:}
     company-line: ${OUTREACH_COMPANY_LINE:Dream Team Trading PLC, Addis Ababa}
     site-url: ${FRONTEND_BASE_URL:https://ethiobuildconnect.et}
     # Optional: read the reply-to mailbox over IMAP so replies and opt-outs are marked

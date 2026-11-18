@@ -38,6 +38,11 @@ public class OutreachProperties {
   /** Where replies land (the expo mailbox). Defaults to app.mail.reply-to. */
   private String replyTo = "";
 
+  /**
+   * Mailbox that gets a blind copy of every outreach email sent to a contact. Defaults to replyTo.
+   */
+  private String copyTo = "";
+
   private String companyLine = "Dream Team Trading PLC, Addis Ababa";
 
   private String siteUrl = "https://ethiobuildconnect.et";

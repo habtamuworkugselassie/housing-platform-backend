@@ -67,6 +67,11 @@ public class OutreachMailer {
         : props.getReplyTo();
   }
 
+  /** Mailbox that gets a blind copy of every email sent to a contact; empty = none. */
+  public String copyTo() {
+    return props.getCopyTo().isBlank() ? replyTo() : props.getCopyTo().trim();
+  }
+
   /**
    * @return the Message-ID header of the sent mail.
    */
@@ -78,6 +83,23 @@ public class OutreachMailer {
       String registerUrl,
       String inReplyTo,
       Options options)
+      throws Exception {
+    return send(to, subject, bodyText, locale, registerUrl, inReplyTo, options, true);
+  }
+
+  /**
+   * @param blindCopy whether the copy mailbox gets a Bcc; false for admin test sends.
+   * @return the Message-ID header of the sent mail.
+   */
+  public String send(
+      String to,
+      String subject,
+      String bodyText,
+      String locale,
+      String registerUrl,
+      String inReplyTo,
+      Options options,
+      boolean blindCopy)
       throws Exception {
     String site = props.getSiteUrl().replaceAll("/$", "");
     String logo =
@@ -92,6 +114,8 @@ public class OutreachMailer {
         new InternetAddress(from(), props.getSenderName(), StandardCharsets.UTF_8.name()));
     helper.setTo(to);
     if (!replyTo().isBlank()) helper.setReplyTo(replyTo());
+    String copy = copyTo();
+    if (blindCopy && !copy.isBlank() && !copy.equalsIgnoreCase(to.trim())) helper.setBcc(copy);
     helper.setSubject(subject);
     String text =
         bodyText.trim()
