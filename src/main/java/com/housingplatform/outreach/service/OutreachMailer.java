@@ -29,8 +29,9 @@ public class OutreachMailer {
       boolean attachBrochure,
       boolean attachSponsorship,
       boolean attachAgreement) {
+    /** First email: package table in the body, brochure, package sheet and agreement attached. */
     public static Options firstEmail() {
-      return new Options(true, true, true, false);
+      return new Options(true, true, true, true);
     }
 
     public static Options followUp() {

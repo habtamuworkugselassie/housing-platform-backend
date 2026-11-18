@@ -59,7 +59,7 @@ class OutreachMailerTest {
   @Test
   void attachmentsFollowTheLanguageAndOptions() {
     assertThat(OutreachMailer.attachmentNames("am", OutreachMailer.Options.firstEmail()))
-        .containsExactly("brochure-am.pdf", "sponsorship-am.pdf");
+        .containsExactly("brochure-am.pdf", "sponsorship-am.pdf", "agreement-am.pdf");
     assertThat(
             OutreachMailer.attachmentNames(
                 "en", new OutreachMailer.Options(true, true, true, true)))
@@ -103,9 +103,10 @@ class OutreachMailerTest {
     assertThat(m.getHeader("Message-ID")[0]).isEqualTo(id);
     MimeMultipart mp = (MimeMultipart) m.getContent();
     int parts = mp.getCount();
-    assertThat(parts).isEqualTo(3); // body (text+html alternative) + 2 PDFs
+    assertThat(parts).isEqualTo(4); // body (text+html alternative) + 3 PDFs
     assertThat(mp.getBodyPart(1).getFileName()).contains("Brochure (English)");
     assertThat(mp.getBodyPart(2).getFileName()).contains("Sponsorship packages (English)");
+    assertThat(mp.getBodyPart(3).getFileName()).contains("Exhibitor agreement (English)");
   }
 
   @Test
