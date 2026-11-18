@@ -136,7 +136,16 @@ jobs:
             # Preserve the image currently serving traffic before promoting the new one.
             docker tag "$DEPLOY_IMAGE:latest" "$DEPLOY_IMAGE:rollback-$SHA" 2>/dev/null || true
 
-            docker pull "$REGISTRY_IMAGE:$SHA"
+            # The pull of the app layer takes minutes on the droplet and containerd has
+            # twice lost the partially written layer mid-pull ("failed commit on ref ...
+            # no such file or directory"). Retrying resumes from the layers already present.
+            pulled=false
+            for attempt in 1 2 3 4; do
+              if docker pull "$REGISTRY_IMAGE:$SHA"; then pulled=true; break; fi
+              echo "::warning::image pull attempt $attempt failed; retrying in 20s"
+              sleep 20
+            done
+            [ "$pulled" = true ] || { echo "::error::could not pull $REGISTRY_IMAGE:$SHA"; exit 1; }
             docker tag "$REGISTRY_IMAGE:$SHA" "$DEPLOY_IMAGE:latest"
 
             # Flyway's V46 needs the pgvector extension and does not create it (on the old
