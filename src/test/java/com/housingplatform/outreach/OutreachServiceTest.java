@@ -12,6 +12,7 @@ import com.housingplatform.outreach.repository.OutreachMessageRepository;
 import com.housingplatform.outreach.repository.OutreachTemplateRepository;
 import com.housingplatform.outreach.service.OutreachMailer;
 import com.housingplatform.outreach.service.OutreachService;
+import com.housingplatform.outreach.service.OutreachSettingsService;
 import com.housingplatform.outreach.service.OutreachTemplateRenderer;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -53,7 +54,8 @@ class OutreachServiceTest {
             mock(OutreachTemplateRepository.class),
             mock(OutreachMessageRepository.class),
             mock(OutreachTemplateRenderer.class),
-            mock(OutreachMailer.class));
+            mock(OutreachMailer.class),
+            mock(OutreachSettingsService.class));
 
     String csv =
         "name,sector,email,phone,website,city,confidence,source_url,notes,locale,hook\n"

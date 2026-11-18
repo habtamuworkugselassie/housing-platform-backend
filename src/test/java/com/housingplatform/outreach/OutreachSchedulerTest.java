@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.outreach.domain.OutreachContact;
+import com.housingplatform.outreach.domain.OutreachSettings;
 import com.housingplatform.outreach.repository.OutreachContactRepository;
 import com.housingplatform.outreach.repository.OutreachMessageRepository;
 import com.housingplatform.outreach.service.*;
@@ -20,8 +21,20 @@ class OutreachSchedulerTest {
   private static OutreachScheduler scheduler(
       OutreachMailer mailer, OutreachContactRepository contacts) {
     OutreachProperties props = new OutreachProperties();
+    OutreachSettingsService settings = mock(OutreachSettingsService.class);
+    when(settings.current())
+        .thenReturn(
+            OutreachSettings.builder()
+                .enabled(false)
+                .dailyCap(30)
+                .hourlyCap(8)
+                .sendWindowStart(9)
+                .sendWindowEnd(17)
+                .followUpAfterDays(5)
+                .build());
     return new OutreachScheduler(
         props,
+        settings,
         contacts,
         mock(OutreachMessageRepository.class),
         mock(OutreachService.class),

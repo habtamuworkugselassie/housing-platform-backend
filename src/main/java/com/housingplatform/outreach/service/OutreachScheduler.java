@@ -4,6 +4,7 @@ import com.housingplatform.exhibition.repository.ExhibitionInterestRepository;
 import com.housingplatform.outreach.domain.OutreachContact;
 import com.housingplatform.outreach.domain.OutreachContact.Status;
 import com.housingplatform.outreach.domain.OutreachMessage;
+import com.housingplatform.outreach.domain.OutreachSettings;
 import com.housingplatform.outreach.dto.OutreachDtos.Stats;
 import com.housingplatform.outreach.repository.OutreachContactRepository;
 import com.housingplatform.outreach.repository.OutreachMessageRepository;
@@ -39,6 +40,7 @@ public class OutreachScheduler {
       Set.of("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "ethionet.et");
 
   private final OutreachProperties props;
+  private final OutreachSettingsService settings;
   private final OutreachContactRepository contacts;
   private final OutreachMessageRepository messages;
   private final OutreachService service;
@@ -51,9 +53,10 @@ public class OutreachScheduler {
 
   @Scheduled(fixedDelayString = "${app.outreach.tick-ms:300000}", initialDelayString = "60000")
   public void tick() {
-    if (!props.isEnabled() || !mailer.configured()) return;
-    if (!insideSendWindow()) return;
-    int room = Math.min(capRemainingToday(), capRemainingThisHour());
+    OutreachSettings cfg = settings.current();
+    if (!cfg.isEnabled() || !mailer.configured()) return;
+    if (!insideSendWindow(cfg)) return;
+    int room = Math.min(capRemainingToday(cfg), capRemainingThisHour(cfg));
     if (room <= 0) return;
     int batch = Math.min(room, 2);
     List<OutreachContact> due =
@@ -113,7 +116,7 @@ public class OutreachScheduler {
     c.setLastError(null);
     if (step == 1) {
       c.setStatus(Status.SENT);
-      c.setNextActionAt(addBusinessDays(now, props.getFollowUpAfterDays()));
+      c.setNextActionAt(addBusinessDays(now, settings.current().getFollowUpAfterDays()));
     } else {
       c.setStatus(Status.FOLLOWED_UP);
       c.setNextActionAt(null);
@@ -191,6 +194,7 @@ public class OutreachScheduler {
   // ------------------------------------------------------------------ stats / helpers
 
   public Stats stats() {
+    OutreachSettings cfg = settings.current();
     Map<String, Long> byStatus = new LinkedHashMap<>();
     for (Status s : Status.values()) byStatus.put(s.name(), 0L);
     for (Object[] row : contacts.countsByStatus())
@@ -199,27 +203,27 @@ public class OutreachScheduler {
         .byStatus(byStatus)
         .sentToday(sentToday())
         .sentLastHour(messages.countBySentAtGreaterThanEqual(LocalDateTime.now().minusHours(1)))
-        .dailyCap(props.getDailyCap())
-        .hourlyCap(props.getHourlyCap())
-        .enabled(props.isEnabled())
+        .dailyCap(cfg.getDailyCap())
+        .hourlyCap(cfg.getHourlyCap())
+        .enabled(cfg.isEnabled())
         .mailConfigured(mailer.configured())
         .replyReaderConfigured(replies.configured())
-        .insideSendWindow(insideSendWindow())
+        .insideSendWindow(insideSendWindow(cfg))
         .senderEmail(mailer.from())
         .replyTo(mailer.replyTo())
         .timezone(props.getTimezone())
-        .sendWindowStart(props.getSendWindowStart())
-        .sendWindowEnd(props.getSendWindowEnd())
-        .followUpAfterDays(props.getFollowUpAfterDays())
+        .sendWindowStart(cfg.getSendWindowStart())
+        .sendWindowEnd(cfg.getSendWindowEnd())
+        .followUpAfterDays(cfg.getFollowUpAfterDays())
         .build();
   }
 
-  boolean insideSendWindow() {
+  boolean insideSendWindow(OutreachSettings cfg) {
     ZonedDateTime now = ZonedDateTime.now(ZoneId.of(props.getTimezone()));
     DayOfWeek d = now.getDayOfWeek();
     if (d == DayOfWeek.SATURDAY || d == DayOfWeek.SUNDAY) return false;
     int h = now.getHour();
-    return h >= props.getSendWindowStart() && h < props.getSendWindowEnd();
+    return h >= cfg.getSendWindowStart() && h < cfg.getSendWindowEnd();
   }
 
   private long sentToday() {
@@ -229,15 +233,15 @@ public class OutreachScheduler {
         startOfDay.withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime());
   }
 
-  private int capRemainingToday() {
-    return (int) Math.max(0, props.getDailyCap() - sentToday());
+  private int capRemainingToday(OutreachSettings cfg) {
+    return (int) Math.max(0, cfg.getDailyCap() - sentToday());
   }
 
-  private int capRemainingThisHour() {
+  private int capRemainingThisHour(OutreachSettings cfg) {
     return (int)
         Math.max(
             0,
-            props.getHourlyCap()
+            cfg.getHourlyCap()
                 - messages.countBySentAtGreaterThanEqual(LocalDateTime.now().minusHours(1)));
   }
 
