@@ -172,8 +172,9 @@ app:
     # Comma-separated addresses told about every interest registration; empty = no notice.
     notify-email: ${EXHIBITION_NOTIFY_EMAIL:}
   outreach:
-    # One-to-one B2B outreach sequencer (admin > Outreach). Sends through the Gmail API from
-    # the authorised mailbox, capped per hour and per day, weekdays inside the window only.
+    # One-to-one B2B outreach (admin > Outreach). Sends through the same SMTP relay as the
+    # rest of the app (Brevo), with the package PDFs attached; the scheduler is capped per
+    # hour and per day and runs weekdays inside the window only. "Send now" ignores the caps.
     enabled: ${OUTREACH_ENABLED:false}
     daily-cap: ${OUTREACH_DAILY_CAP:30}
     hourly-cap: ${OUTREACH_HOURLY_CAP:8}
@@ -181,16 +182,22 @@ app:
     send-window-end: ${OUTREACH_WINDOW_END:17}
     timezone: ${OUTREACH_TIMEZONE:Africa/Addis_Ababa}
     follow-up-after-days: ${OUTREACH_FOLLOW_UP_DAYS:5}
-    sender-name: ${OUTREACH_SENDER_NAME:}
+    sender-name: ${OUTREACH_SENDER_NAME:Ethio Build Connect}
     sender-title: ${OUTREACH_SENDER_TITLE:}
     sender-phone: ${OUTREACH_SENDER_PHONE:}
+    # From address on the Brevo-authenticated domain; empty = app.mail.from.
     sender-email: ${OUTREACH_SENDER_EMAIL:}
-    company-line: ${OUTREACH_COMPANY_LINE:Dream Teams Trading PLC, Addis Ababa}
+    # Where replies land; empty = app.mail.reply-to (the expo mailbox).
+    reply-to: ${OUTREACH_REPLY_TO:}
+    company-line: ${OUTREACH_COMPANY_LINE:Dream Team Trading PLC, Addis Ababa}
     site-url: ${FRONTEND_BASE_URL:https://ethiobuildconnect.et}
-    gmail:
-      client-id: ${OUTREACH_GMAIL_CLIENT_ID:}
-      client-secret: ${OUTREACH_GMAIL_CLIENT_SECRET:}
-      refresh-token: ${OUTREACH_GMAIL_REFRESH_TOKEN:}
+    # Optional: read the reply-to mailbox over IMAP so replies and opt-outs are marked
+    # automatically (Gmail: imap.gmail.com + an app password). Without it, mark them by hand.
+    imap:
+      host: ${OUTREACH_IMAP_HOST:}
+      port: ${OUTREACH_IMAP_PORT:993}
+      username: ${OUTREACH_IMAP_USERNAME:}
+      password: ${OUTREACH_IMAP_PASSWORD:}
   support-chat:
     enabled: ${SUPPORT_CHAT_ENABLED:true}
     # OpenAI-compatible HTTP API: OpenAI, Groq (free tier), OpenRouter, Together, local Ollama proxy, etc.

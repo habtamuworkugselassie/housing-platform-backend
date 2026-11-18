@@ -21,40 +21,37 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Drives the sequence: sends due first emails and follow-ups inside the working window under the
- * daily and hourly caps, and reads Gmail threads for replies, opt-outs and bounces. Everything here
- * is deliberately slow and small: this is one-to-one business mail, not a blast.
+ * Drives the automatic part of the sequence: sends due first emails and follow-ups inside the
+ * working window under the daily and hourly caps, and checks the reply-to mailbox for answers and
+ * opt-outs. Deliberately slow and small: this is one-to-one business mail, not a blast.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OutreachScheduler {
 
-  private static final Pattern OPT_OUT =
+  static final Pattern OPT_OUT =
       Pattern.compile(
           "no thanks|not interested|unsubscribe|remove (me|us)|stop (emailing|contacting)|do not (contact|email)|አልፈልግም|አያስፈልግ",
           Pattern.CASE_INSENSITIVE);
-  private static final Pattern BOUNCE =
-      Pattern.compile(
-          "mailer-daemon|postmaster|delivery (status|failure)|undeliverable",
-          Pattern.CASE_INSENSITIVE);
+
+  private static final Set<String> FREE_MAIL =
+      Set.of("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "ethionet.et");
 
   private final OutreachProperties props;
   private final OutreachContactRepository contacts;
   private final OutreachMessageRepository messages;
   private final OutreachService service;
-  private final GmailClient gmail;
+  private final OutreachMailer mailer;
+  private final OutreachTemplateRenderer renderer;
+  private final OutreachReplyReader replies;
   private final ExhibitionInterestRepository interests;
 
   // ------------------------------------------------------------------ sending
 
   @Scheduled(fixedDelayString = "${app.outreach.tick-ms:300000}", initialDelayString = "60000")
   public void tick() {
-    if (!props.isEnabled()) return;
-    if (!gmail.configured()) {
-      log.debug("Outreach enabled but Gmail not configured; nothing sent.");
-      return;
-    }
+    if (!props.isEnabled() || !mailer.configured()) return;
     if (!insideSendWindow()) return;
     int room = Math.min(capRemainingToday(), capRemainingThisHour());
     if (room <= 0) return;
@@ -67,7 +64,6 @@ public class OutreachScheduler {
       if (sent >= batch) break;
       try {
         if (c.getStatus() == Status.SENT && c.getStep() >= 1) {
-          // Before a follow-up, make sure they have not answered in the meantime.
           syncOne(c);
           if (c.getStatus() != Status.SENT) continue;
         }
@@ -85,17 +81,23 @@ public class OutreachScheduler {
   @Transactional
   public void sendStep(OutreachContact c, int step) throws Exception {
     OutreachTemplateRenderer.Rendered r = service.render(c, step);
-    String inReplyTo = null;
-    if (step == 2) {
-      Optional<OutreachMessage> first =
-          messages.findByContactIdOrderBySentAtAsc(c.getId()).stream().findFirst();
-      if (first.isPresent() && first.get().getProviderMessageId() != null) {
-        inReplyTo = gmail.messageIdHeader(first.get().getProviderMessageId());
-      }
-    }
-    GmailClient.Sent sent =
-        gmail.send(
-            c.getEmail(), r.subject(), r.body(), inReplyTo, step == 2 ? c.getThreadId() : null);
+    String inReplyTo =
+        step == 2
+            ? messages.findByContactIdOrderBySentAtAsc(c.getId()).stream()
+                .map(OutreachMessage::getProviderMessageId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null)
+            : null;
+    String messageId =
+        mailer.send(
+            c.getEmail(),
+            r.subject(),
+            r.body(),
+            c.getLocale(),
+            renderer.registerUrl(c),
+            inReplyTo,
+            step == 1 ? OutreachMailer.Options.firstEmail() : OutreachMailer.Options.followUp());
     LocalDateTime now = LocalDateTime.now();
     messages.save(
         OutreachMessage.builder()
@@ -103,13 +105,11 @@ public class OutreachScheduler {
             .step(step)
             .subject(r.subject())
             .body(r.body())
-            .providerMessageId(sent.messageId())
-            .threadId(sent.threadId())
+            .providerMessageId(messageId)
             .sentAt(now)
             .build());
     c.setStep(step);
     c.setLastSentAt(now);
-    c.setThreadId(sent.threadId());
     c.setLastError(null);
     if (step == 1) {
       c.setStatus(Status.SENT);
@@ -126,34 +126,31 @@ public class OutreachScheduler {
 
   @Scheduled(fixedDelayString = "${app.outreach.sync-ms:1800000}", initialDelayString = "120000")
   public void syncReplies() {
-    if (!gmail.configured()) return;
-    List<OutreachContact> open =
-        contacts.findByStatusInAndThreadIdIsNotNull(List.of(Status.SENT, Status.FOLLOWED_UP));
-    for (OutreachContact c : open) {
-      try {
-        syncOne(c);
-      } catch (Exception e) {
-        log.warn("Reply sync for {} failed: {}", c.getEmail(), e.getMessage());
+    if (replies.configured()) {
+      List<OutreachContact> open =
+          contacts.findByStatusInAndLastSentAtIsNotNull(List.of(Status.SENT, Status.FOLLOWED_UP));
+      for (OutreachContact c : open) {
+        try {
+          syncOne(c);
+        } catch (Exception e) {
+          log.warn("Reply check for {} failed: {}", c.getEmail(), e.getMessage());
+        }
       }
     }
     markRegistered();
   }
 
-  /** Reads the contact's thread; a message not from us is a reply, opt-out or bounce. */
+  /** Any message from the contact since our last email counts as a reply, or an opt-out. */
   @Transactional
   public void syncOne(OutreachContact c) throws Exception {
-    if (c.getThreadId() == null) return;
-    for (GmailClient.ThreadMessage m : gmail.thread(c.getThreadId())) {
-      if (gmail.isOwnAddress(m.from())) continue;
-      String text = (m.from() + " " + m.snippet());
-      if (BOUNCE.matcher(text).find()) {
-        c.setStatus(Status.BOUNCED);
-      } else if (OPT_OUT.matcher(m.snippet()).find()) {
-        c.setStatus(Status.OPTED_OUT);
-      } else {
-        c.setStatus(Status.REPLIED);
-      }
-      c.setRepliedAt(LocalDateTime.ofInstant(m.date(), ZoneId.systemDefault()));
+    if (!replies.configured() || c.getLastSentAt() == null) return;
+    applyReplies(c, replies.repliesFrom(c.getEmail(), c.getLastSentAt()));
+  }
+
+  public void applyReplies(OutreachContact c, List<OutreachReplyReader.Reply> found) {
+    for (OutreachReplyReader.Reply r : found) {
+      c.setStatus(OPT_OUT.matcher(r.text()).find() ? Status.OPTED_OUT : Status.REPLIED);
+      c.setRepliedAt(r.receivedAt());
       c.setNextActionAt(null);
       contacts.save(c);
       log.info("Outreach contact {} -> {}", c.getEmail(), c.getStatus());
@@ -165,7 +162,7 @@ public class OutreachScheduler {
   @Transactional
   public void markRegistered() {
     List<OutreachContact> open =
-        contacts.findByStatusInAndThreadIdIsNotNull(
+        contacts.findByStatusInAndLastSentAtIsNotNull(
             List.of(Status.SENT, Status.FOLLOWED_UP, Status.REPLIED));
     if (open.isEmpty()) return;
     Set<String> registeredEmails = new HashSet<>();
@@ -191,9 +188,6 @@ public class OutreachScheduler {
     }
   }
 
-  private static final Set<String> FREE_MAIL =
-      Set.of("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "ethionet.et");
-
   // ------------------------------------------------------------------ stats / helpers
 
   public Stats stats() {
@@ -208,9 +202,11 @@ public class OutreachScheduler {
         .dailyCap(props.getDailyCap())
         .hourlyCap(props.getHourlyCap())
         .enabled(props.isEnabled())
-        .gmailConfigured(gmail.configured())
+        .mailConfigured(mailer.configured())
+        .replyReaderConfigured(replies.configured())
         .insideSendWindow(insideSendWindow())
-        .senderEmail(props.getSenderEmail())
+        .senderEmail(mailer.from())
+        .replyTo(mailer.replyTo())
         .timezone(props.getTimezone())
         .sendWindowStart(props.getSendWindowStart())
         .sendWindowEnd(props.getSendWindowEnd())
@@ -227,10 +223,8 @@ public class OutreachScheduler {
   }
 
   private long sentToday() {
-    ZonedDateTime startOfDay =
-        ZonedDateTime.now(ZoneId.of(props.getTimezone()))
-            .toLocalDate()
-            .atStartOfDay(ZoneId.of(props.getTimezone()));
+    ZoneId zone = ZoneId.of(props.getTimezone());
+    ZonedDateTime startOfDay = ZonedDateTime.now(zone).toLocalDate().atStartOfDay(zone);
     return messages.countBySentAtGreaterThanEqual(
         startOfDay.withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime());
   }
@@ -247,7 +241,7 @@ public class OutreachScheduler {
                 - messages.countBySentAtGreaterThanEqual(LocalDateTime.now().minusHours(1)));
   }
 
-  static LocalDateTime addBusinessDays(LocalDateTime from, int days) {
+  public static LocalDateTime addBusinessDays(LocalDateTime from, int days) {
     LocalDate d = from.toLocalDate();
     int added = 0;
     while (added < days) {

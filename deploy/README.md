@@ -389,21 +389,23 @@ more RAM than the rest of this list combined.
 
 ## 12. Partner and exhibitor outreach (admin > Outreach)
 
-A small one-to-one sequencer for the curated prospect list: import the CSV, add a personal
-opening line per contact, queue them, and the backend sends the sector template in the
-contact's language from the expo mailbox through the Gmail API, follows up once after five
-business days, and reads the Gmail thread to mark replies, opt-outs and bounces. Contacts
-who register on the portal are marked automatically. It is capped (30 a day, 8 an hour,
-weekdays 09:00–17:00 Addis time by default) and never sends to OPTED_OUT, REPLIED,
-REGISTERED or BOUNCED contacts; an import cannot overwrite those either.
+A one-to-one sequencer for the curated prospect list. Import the CSV, add a personal
+opening line per contact, and either queue contacts (the scheduler sends the sector template
+in the contact's language, capped at 30 a day and 8 an hour, weekdays 09:00–17:00 Addis time,
+with one follow-up after five business days) or open a contact and **send now** with the
+template prefilled and edited as you like. Every email goes through the same Brevo relay as
+the rest of the app, carries the package summary in the body, the brochure and sponsorship
+PDFs in the contact's language as attachments, a registration link for the portal, the
+signature and an opt-out line. Replies land in the reply-to mailbox; with the IMAP settings
+filled in, replies and opt-outs are marked automatically, and contacts who register on the
+portal are marked REGISTERED. OPTED_OUT, REPLIED, REGISTERED and BOUNCED contacts are never
+emailed again, and an import cannot overwrite them.
 
 Setup, once:
-1. Google Cloud console: enable the Gmail API, create an OAuth client (Desktop app), add the
-   mailbox as a test user on the consent screen.
-2. On any machine: `bash deploy/gmail-oauth.sh <client_id> <client_secret>` and approve
-   as the outreach mailbox; it prints `OUTREACH_GMAIL_REFRESH_TOKEN`.
-3. Put `OUTREACH_GMAIL_CLIENT_ID`, `OUTREACH_GMAIL_CLIENT_SECRET`,
-   `OUTREACH_GMAIL_REFRESH_TOKEN`, `OUTREACH_SENDER_EMAIL`, `OUTREACH_SENDER_NAME` and
-   `OUTREACH_SENDER_TITLE` in `deploy/.env`; leave `OUTREACH_ENABLED=false`, roll out.
-4. In admin > Outreach: import the CSV, preview a few emails, send yourself a test, queue
-   the first batch, then set `OUTREACH_ENABLED=true` in `.env` and roll out again.
+1. In Brevo, make sure the sender address (`OUTREACH_SENDER_EMAIL`, on the authenticated
+   domain) exists as a sender, or use the same address as `MAIL_FROM`.
+2. In `deploy/.env` set the `OUTREACH_*` values from `.env.example`; for automatic reply
+   detection create a Gmail app password for the reply-to mailbox and put it in
+   `OUTREACH_IMAP_PASSWORD`. Roll out.
+3. In admin > Outreach: import the CSV, preview a few emails, send yourself a test, then
+   send individually or queue a batch and set `OUTREACH_ENABLED=true`.
