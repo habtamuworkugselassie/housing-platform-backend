@@ -1,0 +1,15 @@
+Subject: Property and construction cover at the Build Connect Expo
+
+Dear {{contact_name}},
+
+{{hook}}
+
+Ethio Build Connect is a real estate and construction marketplace ({{site_url}}) and a five-day expo on 9-13 January 2027 at the Addis Convention Center, with developers, contractors, banks and thousands of buyers attending. Every home sold and every site under construction needs cover.
+
+For insurers we offer:
+- A listed insurer page on the marketplace, linked from developer and contractor profiles.
+- An exhibition stand and a speaking slot on protecting property investments.
+- Bundled placement with partner banks on mortgage offers.
+
+Would you be open to a 20-minute call to see whether this fits your 2027 plans? Packages: {{sponsorship_url}}
+Register as a partner on the portal: {{register_url}}

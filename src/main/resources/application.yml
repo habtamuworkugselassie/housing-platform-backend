@@ -171,6 +171,26 @@ app:
   exhibition:
     # Comma-separated addresses told about every interest registration; empty = no notice.
     notify-email: ${EXHIBITION_NOTIFY_EMAIL:}
+  outreach:
+    # One-to-one B2B outreach sequencer (admin > Outreach). Sends through the Gmail API from
+    # the authorised mailbox, capped per hour and per day, weekdays inside the window only.
+    enabled: ${OUTREACH_ENABLED:false}
+    daily-cap: ${OUTREACH_DAILY_CAP:30}
+    hourly-cap: ${OUTREACH_HOURLY_CAP:8}
+    send-window-start: ${OUTREACH_WINDOW_START:9}
+    send-window-end: ${OUTREACH_WINDOW_END:17}
+    timezone: ${OUTREACH_TIMEZONE:Africa/Addis_Ababa}
+    follow-up-after-days: ${OUTREACH_FOLLOW_UP_DAYS:5}
+    sender-name: ${OUTREACH_SENDER_NAME:}
+    sender-title: ${OUTREACH_SENDER_TITLE:}
+    sender-phone: ${OUTREACH_SENDER_PHONE:}
+    sender-email: ${OUTREACH_SENDER_EMAIL:}
+    company-line: ${OUTREACH_COMPANY_LINE:Dream Teams Trading PLC, Addis Ababa}
+    site-url: ${FRONTEND_BASE_URL:https://ethiobuildconnect.et}
+    gmail:
+      client-id: ${OUTREACH_GMAIL_CLIENT_ID:}
+      client-secret: ${OUTREACH_GMAIL_CLIENT_SECRET:}
+      refresh-token: ${OUTREACH_GMAIL_REFRESH_TOKEN:}
   support-chat:
     enabled: ${SUPPORT_CHAT_ENABLED:true}
     # OpenAI-compatible HTTP API: OpenAI, Groq (free tier), OpenRouter, Together, local Ollama proxy, etc.

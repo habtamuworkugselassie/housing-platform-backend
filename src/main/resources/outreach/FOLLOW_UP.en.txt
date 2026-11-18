@@ -1,0 +1,8 @@
+Subject: Re: {{first_subject}}
+
+Dear {{contact_name}},
+
+A short follow-up in case my note below was buried. The quickest summary: Ethio Build Connect Expo, 9-13 January 2027, Addis Convention Center, and a marketplace at {{site_url}} that sends enquiries straight to you.
+
+If it is relevant, a 15-minute call is enough to decide; if not, no reply needed and I will not follow up again.
+Register on the portal: {{register_url}}

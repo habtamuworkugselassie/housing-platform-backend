@@ -1,0 +1,15 @@
+Subject: Mortgage leads from Ethiopia's real estate expo
+
+Dear {{contact_name}},
+
+{{hook}}
+
+We run {{site_url}}, a marketplace for new homes and construction, and the Ethio Build Connect Expo on 9-13 January 2027 at the Addis Convention Center. Buyers browsing a listing see the financing offers of partner banks and can apply from the listing page; at the expo, banks run a financing desk where developers and buyers are already in the room.
+
+What a partnership looks like:
+- Your financing products shown on every eligible listing, with applications routed to your team.
+- A branded financing zone at the expo and a slot in the buyer seminar programme.
+- Co-branded content for the diaspora buyer campaign ahead of the expo.
+
+Could we set up a short call with your retail or partnerships team? Package overview: {{sponsorship_url}}
+Register as a partner on the portal: {{register_url}}

@@ -1,0 +1,15 @@
+Subject: Meet 100+ developers in one week this January
+
+Dear {{contact_name}},
+
+{{hook}}
+
+The Ethio Build Connect Expo runs 9-13 January 2027 at the Addis Convention Center. It is built around deal-making: developers, contractors, suppliers and financiers under one roof, with a supplier directory on {{site_url}} that stays live all year and sends enquiries straight to your sales team.
+
+Options for suppliers and contractors:
+- Exhibitor stand with a listed supplier page and product catalogue on the marketplace.
+- Sector sponsor (cement, steel, finishes, equipment): branding across the hall and the website.
+- Listing only, if you want to test enquiries before committing to a stand.
+
+Can I send you the floor plan and stand prices, or book a 15-minute call? Overview: {{sponsorship_url}}
+Register your company on the portal in two minutes: {{register_url}}

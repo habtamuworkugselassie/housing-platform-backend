@@ -1,0 +1,15 @@
+Subject: Partnering on Ethiopia's real estate and construction expo
+
+Dear {{contact_name}},
+
+{{hook}}
+
+Ethio Build Connect is organising a five-day expo, 9-13 January 2027 at the Addis Convention Center, with a conference programme on housing finance, construction quality and urban development, alongside the {{site_url}} marketplace used by developers, contractors, banks and buyers.
+
+We would value {{name}} as a supporting partner:
+- A speaking slot or panel in the conference programme.
+- A complimentary stand to engage members and the public.
+- Your logo as a supporting organisation on all expo materials, at no cost.
+
+Could we arrange a short meeting with your secretariat? I am happy to come to your offices.
+Register your organisation as a supporting partner: {{register_url}}
