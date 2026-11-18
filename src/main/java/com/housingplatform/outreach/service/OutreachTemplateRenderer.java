@@ -21,6 +21,17 @@ public class OutreachTemplateRenderer {
 
   private final OutreachProperties props;
 
+  public OutreachProperties props() {
+    return props;
+  }
+
+  /** Portal registration link for this contact's language and role. */
+  public String registerUrl(OutreachContact c) {
+    boolean am = MailLocale.isAmharic(c.getLocale());
+    String site = props.getSiteUrl().replaceAll("/$", "");
+    return (am ? site + "/am" : site) + "/?interest=" + effectiveKey(c).interest();
+  }
+
   public Rendered render(OutreachTemplate template, OutreachContact c, String firstSubject) {
     Map<String, String> v = values(c, firstSubject);
     String subject = fill(template.getSubject(), v);

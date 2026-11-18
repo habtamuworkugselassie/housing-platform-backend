@@ -47,7 +47,7 @@ public class OutreachService {
   private final OutreachTemplateRepository templates;
   private final OutreachMessageRepository messages;
   private final OutreachTemplateRenderer renderer;
-  private final GmailClient gmail;
+  private final OutreachMailer mailer;
 
   // ------------------------------------------------------------------ import
 
@@ -235,17 +235,103 @@ public class OutreachService {
   /** Sends the rendered email for a contact to an address of the admin's choosing. */
   @Transactional(readOnly = true)
   public void sendTest(UUID id, String to, int step) {
-    if (!gmail.configured()) throw new BusinessException("Gmail is not configured for outreach");
+    if (!mailer.configured()) throw new BusinessException("Outgoing mail is not configured");
     if (to == null || !EMAIL.matcher(to.trim()).matches()) {
       throw new BusinessException("A valid test address is required");
     }
     OutreachContact c = load(id);
     OutreachTemplateRenderer.Rendered r = render(c, step);
     try {
-      gmail.send(to.trim(), "[TEST] " + r.subject(), r.body(), null, null);
+      mailer.send(
+          to.trim(),
+          "[TEST] " + r.subject(),
+          r.body(),
+          c.getLocale(),
+          renderer.registerUrl(c),
+          null,
+          step == 2 ? OutreachMailer.Options.followUp() : OutreachMailer.Options.firstEmail());
     } catch (Exception e) {
       throw new BusinessException("Test send failed: " + e.getMessage());
     }
+  }
+
+  /**
+   * Admin-triggered send with the content as edited in the drawer. Ignores the scheduler's window
+   * and caps (a person decided), refuses contacts who opted out or bounced, and records the message
+   * so the follow-up threads onto it.
+   */
+  @Transactional
+  public ContactResponse sendNow(UUID id, SendNowRequest r) {
+    if (!mailer.configured()) throw new BusinessException("Outgoing mail is not configured");
+    OutreachContact c = load(id);
+    if (c.getStatus() == OutreachContact.Status.OPTED_OUT
+        || c.getStatus() == OutreachContact.Status.BOUNCED) {
+      throw new BusinessException("This contact opted out or bounced; nothing is sent.");
+    }
+    if (r.getSubject() == null
+        || r.getSubject().isBlank()
+        || r.getBody() == null
+        || r.getBody().isBlank()) {
+      throw new BusinessException("Subject and body are required");
+    }
+    boolean first = c.getStep() == 0;
+    String inReplyTo =
+        first
+            ? null
+            : messages.findByContactIdOrderBySentAtAsc(c.getId()).stream()
+                .map(OutreachMessage::getProviderMessageId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    String messageId;
+    try {
+      messageId =
+          mailer.send(
+              c.getEmail(),
+              r.getSubject().trim(),
+              r.getBody(),
+              c.getLocale(),
+              renderer.registerUrl(c),
+              inReplyTo,
+              new OutreachMailer.Options(
+                  r.isIncludePackages(),
+                  r.isAttachBrochure(),
+                  r.isAttachSponsorship(),
+                  r.isAttachAgreement()));
+    } catch (Exception e) {
+      c.setLastError(e.getMessage() == null ? "send failed" : e.getMessage());
+      contacts.save(c);
+      throw new BusinessException("Send failed: " + e.getMessage());
+    }
+    LocalDateTime now = LocalDateTime.now();
+    int step = first ? 1 : Math.max(2, c.getStep() + 1);
+    messages.save(
+        OutreachMessage.builder()
+            .contact(c)
+            .step(step)
+            .subject(r.getSubject().trim())
+            .body(r.getBody())
+            .providerMessageId(messageId)
+            .sentAt(now)
+            .build());
+    c.setStep(step);
+    c.setLastSentAt(now);
+    c.setLastError(null);
+    if (first && r.isScheduleFollowUp()) {
+      c.setStatus(OutreachContact.Status.SENT);
+      c.setNextActionAt(OutreachScheduler.addBusinessDays(now, followUpAfterDays()));
+    } else if (c.getStatus() == OutreachContact.Status.NEW
+        || c.getStatus() == OutreachContact.Status.QUEUED
+        || c.getStatus() == OutreachContact.Status.SENT
+        || c.getStatus() == OutreachContact.Status.PAUSED) {
+      c.setStatus(OutreachContact.Status.FOLLOWED_UP);
+      c.setNextActionAt(null);
+    }
+    return toResponse(contacts.save(c));
+  }
+
+  private int followUpAfterDays() {
+    return renderer.props().getFollowUpAfterDays();
   }
 
   // ------------------------------------------------------------------ templates

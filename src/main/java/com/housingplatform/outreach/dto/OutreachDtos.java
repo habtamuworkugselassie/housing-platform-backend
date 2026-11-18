@@ -103,9 +103,11 @@ public final class OutreachDtos {
     private int dailyCap;
     private int hourlyCap;
     private boolean enabled;
-    private boolean gmailConfigured;
+    private boolean mailConfigured;
+    private boolean replyReaderConfigured;
     private boolean insideSendWindow;
     private String senderEmail;
+    private String replyTo;
     private String timezone;
     private int sendWindowStart;
     private int sendWindowEnd;
@@ -126,5 +128,19 @@ public final class OutreachDtos {
   public static class SendTestRequest {
     private String to;
     private int step = 1;
+  }
+
+  /** Admin-composed email: the preview, edited as needed, sent now. */
+  @Data
+  public static class SendNowRequest {
+    private String subject;
+    private String body;
+    private boolean includePackages = true;
+    private boolean attachBrochure = true;
+    private boolean attachSponsorship = true;
+    private boolean attachAgreement = false;
+
+    /** For a first email: schedule the automatic follow-up afterwards. */
+    private boolean scheduleFollowUp = true;
   }
 }

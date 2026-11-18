@@ -10,7 +10,7 @@ import com.housingplatform.outreach.dto.OutreachDtos.ImportResult;
 import com.housingplatform.outreach.repository.OutreachContactRepository;
 import com.housingplatform.outreach.repository.OutreachMessageRepository;
 import com.housingplatform.outreach.repository.OutreachTemplateRepository;
-import com.housingplatform.outreach.service.GmailClient;
+import com.housingplatform.outreach.service.OutreachMailer;
 import com.housingplatform.outreach.service.OutreachService;
 import com.housingplatform.outreach.service.OutreachTemplateRenderer;
 import java.io.ByteArrayInputStream;
@@ -53,7 +53,7 @@ class OutreachServiceTest {
             mock(OutreachTemplateRepository.class),
             mock(OutreachMessageRepository.class),
             mock(OutreachTemplateRenderer.class),
-            mock(GmailClient.class));
+            mock(OutreachMailer.class));
 
     String csv =
         "name,sector,email,phone,website,city,confidence,source_url,notes,locale,hook\n"

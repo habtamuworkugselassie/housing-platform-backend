@@ -92,6 +92,13 @@ public class AdminOutreachController {
     return ResponseEntity.noContent().build();
   }
 
+  @PostMapping("/contacts/{id}/send")
+  @Operation(summary = "Send the composed email to this contact now (admin-triggered)")
+  public ResponseEntity<ContactResponse> sendNow(
+      @PathVariable UUID id, @RequestBody SendNowRequest body) {
+    return ResponseEntity.ok(service.sendNow(id, body));
+  }
+
   @GetMapping("/templates")
   public ResponseEntity<List<TemplateResponse>> templates() {
     return ResponseEntity.ok(service.listTemplates());
@@ -104,7 +111,7 @@ public class AdminOutreachController {
   }
 
   @PostMapping("/sync")
-  @Operation(summary = "Read Gmail threads now for replies, opt-outs and bounces")
+  @Operation(summary = "Read the reply-to mailbox now for replies and opt-outs")
   public ResponseEntity<Void> sync() {
     scheduler.syncReplies();
     return ResponseEntity.noContent().build();

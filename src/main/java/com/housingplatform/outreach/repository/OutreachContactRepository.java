@@ -36,7 +36,7 @@ public interface OutreachContactRepository extends JpaRepository<OutreachContact
   List<OutreachContact> findTop20ByStatusInAndNextActionAtLessThanEqualOrderByNextActionAtAsc(
       List<OutreachContact.Status> statuses, LocalDateTime now);
 
-  List<OutreachContact> findByStatusInAndThreadIdIsNotNull(List<OutreachContact.Status> statuses);
+  List<OutreachContact> findByStatusInAndLastSentAtIsNotNull(List<OutreachContact.Status> statuses);
 
   long countByStatus(OutreachContact.Status status);
 
