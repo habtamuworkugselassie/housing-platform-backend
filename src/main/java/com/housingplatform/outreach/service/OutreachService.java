@@ -24,7 +24,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,9 +110,37 @@ public class OutreachService {
   @Transactional(readOnly = true)
   public Page<ContactResponse> search(
       OutreachContact.Status status, String sector, String q, Pageable pageable) {
-    return contacts
-        .search(status, blankToNull(sector), blankToNull(q), pageable)
-        .map(this::toResponse);
+    // Built dynamically: a JPQL "(:q is null or lower(x) like :q)" makes Postgres infer the
+    // null parameter as bytea and fail with "function lower(bytea) does not exist".
+    Specification<OutreachContact> spec = (root, query, cb) -> cb.conjunction();
+    if (status != null) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
+    }
+    String sec = blankToNull(sector);
+    if (sec != null) {
+      spec =
+          spec.and(
+              (root, query, cb) ->
+                  cb.equal(cb.lower(root.get("sector")), sec.toLowerCase(Locale.ROOT)));
+    }
+    String term = blankToNull(q);
+    if (term != null) {
+      String like = "%" + term.toLowerCase(Locale.ROOT) + "%";
+      spec =
+          spec.and(
+              (root, query, cb) ->
+                  cb.or(
+                      cb.like(cb.lower(root.get("name")), like),
+                      cb.like(cb.lower(root.get("email")), like)));
+    }
+    Pageable sorted =
+        pageable.getSort().isSorted()
+            ? pageable
+            : PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "updatedAt"));
+    return contacts.findAll(spec, sorted).map(this::toResponse);
   }
 
   @Transactional(readOnly = true)
