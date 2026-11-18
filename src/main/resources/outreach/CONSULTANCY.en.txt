@@ -1,0 +1,12 @@
+Subject: Showcase {{name}}'s projects at the Build Connect Expo
+
+Dear {{contact_name}},
+
+{{hook}}
+
+Ethio Build Connect runs a real estate and construction marketplace ({{site_url}}) and the Ethio Build Connect Expo, 9-13 January 2027 at the Addis Convention Center, where developers meet the consultants, contractors and financiers they need.
+
+For consultancies we offer a design showcase wall, a listed consultant page on the marketplace, and speaking slots on design quality and compliance. A stand is optional.
+
+Would you like the showcase details, or a quick call? Overview: {{sponsorship_url}}
+Register your company on the portal in two minutes: {{register_url}}

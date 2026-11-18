@@ -384,3 +384,26 @@ still starts them; it is for local development, not this stack.
 **LiveKit is separate.** Live broadcasting is feature-flagged off and has its own
 stack in `infra/livekit/`. Bring it up only when the flag is turned on; it needs
 more RAM than the rest of this list combined.
+
+---
+
+## 12. Partner and exhibitor outreach (admin > Outreach)
+
+A small one-to-one sequencer for the curated prospect list: import the CSV, add a personal
+opening line per contact, queue them, and the backend sends the sector template in the
+contact's language from the expo mailbox through the Gmail API, follows up once after five
+business days, and reads the Gmail thread to mark replies, opt-outs and bounces. Contacts
+who register on the portal are marked automatically. It is capped (30 a day, 8 an hour,
+weekdays 09:00–17:00 Addis time by default) and never sends to OPTED_OUT, REPLIED,
+REGISTERED or BOUNCED contacts; an import cannot overwrite those either.
+
+Setup, once:
+1. Google Cloud console: enable the Gmail API, create an OAuth client (Desktop app), add the
+   mailbox as a test user on the consent screen.
+2. On any machine: `bash deploy/gmail-oauth.sh <client_id> <client_secret>` and approve
+   as the outreach mailbox; it prints `OUTREACH_GMAIL_REFRESH_TOKEN`.
+3. Put `OUTREACH_GMAIL_CLIENT_ID`, `OUTREACH_GMAIL_CLIENT_SECRET`,
+   `OUTREACH_GMAIL_REFRESH_TOKEN`, `OUTREACH_SENDER_EMAIL`, `OUTREACH_SENDER_NAME` and
+   `OUTREACH_SENDER_TITLE` in `deploy/.env`; leave `OUTREACH_ENABLED=false`, roll out.
+4. In admin > Outreach: import the CSV, preview a few emails, send yourself a test, queue
+   the first batch, then set `OUTREACH_ENABLED=true` in `.env` and roll out again.

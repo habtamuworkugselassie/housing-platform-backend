@@ -1,0 +1,15 @@
+Subject: Media partnership: Ethio Build Connect Expo 2027
+
+Dear {{contact_name}},
+
+{{hook}}
+
+The Ethio Build Connect Expo takes place 9-13 January 2027 at the Addis Convention Center, with developers, banks, contractors and thousands of buyers, plus a year-round marketplace at {{site_url}}.
+
+What we propose:
+- Official media partner status: logo on all materials, press access and interview slots with exhibitors and speakers.
+- A branded stand or broadcast position at the venue.
+- In return, agreed editorial and advertising coverage in the run-up to the expo.
+
+Would your commercial or partnerships team have 20 minutes for a call? Press kit and packages: {{sponsorship_url}}
+Register as a media partner on the portal: {{register_url}}

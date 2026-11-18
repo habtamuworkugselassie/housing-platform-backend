@@ -1,0 +1,14 @@
+Subject: {{project_or_company}} in front of expo buyers this January
+
+Dear {{contact_name}},
+
+{{hook}}
+
+We are organising the Ethio Build Connect Expo, 9-13 January 2027 at the Addis Convention Center: a five-day show where developers meet buyers, diaspora investors, banks and contractors in one place. Alongside it runs {{site_url}}, a marketplace where your listings get a verified company page, enquiry forms that land in your inbox, and mortgage offers from partner banks shown next to each property.
+
+Two ways to take part:
+1. Exhibit: a stand at the expo plus a featured developer page on the marketplace for the year.
+2. List now: we publish your current projects on the marketplace this month so enquiries start before the expo.
+
+Would a 20-minute call this week or next suit? The sponsorship packages are at {{sponsorship_url}}
+Register your company on the portal in two minutes: {{register_url}}
