@@ -94,4 +94,25 @@ class OutreachTemplateRendererTest {
             .build();
     assertThat(OutreachTemplateRenderer.effectiveKey(c)).isEqualTo(TemplateKey.BANK);
   }
+
+  @Test
+  void signatureNamesTheBrandOnceWhenTheSenderIsTheBrand() {
+    OutreachProperties props = new OutreachProperties();
+    props.setSenderName("Ethio Build Connect");
+    OutreachTemplateRenderer r = new OutreachTemplateRenderer(props);
+    OutreachTemplate t = new OutreachTemplate();
+    t.setSubject("Hi");
+    t.setBody("Hello {{name}}");
+    OutreachContact c = new OutreachContact();
+    c.setName("Noah");
+    c.setLocale("en");
+    String body = r.render(t, c, null).body();
+    assertThat(body.split("Ethio Build Connect", -1).length - 1).isEqualTo(1);
+    assertThat(body).contains("Kind regards,\nEthio Build Connect\nDream Team Trading PLC");
+
+    props.setSenderName("Habtamu Worku");
+    props.setSenderTitle("Partnerships");
+    body = r.render(t, c, null).body();
+    assertThat(body).contains("Habtamu Worku\nPartnerships, Ethio Build Connect\n");
+  }
 }

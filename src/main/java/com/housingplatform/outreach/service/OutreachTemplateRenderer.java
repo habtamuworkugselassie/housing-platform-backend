@@ -87,13 +87,22 @@ public class OutreachTemplateRenderer {
     boolean am = MailLocale.isAmharic(locale);
     StringBuilder sb = new StringBuilder();
     sb.append(am ? "ከአክብሮት ጋር፣" : "Kind regards,").append('\n');
-    if (!props.getSenderName().isBlank()) sb.append(props.getSenderName()).append('\n');
-    if (!props.getSenderTitle().isBlank()) {
-      sb.append(props.getSenderTitle())
-          .append(am ? "፣ ኢትዮ ቢልድ ኮኔክት" : ", Ethio Build Connect")
-          .append('\n');
+    String brand = am ? "ኢትዮ ቢልድ ኮኔክት" : "Ethio Build Connect";
+    String name = props.getSenderName() == null ? "" : props.getSenderName().trim();
+    boolean nameIsBrand =
+        name.equalsIgnoreCase("Ethio Build Connect") || name.equals("ኢትዮ ቢልድ ኮኔክት");
+    // A person signs with their title and the brand; when the sender is the brand itself,
+    // write it once in the reader's language.
+    if (nameIsBrand) {
+      if (!props.getSenderTitle().isBlank()) sb.append(props.getSenderTitle()).append('\n');
+      sb.append(brand).append('\n');
     } else {
-      sb.append(am ? "ኢትዮ ቢልድ ኮኔክት" : "Ethio Build Connect").append('\n');
+      if (!name.isBlank()) sb.append(name).append('\n');
+      if (!props.getSenderTitle().isBlank()) {
+        sb.append(props.getSenderTitle()).append(am ? "፣ " : ", ").append(brand).append('\n');
+      } else {
+        sb.append(brand).append('\n');
+      }
     }
     if (!props.getCompanyLine().isBlank()) sb.append(props.getCompanyLine()).append('\n');
     String contact =
