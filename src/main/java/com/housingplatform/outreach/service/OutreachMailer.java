@@ -97,9 +97,7 @@ public class OutreachMailer {
         bodyText.trim()
             + (options.includePackages() ? "\n\n" + OutreachPackages.plainText(locale) : "")
             + "\n";
-    helper.setText(
-        text,
-        OutreachHtml.render(bodyText, locale, options.includePackages(), registerUrl, site, logo));
+    helper.setText(text, html(subject, bodyText, locale, options.includePackages(), registerUrl));
     message.setHeader("Message-ID", messageId);
     if (inReplyTo != null && !inReplyTo.isBlank()) {
       message.setHeader("In-Reply-To", inReplyTo);
@@ -116,6 +114,17 @@ public class OutreachMailer {
     mailSender.send(message);
     log.info("Outreach mail '{}' sent to {}", subject, to);
     return messageId;
+  }
+
+  /** The HTML the mail would carry, for the admin preview. */
+  public String html(
+      String subject, String bodyText, String locale, boolean includePackages, String registerUrl) {
+    String site = props.getSiteUrl().replaceAll("/$", "");
+    String logo =
+        logoUrl == null || logoUrl.isBlank()
+            ? site + "/images/branding/ethio-build-connect-wordmark.png"
+            : logoUrl;
+    return OutreachHtml.render(subject, bodyText, locale, includePackages, registerUrl, site, logo);
   }
 
   public static List<String> attachmentNames(String locale, Options o) {
