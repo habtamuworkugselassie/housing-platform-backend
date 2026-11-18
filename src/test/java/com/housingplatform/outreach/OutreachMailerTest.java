@@ -109,6 +109,8 @@ class OutreachMailerTest {
     assertThat(m.getFrom()[0].toString())
         .isEqualTo("Ethio Build Connect <partnerships@ethiobuildconnect.et>");
     assertThat(m.getReplyTo()[0].toString()).isEqualTo("ethiobuildconnectexpo@gmail.com");
+    assertThat(m.getRecipients(jakarta.mail.Message.RecipientType.BCC)[0].toString())
+        .isEqualTo("ethiobuildconnectexpo@gmail.com");
     assertThat(m.getHeader("In-Reply-To")[0]).isEqualTo("<first@ethiobuildconnect.et>");
     assertThat(m.getHeader("Message-ID")[0]).isEqualTo(id);
     MimeMultipart mp = (MimeMultipart) m.getContent();
@@ -131,5 +133,28 @@ class OutreachMailerTest {
   private static void verifyNoSend() {
     JavaMailSender s = mock(JavaMailSender.class);
     verify(s, org.mockito.Mockito.never()).send(any(MimeMessage.class));
+  }
+
+  @Test
+  void testSendsCarryNoBlindCopy() throws Exception {
+    JavaMailSender sender = mock(JavaMailSender.class);
+    when(sender.createMimeMessage()).thenReturn(new MimeMessage((Session) null));
+    OutreachProperties props = new OutreachProperties();
+    props.setSenderEmail("partnerships@ethiobuildconnect.et");
+    props.setReplyTo("ethiobuildconnectexpo@gmail.com");
+    OutreachMailer mailer = new OutreachMailer(sender, props);
+    ReflectionTestUtils.setField(mailer, "logoUrl", "");
+    mailer.send(
+        "me@example.com",
+        "Hello",
+        "Body",
+        "en",
+        "https://x/",
+        null,
+        OutreachMailer.Options.followUp(),
+        false);
+    ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+    verify(sender).send(captor.capture());
+    assertThat(captor.getValue().getRecipients(jakarta.mail.Message.RecipientType.BCC)).isNull();
   }
 }

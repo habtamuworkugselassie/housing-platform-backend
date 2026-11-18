@@ -303,7 +303,8 @@ public class OutreachService {
           c.getLocale(),
           renderer.registerUrl(c),
           null,
-          step == 2 ? OutreachMailer.Options.followUp() : OutreachMailer.Options.firstEmail());
+          step == 2 ? OutreachMailer.Options.followUp() : OutreachMailer.Options.firstEmail(),
+          false);
     } catch (Exception e) {
       throw new BusinessException("Test send failed: " + e.getMessage());
     }
