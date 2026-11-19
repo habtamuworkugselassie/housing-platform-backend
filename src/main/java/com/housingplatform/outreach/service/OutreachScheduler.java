@@ -59,6 +59,7 @@ public class OutreachScheduler {
     int room = Math.min(capRemainingToday(cfg), capRemainingThisHour(cfg));
     if (room <= 0) return;
     int batch = Math.min(room, 2);
+    if (cfg.isAutoQueueNew()) promoteNew(batch);
     List<OutreachContact> due =
         contacts.findTop20ByStatusInAndNextActionAtLessThanEqualOrderByNextActionAtAsc(
             List.of(Status.QUEUED, Status.SENT), LocalDateTime.now());
@@ -78,6 +79,21 @@ public class OutreachScheduler {
         c.setNextActionAt(LocalDateTime.now().plusHours(6));
         contacts.save(c);
       }
+    }
+  }
+
+  /** Moves up to {@code n} NEW contacts into the queue so the tick can send them. */
+  public void promoteNew(int n) {
+    LocalDateTime now = LocalDateTime.now();
+    List<OutreachContact> fresh =
+        contacts.findTop20ByStatusAndStepOrderByCreatedAtAsc(Status.NEW, 0);
+    int moved = 0;
+    for (OutreachContact c : fresh) {
+      if (moved >= n) break;
+      c.setStatus(Status.QUEUED);
+      c.setNextActionAt(now);
+      contacts.save(c);
+      moved++;
     }
   }
 
@@ -206,6 +222,7 @@ public class OutreachScheduler {
         .dailyCap(cfg.getDailyCap())
         .hourlyCap(cfg.getHourlyCap())
         .enabled(cfg.isEnabled())
+        .autoQueueNew(cfg.isAutoQueueNew())
         .mailConfigured(mailer.configured())
         .replyReaderConfigured(replies.configured())
         .insideSendWindow(insideSendWindow(cfg))

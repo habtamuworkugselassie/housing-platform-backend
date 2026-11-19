@@ -31,6 +31,7 @@ public class OutreachSettingsService {
                         .sendWindowStart(props.getSendWindowStart())
                         .sendWindowEnd(props.getSendWindowEnd())
                         .followUpAfterDays(props.getFollowUpAfterDays())
+                        .autoQueueNew(true)
                         .build()));
   }
 
@@ -38,6 +39,7 @@ public class OutreachSettingsService {
   public OutreachSettings update(SettingsRequest r) {
     OutreachSettings s = current();
     if (r.getEnabled() != null) s.setEnabled(r.getEnabled());
+    if (r.getAutoQueueNew() != null) s.setAutoQueueNew(r.getAutoQueueNew());
     if (r.getDailyCap() != null) s.setDailyCap(range(r.getDailyCap(), 1, 200, "Daily cap"));
     if (r.getHourlyCap() != null) s.setHourlyCap(range(r.getHourlyCap(), 1, 50, "Hourly cap"));
     if (r.getSendWindowStart() != null) {

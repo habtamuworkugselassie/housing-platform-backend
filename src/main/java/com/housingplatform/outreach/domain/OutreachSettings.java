@@ -33,4 +33,8 @@ public class OutreachSettings extends BaseEntity {
 
   @Column(name = "follow_up_after_days", nullable = false)
   private int followUpAfterDays;
+
+  /** Email NEW contacts without an explicit queue step, oldest first, under the caps. */
+  @Column(name = "auto_queue_new", nullable = false)
+  private boolean autoQueueNew;
 }

@@ -122,6 +122,7 @@ public final class OutreachDtos {
     private int sendWindowStart;
     private int sendWindowEnd;
     private int followUpAfterDays;
+    private boolean autoQueueNew;
   }
 
   @Data
@@ -149,6 +150,7 @@ public final class OutreachDtos {
     private Integer sendWindowStart;
     private Integer sendWindowEnd;
     private Integer followUpAfterDays;
+    private Boolean autoQueueNew;
   }
 
   /** Admin-composed email: the preview, edited as needed, sent now. */
