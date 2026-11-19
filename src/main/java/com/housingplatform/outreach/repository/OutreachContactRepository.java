@@ -24,6 +24,11 @@ public interface OutreachContactRepository
 
   long countByStatus(OutreachContact.Status status);
 
+  List<OutreachContact> findTop20ByStatusAndStepOrderByCreatedAtAsc(
+      OutreachContact.Status status, int step);
+
+  List<OutreachContact> findByStatusAndStep(OutreachContact.Status status, int step);
+
   @Query("select c.status, count(c) from OutreachContact c group by c.status")
   List<Object[]> countsByStatus();
 }

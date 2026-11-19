@@ -167,6 +167,20 @@ public class OutreachService {
     return toResponse(contacts.save(c));
   }
 
+  /** Queues every NEW contact that has not been emailed yet. */
+  @Transactional
+  public int queueAllNew() {
+    LocalDateTime now = LocalDateTime.now();
+    int n = 0;
+    for (OutreachContact c : contacts.findByStatusAndStep(OutreachContact.Status.NEW, 0)) {
+      c.setStatus(OutreachContact.Status.QUEUED);
+      c.setNextActionAt(now);
+      contacts.save(c);
+      n++;
+    }
+    return n;
+  }
+
   /** Queue the first email. Only NEW or PAUSED contacts move; others are left as they are. */
   @Transactional
   public int queue(List<UUID> ids) {

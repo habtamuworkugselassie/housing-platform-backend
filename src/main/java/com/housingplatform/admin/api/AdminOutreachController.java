@@ -72,6 +72,12 @@ public class AdminOutreachController {
     return ResponseEntity.ok(service.update(id, body));
   }
 
+  @PostMapping("/contacts/queue-all")
+  @Operation(summary = "Queue every contact that has not been emailed yet")
+  public ResponseEntity<Map<String, Integer>> queueAll() {
+    return ResponseEntity.ok(Map.of("queued", service.queueAllNew()));
+  }
+
   @PostMapping("/contacts/queue")
   @Operation(summary = "Queue the first email for the given contacts")
   public ResponseEntity<Map<String, Integer>> queue(@RequestBody IdsRequest body) {

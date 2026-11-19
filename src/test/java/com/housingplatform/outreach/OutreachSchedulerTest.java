@@ -106,4 +106,37 @@ class OutreachSchedulerTest {
     scheduler(mailer, contacts).tick();
     verifyNoInteractions(contacts);
   }
+
+  @Test
+  void promotesNewContactsOldestFirstWhenAutoQueueIsOn() {
+    OutreachContactRepository contacts = mock(OutreachContactRepository.class);
+    OutreachContact a =
+        OutreachContact.builder()
+            .name("A")
+            .email("a@x.et")
+            .status(OutreachContact.Status.NEW)
+            .step(0)
+            .build();
+    OutreachContact b =
+        OutreachContact.builder()
+            .name("B")
+            .email("b@x.et")
+            .status(OutreachContact.Status.NEW)
+            .step(0)
+            .build();
+    OutreachContact c =
+        OutreachContact.builder()
+            .name("C")
+            .email("c@x.et")
+            .status(OutreachContact.Status.NEW)
+            .step(0)
+            .build();
+    when(contacts.findTop20ByStatusAndStepOrderByCreatedAtAsc(OutreachContact.Status.NEW, 0))
+        .thenReturn(List.of(a, b, c));
+    scheduler(mock(OutreachMailer.class), contacts).promoteNew(2);
+    assertThat(a.getStatus()).isEqualTo(OutreachContact.Status.QUEUED);
+    assertThat(a.getNextActionAt()).isNotNull();
+    assertThat(b.getStatus()).isEqualTo(OutreachContact.Status.QUEUED);
+    assertThat(c.getStatus()).isEqualTo(OutreachContact.Status.NEW);
+  }
 }

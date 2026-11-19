@@ -34,6 +34,7 @@ class OutreachSettingsServiceTest {
     assertThat(s.isEnabled()).isFalse();
     assertThat(s.getDailyCap()).isEqualTo(30);
     assertThat(s.getSendWindowStart()).isEqualTo(9);
+    assertThat(s.isAutoQueueNew()).isTrue();
   }
 
   @Test
@@ -51,9 +52,11 @@ class OutreachSettingsServiceTest {
     SettingsRequest r = new SettingsRequest();
     r.setEnabled(true);
     r.setHourlyCap(4);
+    r.setAutoQueueNew(false);
     OutreachSettings s = service().update(r);
     assertThat(s.isEnabled()).isTrue();
     assertThat(s.getHourlyCap()).isEqualTo(4);
+    assertThat(s.isAutoQueueNew()).isFalse();
     assertThat(s.getDailyCap()).isEqualTo(30);
   }
 
