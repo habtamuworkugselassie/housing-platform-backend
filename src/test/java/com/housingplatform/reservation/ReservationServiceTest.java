@@ -195,4 +195,40 @@ class ReservationServiceTest {
     verify(mail, never()).sendReminder(capped);
     verify(mail, never()).sendReminder(recent);
   }
+
+  @Test
+  void adminCanEnterAManualReservationAtAnyStage() {
+    UUID id = UUID.randomUUID();
+    when(packages.findById(id)).thenReturn(Optional.of(gold(id)));
+    when(repo.existsByReferenceIgnoreCase(anyString())).thenReturn(false);
+    when(repo.save(any()))
+        .thenAnswer(
+            inv -> {
+              SponsorshipReservation r = inv.getArgument(0);
+              r.setId(UUID.randomUUID());
+              return r;
+            });
+    when(boothService.hold(any(), any())).thenReturn(List.of("B104"));
+    when(boothService.codesFor(any())).thenReturn(List.of("B104"));
+
+    com.housingplatform.reservation.dto.ReservationDtos.AdminCreate c =
+        new com.housingplatform.reservation.dto.ReservationDtos.AdminCreate();
+    c.setSponsorshipId(id);
+    c.setCompany("Walk-in PLC");
+    c.setContactName("Dawit");
+    c.setEmail("dawit@walkin.et");
+    c.setStatus("deposit_paid");
+    c.setAmountPaid(new BigDecimal("300000"));
+    c.setBoothCodes(List.of("B104"));
+    c.setSendEmail(false);
+
+    var row = service.createManual(c, "admin@ebc");
+    assertThat(row.getReference()).startsWith("RSV-");
+    assertThat(row.getStatus()).isEqualTo("DEPOSIT_PAID");
+    assertThat(row.getAmountPaid()).isEqualByComparingTo("300000");
+    assertThat(row.getSource()).isEqualTo("manual");
+    assertThat(row.getAssignedTo()).isEqualTo("admin@ebc");
+    assertThat(row.getBoothCodes()).containsExactly("B104");
+    verify(mail, never()).sendConfirmation(any(), anyBoolean(), anyBoolean());
+  }
 }

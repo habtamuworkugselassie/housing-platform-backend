@@ -41,6 +41,12 @@ public class ReservationMailService {
 
   @Async
   public void sendConfirmation(SponsorshipReservation r, boolean markAgreementSent) {
+    sendConfirmation(r, markAgreementSent, true);
+  }
+
+  @Async
+  public void sendConfirmation(
+      SponsorshipReservation r, boolean markAgreementSent, boolean notifyTeam) {
     if (!sender.configured()) {
       log.warn("Mail not configured; reservation {} not emailed", r.getReference());
       return;
@@ -59,7 +65,7 @@ public class ReservationMailService {
                 repository.save(fresh);
               });
     }
-    if (notifyEmail != null && !notifyEmail.isBlank()) sender.send(teamNotice(r));
+    if (notifyTeam && notifyEmail != null && !notifyEmail.isBlank()) sender.send(teamNotice(r));
   }
 
   @Async

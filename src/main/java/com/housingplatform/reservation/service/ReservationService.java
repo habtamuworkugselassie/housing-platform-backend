@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.identity.repository.SponsorshipRepository;
 import com.housingplatform.reservation.domain.SponsorshipReservation;
 import com.housingplatform.reservation.domain.SponsorshipReservation.Status;
+import com.housingplatform.reservation.dto.ReservationDtos.AdminCreate;
 import com.housingplatform.reservation.dto.ReservationDtos.AdminRow;
 import com.housingplatform.reservation.dto.ReservationDtos.AdminUpdate;
 import com.housingplatform.reservation.dto.ReservationDtos.BankAccount;
@@ -94,6 +95,74 @@ public class ReservationService {
   }
 
   // ---------------------------------------------------------------- admin
+
+  /** An admin enters a reservation taken by phone or in person. */
+  @Transactional
+  public AdminRow createManual(AdminCreate c, String by) {
+    if (c.getSponsorshipId() == null) throw new BusinessException("Please choose a package");
+    Sponsorship pkg =
+        sponsorships
+            .findById(c.getSponsorshipId())
+            .orElseThrow(() -> new BusinessException("Unknown package"));
+    Status status =
+        c.getStatus() == null || c.getStatus().isBlank()
+            ? Status.REQUESTED
+            : Status.valueOf(c.getStatus().trim().toUpperCase(Locale.ROOT));
+    BigDecimal amount =
+        c.getAmount() != null && c.getAmount().signum() >= 0
+            ? c.getAmount()
+            : (pkg.getBasePrice() == null ? BigDecimal.ZERO : pkg.getBasePrice());
+    BigDecimal paid =
+        c.getAmountPaid() == null || c.getAmountPaid().signum() < 0
+            ? BigDecimal.ZERO
+            : c.getAmountPaid();
+    LocalDateTime now = LocalDateTime.now();
+    SponsorshipReservation saved =
+        repository.save(
+            SponsorshipReservation.builder()
+                .reference(newReference())
+                .sponsorship(pkg)
+                .packageName(pkg.getName())
+                .packageType(pkg.getType() != null ? pkg.getType().name() : null)
+                .amount(amount)
+                .currency("ETB")
+                .company(c.getCompany().trim())
+                .contactName(c.getContactName().trim())
+                .email(c.getEmail().trim())
+                .phone(blankToNull(c.getPhone()))
+                .tin(blankToNull(c.getTin()))
+                .boothPreference(blankToNull(c.getBoothPreference()))
+                .message(blankToNull(c.getMessage()))
+                .locale(MailLocale.normalize(c.getLocale()))
+                .status(status)
+                .amountPaid(paid)
+                .adminNotes(blankToNull(c.getAdminNotes()))
+                .assignedTo(blankToNull(c.getAssignedTo()) == null ? by : c.getAssignedTo().trim())
+                .source("manual")
+                .reminderCount(0)
+                .statusChangedAt(now)
+                .agreementSentAt(
+                    status.ordinal() >= Status.AGREEMENT_SENT.ordinal()
+                            && status != Status.CANCELLED
+                        ? now
+                        : null)
+                .signedAt(
+                    status == Status.SIGNED
+                            || status == Status.DEPOSIT_PAID
+                            || status == Status.PAID
+                        ? now
+                        : null)
+                .paidAt(status == Status.PAID ? now : null)
+                .build());
+    if (c.getBoothCodes() != null && !c.getBoothCodes().isEmpty()) {
+      boothService.hold(saved, c.getBoothCodes());
+      if (status == Status.PAID) boothService.sell(saved.getId());
+    }
+    if (c.isSendEmail() && status != Status.CANCELLED) {
+      afterCommit(() -> mail.sendConfirmation(saved, status == Status.REQUESTED, false));
+    }
+    return row(saved);
+  }
 
   @Transactional(readOnly = true)
   public Page<AdminRow> search(String q, Status status, Pageable pageable) {

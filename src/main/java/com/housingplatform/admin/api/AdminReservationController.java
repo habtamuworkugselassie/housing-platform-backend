@@ -65,6 +65,16 @@ public class AdminReservationController {
     return ResponseEntity.ok(service.search(q, status, PageRequest.of(page, Math.min(size, 200))));
   }
 
+  @PostMapping
+  @Operation(summary = "Enter a reservation taken by phone, email or in person")
+  public ResponseEntity<AdminRow> create(
+      @jakarta.validation.Valid @RequestBody
+          com.housingplatform.reservation.dto.ReservationDtos.AdminCreate body,
+      java.security.Principal principal) {
+    return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+        .body(service.createManual(body, principal == null ? null : principal.getName()));
+  }
+
   @PatchMapping("/{id}")
   @Operation(summary = "Update status, amount paid, notes, owner or booth")
   public ResponseEntity<AdminRow> update(@PathVariable UUID id, @RequestBody AdminUpdate body) {
