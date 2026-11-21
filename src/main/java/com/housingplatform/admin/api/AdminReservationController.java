@@ -23,6 +23,31 @@ import org.springframework.web.bind.annotation.*;
 public class AdminReservationController {
 
   private final ReservationService service;
+  private final com.housingplatform.reservation.service.BoothService boothService;
+
+  @GetMapping("/booths")
+  @Operation(summary = "Every booth with who holds it")
+  public ResponseEntity<
+          java.util.List<com.housingplatform.reservation.dto.ReservationDtos.BoothView>>
+      booths() {
+    return ResponseEntity.ok(boothService.list());
+  }
+
+  @PatchMapping("/booths/{code}")
+  @Operation(summary = "Change a booth's status, type or notes")
+  public ResponseEntity<com.housingplatform.reservation.dto.ReservationDtos.BoothView> updateBooth(
+      @PathVariable String code,
+      @RequestBody com.housingplatform.reservation.dto.ReservationDtos.BoothUpdate body) {
+    return ResponseEntity.ok(boothService.update(code, body));
+  }
+
+  @PutMapping("/{id}/booths")
+  @Operation(summary = "Assign (replace) the booths held by a reservation")
+  public ResponseEntity<AdminRow> assignBooths(
+      @PathVariable UUID id,
+      @RequestBody com.housingplatform.reservation.dto.ReservationDtos.BoothAssign body) {
+    return ResponseEntity.ok(service.assignBooths(id, body.getCodes()));
+  }
 
   @GetMapping("/pipeline")
   @Operation(summary = "Counts and ETB totals per status")

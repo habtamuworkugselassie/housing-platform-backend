@@ -24,9 +24,25 @@ class ReservationIT extends BaseIntegrationTest {
   @Autowired MockMvc mockMvc;
   @Autowired SponsorshipRepository packages;
   @Autowired ReservationService service;
+  @Autowired com.housingplatform.reservation.repository.BoothRepository booths;
 
   @Test
   void publicReservationLandsInThePipeline() throws Exception {
+    // H2 tests build the schema from the entities, so seed the plan the migration would provide.
+    for (String code : new String[] {"A101", "B101", "B102"}) {
+      if (booths.findByCodeInIgnoreCase(java.util.List.of(code)).isEmpty()) {
+        booths.save(
+            com.housingplatform.reservation.domain.Booth.builder()
+                .code(code)
+                .block(code.substring(0, 1))
+                .mapCol(code.startsWith("A") ? 1 : 3)
+                .mapRow(1)
+                .boothType(com.housingplatform.reservation.domain.Booth.Type.PREMIUM)
+                .sizeSqm(9)
+                .status(com.housingplatform.reservation.domain.Booth.Status.AVAILABLE)
+                .build());
+      }
+    }
     Sponsorship pkg =
         packages.save(
             Sponsorship.builder()
@@ -43,7 +59,7 @@ class ReservationIT extends BaseIntegrationTest {
                     .content(
                         "{\"sponsorshipId\":\""
                             + pkg.getId()
-                            + "\",\"company\":\"Noah, PLC\",\"contactName\":\"Sara\",\"email\":\"sara.rsv@example.com\",\"locale\":\"am\"}"))
+                            + "\",\"company\":\"Noah, PLC\",\"contactName\":\"Sara\",\"email\":\"sara.rsv@example.com\",\"locale\":\"am\",\"boothCodes\":[\"B101\",\"B102\"]}"))
             .andReturn();
     assertThat(res.getResponse().getStatus()).isEqualTo(201);
     assertThat(res.getResponse().getContentAsString())

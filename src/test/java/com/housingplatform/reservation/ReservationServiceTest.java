@@ -34,7 +34,10 @@ class ReservationServiceTest {
       mock(SponsorshipReservationRepository.class);
   private final SponsorshipRepository packages = mock(SponsorshipRepository.class);
   private final ReservationMailService mail = mock(ReservationMailService.class);
-  private final ReservationService service = new ReservationService(repo, packages, mail);
+  private final com.housingplatform.reservation.service.BoothService boothService =
+      mock(com.housingplatform.reservation.service.BoothService.class);
+  private final ReservationService service =
+      new ReservationService(repo, packages, mail, boothService);
 
   private static Sponsorship gold(UUID id) {
     Sponsorship s =
