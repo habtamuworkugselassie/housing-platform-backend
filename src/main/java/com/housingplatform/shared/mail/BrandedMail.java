@@ -32,6 +32,22 @@ public final class BrandedMail {
   private byte[] inlineImagePng;
   private String inlineImageAlt;
   private String inlineImageCaption;
+  private final List<Attachment> attachments = new ArrayList<>();
+  private final List<String> bcc = new ArrayList<>();
+
+  public record Attachment(String filename, byte[] content, String contentType) {}
+
+  /** A file attached to the message (a PDF, typically). */
+  public BrandedMail attach(String filename, byte[] content, String contentType) {
+    if (content != null && content.length > 0)
+      attachments.add(new Attachment(filename, content, contentType));
+    return this;
+  }
+
+  public BrandedMail bcc(String... addresses) {
+    for (String a : addresses) if (notBlank(a)) bcc.add(a.trim());
+    return this;
+  }
 
   private BrandedMail() {}
 

@@ -428,3 +428,16 @@ At the door, admin > Visitors has a scanner (phone camera) and a code box; a bad
 checked in once. The same page shows totals by day and by visitor type and exports a CSV for the
 badge printer.
 
+---
+
+## 14. Sponsorship package reservations (admin > Reservations)
+
+A sponsor clicks "Reserve this package" on a tier (site or `/reserve`), fills company, contact,
+email, phone, TIN and booth preference, and gets a reference (`RSV-XXXXXX`). The backend emails
+them the exhibitor agreement and package sheet (PDFs from `resources/outreach/attachments`) with
+the bank accounts, and notifies `EXHIBITION_NOTIFY_EMAIL`. Admin > Reservations shows the
+pipeline (count and ETB per status), lets you set status, amount paid, owner and notes, resend
+the agreement, or send a reminder. Reservations that sit untouched for five business days get an
+automatic reminder (max two) at 09:30 Addis time on weekdays. The bank accounts live in
+`SponsorshipPaymentDetails`; change them there and in the brochure together.
+

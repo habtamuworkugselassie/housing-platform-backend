@@ -55,6 +55,7 @@ public class BrandedMailSenderImpl implements BrandedMailSender {
       helper.setFrom(new InternetAddress(fromEmail, fromName, StandardCharsets.UTF_8.name()));
       helper.setTo(mail.getTo().toArray(new String[0]));
       if (mail.getReplyTo() != null) helper.setReplyTo(mail.getReplyTo());
+      if (!mail.getBcc().isEmpty()) helper.setBcc(mail.getBcc().toArray(new String[0]));
       helper.setSubject(mail.getSubject());
       helper.setText(mail.toPlainText(site), mail.toHtml(site, logo));
       if (mail.getInlineImagePng() != null) {
@@ -62,6 +63,12 @@ public class BrandedMailSenderImpl implements BrandedMailSender {
             mail.getInlineImageCid(),
             new org.springframework.core.io.ByteArrayResource(mail.getInlineImagePng()),
             "image/png");
+      }
+      for (BrandedMail.Attachment a : mail.getAttachments()) {
+        helper.addAttachment(
+            a.filename(),
+            new org.springframework.core.io.ByteArrayResource(a.content()),
+            a.contentType());
       }
       mailSender.send(message);
       log.info("Mail '{}' sent to {}", mail.getSubject(), mail.getTo());
