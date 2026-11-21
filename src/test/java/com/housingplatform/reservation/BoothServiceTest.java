@@ -116,7 +116,9 @@ class BoothServiceTest {
   void premiumBoothsAreForTheTopTiersOnly() {
     assertThat(BoothService.allowedTypesFor("GOLD"))
         .containsExactlyInAnyOrder(Booth.Type.CORNER, Booth.Type.STANDARD);
-    assertThat(BoothService.allowedTypesFor("SILVER")).containsExactly(Booth.Type.STANDARD);
+    assertThat(BoothService.allowedTypesFor("SILVER"))
+        .containsExactlyInAnyOrder(Booth.Type.CORNER, Booth.Type.STANDARD);
+    assertThat(BoothService.allowedTypesFor("SPECIAL")).doesNotContain(Booth.Type.PREMIUM);
     assertThat(BoothService.allowedTypesFor("PLATINUM")).hasSize(3);
 
     SponsorshipReservation gold = reservation("GOLD");
