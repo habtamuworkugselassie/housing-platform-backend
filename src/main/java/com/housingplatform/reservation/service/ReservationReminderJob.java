@@ -16,6 +16,8 @@ public class ReservationReminderJob {
   @Scheduled(cron = "0 30 9 * * MON-FRI", zone = "Africa/Addis_Ababa")
   public void run() {
     try {
+      int freed = service.expireBoothHolds();
+      if (freed > 0) log.info("Booth holds expired on {} reservation(s)", freed);
       int n = service.sendDueReminders(5, 2);
       if (n > 0) log.info("Sent {} sponsorship reservation reminder(s)", n);
     } catch (Exception e) {

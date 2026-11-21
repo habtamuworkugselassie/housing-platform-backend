@@ -51,8 +51,47 @@ public final class ReservationDtos {
     @Size(max = 40)
     private String source;
 
+    /** Booth codes the sponsor would like (optional, at most the package's booth count). */
+    private List<String> boothCodes;
+
     /** Honeypot. */
     private String website;
+  }
+
+  @Value
+  @Builder
+  public static class BoothView {
+    String code;
+    String block;
+    int col;
+    int row;
+    String boothType;
+    int sizeSqm;
+    String status;
+    UUID reservationId;
+    LocalDateTime holdExpiresAt;
+    String notes;
+  }
+
+  /** Public map payload: booths without who holds them, plus counts. */
+  @Value
+  @Builder
+  public static class BoothMap {
+    List<BoothView> booths;
+    Map<String, Long> counts;
+    int holdBusinessDays;
+  }
+
+  @Data
+  public static class BoothUpdate {
+    private String status;
+    private String boothType;
+    private String notes;
+  }
+
+  @Data
+  public static class BoothAssign {
+    private List<String> codes;
   }
 
   @Value
@@ -66,6 +105,8 @@ public final class ReservationDtos {
     String email;
     List<BankAccount> bankAccounts;
     String payee;
+    List<String> boothCodes;
+    int boothsIncluded;
   }
 
   public record BankAccount(String bank, String number) {}
@@ -101,6 +142,8 @@ public final class ReservationDtos {
     LocalDateTime statusChangedAt;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    List<String> boothCodes;
+    int boothsIncluded;
   }
 
   @Data
@@ -120,6 +163,7 @@ public final class ReservationDtos {
     BigDecimal openValue;
     BigDecimal paidValue;
     Map<String, StatusTotal> byStatus;
+    Map<String, Long> booths;
   }
 
   public record StatusTotal(long count, BigDecimal value, BigDecimal paid) {}

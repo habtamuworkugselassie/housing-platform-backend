@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class ReservationService {
   private final SponsorshipReservationRepository repository;
   private final SponsorshipRepository sponsorships;
   private final ReservationMailService mail;
+  private final BoothService boothService;
 
   @Transactional
   public Confirmation reserve(ReserveRequest r) {
@@ -83,8 +85,12 @@ public class ReservationService {
                 .reminderCount(0)
                 .statusChangedAt(LocalDateTime.now())
                 .build());
+    List<String> held = List.of();
+    if (r.getBoothCodes() != null && !r.getBoothCodes().isEmpty()) {
+      held = boothService.hold(saved, r.getBoothCodes());
+    }
     afterCommit(() -> mail.sendConfirmation(saved, true));
-    return toConfirmation(saved);
+    return toConfirmation(saved, held);
   }
 
   // ---------------------------------------------------------------- admin
@@ -112,7 +118,11 @@ public class ReservationService {
                 pageable.getPageNumber(),
                 pageable.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
-    return repository.findAll(spec, sorted).map(ReservationService::toRow);
+    return repository.findAll(spec, sorted).map(this::row);
+  }
+
+  private AdminRow row(SponsorshipReservation r) {
+    return toRow(r, boothService.codesFor(r.getId()));
   }
 
   @Transactional(readOnly = true)
@@ -140,6 +150,7 @@ public class ReservationService {
         .openValue(openValue)
         .paidValue(paidValue)
         .byStatus(by)
+        .booths(boothService.counts())
         .build();
   }
 
@@ -184,7 +195,47 @@ public class ReservationService {
     if (u.getAdminNotes() != null) r.setAdminNotes(blankToNull(u.getAdminNotes()));
     if (u.getAssignedTo() != null) r.setAssignedTo(blankToNull(u.getAssignedTo()));
     if (u.getBoothPreference() != null) r.setBoothPreference(blankToNull(u.getBoothPreference()));
-    return toRow(repository.save(r));
+    SponsorshipReservation saved = repository.save(r);
+    if (saved.getStatus() == Status.PAID) boothService.sell(saved.getId());
+    if (saved.getStatus() == Status.CANCELLED) boothService.release(saved.getId());
+    return row(saved);
+  }
+
+  /** Admin assigns (or replaces) the booths of a reservation. */
+  @Transactional
+  public AdminRow assignBooths(UUID id, List<String> codes) {
+    SponsorshipReservation r = load(id);
+    if (!r.getStatus().open()) throw new BusinessException("The reservation is cancelled");
+    boothService.hold(r, codes == null ? List.of() : codes);
+    return row(r);
+  }
+
+  /** Frees booth holds that ran out and notes it on the reservation. Returns how many. */
+  @Transactional
+  public int expireBoothHolds() {
+    Set<UUID> affected = boothService.expireHolds();
+    for (UUID id : affected) {
+      repository
+          .findById(id)
+          .ifPresent(
+              r -> {
+                String note = "Booth hold expired on " + LocalDateTime.now().withNano(0);
+                r.setAdminNotes(r.getAdminNotes() == null ? note : r.getAdminNotes() + "\n" + note);
+                repository.save(r);
+              });
+    }
+    return affected.size();
+  }
+
+  public static LocalDateTime plusBusinessDays(LocalDateTime from, int days) {
+    LocalDateTime t = from;
+    int left = days;
+    while (left > 0) {
+      t = t.plusDays(1);
+      java.time.DayOfWeek d = t.getDayOfWeek();
+      if (d != java.time.DayOfWeek.SATURDAY && d != java.time.DayOfWeek.SUNDAY) left--;
+    }
+    return t;
   }
 
   /** Resend the confirmation with the agreement; moves REQUESTED to AGREEMENT_SENT. */
@@ -203,7 +254,7 @@ public class ReservationService {
     r.setReminderCount(r.getReminderCount() + 1);
     SponsorshipReservation saved = repository.save(r);
     afterCommit(() -> mail.sendReminder(saved));
-    return toRow(saved);
+    return row(saved);
   }
 
   /**
@@ -256,7 +307,7 @@ public class ReservationService {
     throw new IllegalStateException("Could not allocate a reservation reference");
   }
 
-  static Confirmation toConfirmation(SponsorshipReservation r) {
+  static Confirmation toConfirmation(SponsorshipReservation r, List<String> boothCodes) {
     return Confirmation.builder()
         .reference(r.getReference())
         .packageName(r.getPackageName())
@@ -269,10 +320,12 @@ public class ReservationService {
                 .map(a -> new BankAccount(a.bank(), a.number()))
                 .toList())
         .payee(SponsorshipPaymentDetails.PAYEE)
+        .boothCodes(boothCodes)
+        .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
         .build();
   }
 
-  static AdminRow toRow(SponsorshipReservation r) {
+  static AdminRow toRow(SponsorshipReservation r, List<String> boothCodes) {
     return AdminRow.builder()
         .id(r.getId())
         .reference(r.getReference())
@@ -302,6 +355,8 @@ public class ReservationService {
         .statusChangedAt(r.getStatusChangedAt())
         .createdAt(r.getCreatedAt())
         .updatedAt(r.getUpdatedAt())
+        .boothCodes(boothCodes)
+        .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
         .build();
   }
 

@@ -441,3 +441,13 @@ the agreement, or send a reminder. Reservations that sit untouched for five busi
 automatic reminder (max two) at 09:30 Addis time on weekdays. The bank accounts live in
 `SponsorshipPaymentDetails`; change them there and in the brochure together.
 
+### Booth map
+
+The 120 booths of the Addis International Hall plan (blocks A–D plus perimeter 01–20, from the
+exhibitor agreement) are seeded by V79. A reservation may pick up to the package's booth count
+(Exclusive 6, Platinum 3, Gold 2, Silver 1, Special none); picked booths are HELD for 10
+business days and freed by the morning job if the reservation has not moved, SOLD once it is
+paid, released if cancelled. Admin > Reservations has the map to change a booth's type, block
+it, or assign booths to a reservation. The public map (`GET /api/v1/sponsorship-reservations/booths`)
+shows status only, never who holds a booth.
+
