@@ -28,6 +28,10 @@ public final class BrandedMail {
   private String ctaUrl;
   private final List<String> closing = new ArrayList<>();
   private String lang = MailLocale.EN;
+  private String inlineImageCid;
+  private byte[] inlineImagePng;
+  private String inlineImageAlt;
+  private String inlineImageCaption;
 
   private BrandedMail() {}
 
@@ -91,6 +95,17 @@ public final class BrandedMail {
     return this;
   }
 
+  /** A PNG shown centred between the details and the button, referenced by Content-ID. */
+  public BrandedMail inlineImage(String cid, byte[] png, String alt, String caption) {
+    if (png != null && png.length > 0) {
+      this.inlineImageCid = cid;
+      this.inlineImagePng = png;
+      this.inlineImageAlt = alt;
+      this.inlineImageCaption = caption;
+    }
+    return this;
+  }
+
   public BrandedMail cta(String label, String url) {
     this.ctaLabel = label;
     this.ctaUrl = url;
@@ -114,6 +129,7 @@ public final class BrandedMail {
     if (messageBody != null) {
       sb.append(messageLabel).append(":\n").append(messageBody).append("\n\n");
     }
+    if (notBlank(inlineImageCaption)) sb.append(inlineImageCaption).append("\n\n");
     if (notBlank(ctaUrl)) sb.append(ctaLabel).append(": ").append(ctaUrl).append("\n\n");
     for (String c : closing) sb.append(c).append("\n\n");
     sb.append("Ethio Build Connect\n").append(siteUrl).append('\n').append(city()).append('\n');
@@ -192,6 +208,21 @@ public final class BrandedMail {
               "<div style=\"margin:0 0 20px;padding:16px 18px;background:#f4f2fa;border-left:4px solid #f4c977;border-radius:0 14px 14px 0;font-size:15px;line-height:1.6;white-space:pre-wrap;\">")
           .append(esc(messageBody))
           .append("</div>");
+    }
+    if (inlineImagePng != null) {
+      b.append("<div style=\"margin:4px 0 20px;text-align:center;\"><img src=\"cid:")
+          .append(esc(inlineImageCid))
+          .append("\" width=\"220\" height=\"220\" alt=\"")
+          .append(esc(inlineImageAlt))
+          .append(
+              "\" style=\"display:inline-block;width:220px;height:220px;border:8px solid #ffffff;border-radius:16px;box-shadow:0 0 0 1px #e9e4f5;\">");
+      if (notBlank(inlineImageCaption)) {
+        b.append(
+                "<p style=\"margin:10px 0 0;font-size:22px;font-weight:800;letter-spacing:0.08em;color:#2e1065;\">")
+            .append(esc(inlineImageCaption))
+            .append("</p>");
+      }
+      b.append("</div>");
     }
     if (notBlank(ctaUrl)) {
       b.append(

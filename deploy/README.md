@@ -413,3 +413,18 @@ Setup, once:
    by itself, oldest first; turn it off to send only what you queue by hand. The switch, caps, send window and follow-up delay are stored in the database
    (`outreach_settings`), so changing them needs no restart; the `OUTREACH_*` values in
    `.env` only seed the first row.
+
+---
+
+## 13. Visitor pre-registration and QR badges
+
+Visitors register at `/register-visitor` (Amharic: `/am/register-visitor`). Each registration gets
+a code like `EBC-K7M2PX`, a badge page at `/badge/<code>` and an email with the QR code inline
+(sent through the normal Brevo sender; nothing extra to configure). Registering again with the
+same email keeps the code and resends the badge. The public endpoint is rate limited like the
+other lead forms.
+
+At the door, admin > Visitors has a scanner (phone camera) and a code box; a badge can only be
+checked in once. The same page shows totals by day and by visitor type and exports a CSV for the
+badge printer.
+
