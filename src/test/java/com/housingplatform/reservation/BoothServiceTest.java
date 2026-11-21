@@ -111,4 +111,22 @@ class BoothServiceTest {
     assertThat(old.getStatus()).isEqualTo(Booth.Status.AVAILABLE);
     assertThat(old.getReservation()).isNull();
   }
+
+  @Test
+  void premiumBoothsAreForTheTopTiersOnly() {
+    assertThat(BoothService.allowedTypesFor("GOLD"))
+        .containsExactlyInAnyOrder(Booth.Type.CORNER, Booth.Type.STANDARD);
+    assertThat(BoothService.allowedTypesFor("SILVER")).containsExactly(Booth.Type.STANDARD);
+    assertThat(BoothService.allowedTypesFor("PLATINUM")).hasSize(3);
+
+    SponsorshipReservation gold = reservation("GOLD");
+    Booth premium = booth("B101", Booth.Status.AVAILABLE);
+    premium.setBoothType(Booth.Type.PREMIUM);
+    when(repo.findByReservationId(gold.getId())).thenReturn(List.of());
+    when(repo.findByCodeInIgnoreCase(anyCollection())).thenReturn(List.of(premium));
+    assertThatThrownBy(() -> service.hold(gold, List.of("B101")))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("premium booth");
+    assertThat(premium.getStatus()).isEqualTo(Booth.Status.AVAILABLE);
+  }
 }
