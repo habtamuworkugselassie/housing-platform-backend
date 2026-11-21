@@ -57,6 +57,12 @@ public class BrandedMailSenderImpl implements BrandedMailSender {
       if (mail.getReplyTo() != null) helper.setReplyTo(mail.getReplyTo());
       helper.setSubject(mail.getSubject());
       helper.setText(mail.toPlainText(site), mail.toHtml(site, logo));
+      if (mail.getInlineImagePng() != null) {
+        helper.addInline(
+            mail.getInlineImageCid(),
+            new org.springframework.core.io.ByteArrayResource(mail.getInlineImagePng()),
+            "image/png");
+      }
       mailSender.send(message);
       log.info("Mail '{}' sent to {}", mail.getSubject(), mail.getTo());
       return true;
