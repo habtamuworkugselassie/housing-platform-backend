@@ -39,6 +39,14 @@ public class VisitorController {
     return ResponseEntity.status(HttpStatus.CREATED).body(service.register(request));
   }
 
+  @GetMapping("/count")
+  @Operation(summary = "How many visitors have registered (public, for the landing page)")
+  public ResponseEntity<java.util.Map<String, Long>> count() {
+    return ResponseEntity.ok()
+        .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+        .body(java.util.Map.of("registered", service.publicCount()));
+  }
+
   @GetMapping("/{code}")
   @Operation(summary = "The badge behind a code (name, type, status)")
   public ResponseEntity<Badge> badge(@PathVariable String code) {

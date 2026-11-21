@@ -76,7 +76,9 @@ class ScopeAuthorizationEnforcementTest extends BaseIntegrationTest {
             "/api/v1/admin/outreach/stats",
             "/api/v1/admin/outreach/contacts",
             "/api/v1/admin/visitors",
-            "/api/v1/admin/visitors/stats")) {
+            "/api/v1/admin/visitors/stats",
+            "/api/v1/admin/sponsorship-reservations",
+            "/api/v1/admin/sponsorship-reservations/pipeline")) {
       MvcResult result = mockMvc.perform(get(path)).andReturn();
       assertThat(result.getResponse().getStatus())
           .as("%s must not be reachable without a token", path)

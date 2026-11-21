@@ -95,6 +95,11 @@ public class VisitorService {
   }
 
   @Transactional(readOnly = true)
+  public long publicCount() {
+    return repository.count() - repository.countByStatus(Status.CANCELLED);
+  }
+
+  @Transactional(readOnly = true)
   public Badge badge(String code) {
     return toBadge(load(code), false);
   }
