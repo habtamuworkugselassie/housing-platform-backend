@@ -94,6 +94,53 @@ public final class ReservationDtos {
     private List<String> codes;
   }
 
+  /** A reservation entered by an admin (phone, meeting, email). */
+  @Data
+  public static class AdminCreate {
+    private UUID sponsorshipId;
+
+    @NotBlank(message = "Company is required")
+    @Size(max = 200)
+    private String company;
+
+    @NotBlank(message = "Contact name is required")
+    @Size(max = 200)
+    private String contactName;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    @Size(max = 255)
+    private String email;
+
+    @Size(max = 50)
+    private String phone;
+
+    @Size(max = 40)
+    private String tin;
+
+    @Size(max = 200)
+    private String boothPreference;
+
+    @Size(max = 4000)
+    private String message;
+
+    @Size(max = 8)
+    private String locale;
+
+    private List<String> boothCodes;
+
+    /** Starting stage; default REQUESTED. */
+    private String status;
+
+    private BigDecimal amount;
+    private BigDecimal amountPaid;
+    private String adminNotes;
+    private String assignedTo;
+
+    /** Email the sponsor the agreement and bank details now. */
+    private boolean sendEmail = true;
+  }
+
   @Value
   @Builder
   public static class Confirmation {
