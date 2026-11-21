@@ -45,13 +45,15 @@ public class BoothService {
     };
   }
 
-  /** Which booth types a package may take: premium front row for the top tiers only. */
+  /**
+   * Which booth types a package may take: the premium front row is for Exclusive, Platinum and
+   * Premium only; corner and standard booths are open to every package.
+   */
   public static java.util.Set<Booth.Type> allowedTypesFor(String packageType) {
     String t = packageType == null ? "" : packageType.toUpperCase(Locale.ROOT);
     return switch (t) {
       case "EXCLUSIVE", "PLATINUM", "PREMIUM" -> java.util.EnumSet.allOf(Booth.Type.class);
-      case "GOLD" -> java.util.EnumSet.of(Booth.Type.CORNER, Booth.Type.STANDARD);
-      default -> java.util.EnumSet.of(Booth.Type.STANDARD);
+      default -> java.util.EnumSet.of(Booth.Type.CORNER, Booth.Type.STANDARD);
     };
   }
 
