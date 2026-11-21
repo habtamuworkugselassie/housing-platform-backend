@@ -272,7 +272,7 @@ public class VisitorService {
         .checkedInAt(v.getCheckedInAt())
         .createdAt(v.getCreatedAt())
         .badgeUrl(url)
-        .qrUrl("/api/v1/visitors/" + v.getCode() + "/qr.png")
+        .qrUrl("/api/v1/visitors/" + v.getCode() + "/qr")
         .alreadyRegistered(already)
         .build();
   }
