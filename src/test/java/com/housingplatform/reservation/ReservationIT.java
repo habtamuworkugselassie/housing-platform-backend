@@ -37,7 +37,10 @@ class ReservationIT extends BaseIntegrationTest {
                 .block(code.substring(0, 1))
                 .mapCol(code.startsWith("A") ? 1 : 3)
                 .mapRow(1)
-                .boothType(com.housingplatform.reservation.domain.Booth.Type.PREMIUM)
+                .boothType(
+                    code.equals("A101")
+                        ? com.housingplatform.reservation.domain.Booth.Type.PREMIUM
+                        : com.housingplatform.reservation.domain.Booth.Type.CORNER)
                 .sizeSqm(9)
                 .status(com.housingplatform.reservation.domain.Booth.Status.AVAILABLE)
                 .build());

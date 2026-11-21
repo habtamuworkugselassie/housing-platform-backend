@@ -45,6 +45,16 @@ public class BoothService {
     };
   }
 
+  /** Which booth types a package may take: premium front row for the top tiers only. */
+  public static java.util.Set<Booth.Type> allowedTypesFor(String packageType) {
+    String t = packageType == null ? "" : packageType.toUpperCase(Locale.ROOT);
+    return switch (t) {
+      case "EXCLUSIVE", "PLATINUM", "PREMIUM" -> java.util.EnumSet.allOf(Booth.Type.class);
+      case "GOLD" -> java.util.EnumSet.of(Booth.Type.CORNER, Booth.Type.STANDARD);
+      default -> java.util.EnumSet.of(Booth.Type.STANDARD);
+    };
+  }
+
   @Transactional(readOnly = true)
   public List<BoothView> list() {
     return booths.findAllByOrderByBlockAscMapRowAscMapColAsc().stream()
@@ -91,10 +101,21 @@ public class BoothService {
     }
     List<Booth> wanted = booths.findByCodeInIgnoreCase(codes);
     if (wanted.size() != codes.size()) throw new BusinessException("Unknown booth code");
+    java.util.Set<Booth.Type> allowed = allowedTypesFor(r.getPackageType());
     for (Booth b : wanted) {
       boolean mine = b.getReservation() != null && b.getReservation().getId().equals(r.getId());
       if (!mine && b.getStatus() != Booth.Status.AVAILABLE) {
         throw new BusinessException("Booth " + b.getCode() + " is no longer available");
+      }
+      if (!allowed.contains(b.getBoothType())) {
+        throw new BusinessException(
+            "Booth "
+                + b.getCode()
+                + " is a "
+                + b.getBoothType().name().toLowerCase(Locale.ROOT)
+                + " booth, not included in the "
+                + r.getPackageName()
+                + " package");
       }
       b.setReservation(r);
       b.setStatus(
