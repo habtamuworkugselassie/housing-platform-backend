@@ -44,7 +44,7 @@ class VisitorRegistrationIT extends BaseIntegrationTest {
         .contains("Sara Tesfaye")
         .contains("INVESTOR");
 
-    MvcResult qr = mockMvc.perform(get("/api/v1/visitors/" + code + "/qr.png")).andReturn();
+    MvcResult qr = mockMvc.perform(get("/api/v1/visitors/" + code + "/qr")).andReturn();
     assertThat(qr.getResponse().getStatus()).isEqualTo(200);
     assertThat(qr.getResponse().getContentType()).startsWith("image/png");
     assertThat(qr.getResponse().getContentAsByteArray().length).isGreaterThan(200);

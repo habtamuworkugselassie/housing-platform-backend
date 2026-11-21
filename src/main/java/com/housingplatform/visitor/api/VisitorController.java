@@ -45,7 +45,10 @@ public class VisitorController {
     return ResponseEntity.ok(service.badge(code));
   }
 
-  @GetMapping(value = "/{code}/qr.png", produces = MediaType.IMAGE_PNG_VALUE)
+  // No file extension on purpose: the edge proxy hands *.png paths to the static site.
+  @GetMapping(
+      value = {"/{code}/qr", "/{code}/qr.png"},
+      produces = MediaType.IMAGE_PNG_VALUE)
   @Operation(summary = "The badge's QR code as PNG")
   public ResponseEntity<byte[]> qr(
       @PathVariable String code, @RequestParam(defaultValue = "440") int size) {
