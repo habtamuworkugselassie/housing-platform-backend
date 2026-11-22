@@ -54,6 +54,7 @@ public class ReservationService {
       paymentService;
   private final org.springframework.context.ApplicationEventPublisher events;
   private final ReservationOrganizationLinker linker;
+  private final com.housingplatform.exhibition.repository.ExhibitionInterestRepository interests;
 
   @Transactional
   public Confirmation reserve(ReserveRequest r) {
@@ -452,6 +453,33 @@ public class ReservationService {
         .interestId(r.getInterest() != null ? r.getInterest().getId() : null)
         .exhibitorInvitedAt(r.getExhibitorInvitedAt())
         .build();
+  }
+
+  /** Admin: the organization's leads and reservations, newest first. */
+  @Transactional(readOnly = true)
+  public ReservationDtos.OrganizationExpo expoFor(UUID organizationId) {
+    List<AdminRow> rows =
+        repository.findByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
+            .map(this::row)
+            .toList();
+    List<ReservationDtos.Lead> leads =
+        interests.findByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
+            .map(
+                e ->
+                    ReservationDtos.Lead.builder()
+                        .id(e.getId())
+                        .createdAt(e.getCreatedAt())
+                        .email(e.getEmail())
+                        .phone(e.getPhoneNumber())
+                        .interestType(e.getInterestType())
+                        .sponsorshipId(
+                            e.getSponsorship() != null ? e.getSponsorship().getId() : null)
+                        .packageName(
+                            e.getSponsorship() != null ? e.getSponsorship().getName() : null)
+                        .reserveInvitedAt(e.getReserveInvitedAt())
+                        .build())
+            .toList();
+    return ReservationDtos.OrganizationExpo.builder().reservations(rows).leads(leads).build();
   }
 
   /** Reservations linked to the signed-in user's organization, newest first. */

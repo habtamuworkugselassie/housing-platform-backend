@@ -90,6 +90,14 @@ public class AdminReservationController {
     return ResponseEntity.accepted().build();
   }
 
+  @GetMapping("/organization/{organizationId}")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Expo pipeline of one organization: its leads and reservations")
+  public ResponseEntity<com.housingplatform.reservation.dto.ReservationDtos.OrganizationExpo>
+      byOrganization(@PathVariable UUID organizationId) {
+    return ResponseEntity.ok(service.expoFor(organizationId));
+  }
+
   @PostMapping("/link-organizations")
   @io.swagger.v3.oas.annotations.Operation(
       summary = "Attach an organization to every reservation that still has none")

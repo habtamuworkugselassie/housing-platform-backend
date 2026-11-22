@@ -250,6 +250,11 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
     assertThat(row.getOrganizationId()).isEqualTo(existing.getId());
     assertThat(row.getOrganizationName()).isEqualTo("Existing Cement SC");
     assertThat(row.getInterestId()).isNotNull();
+    com.housingplatform.reservation.dto.ReservationDtos.OrganizationExpo expo =
+        reservations.expoFor(existing.getId());
+    assertThat(expo.getReservations()).extracting("reference").contains(row.getReference());
+    assertThat(expo.getLeads()).hasSize(1);
+    assertThat(expo.getLeads().get(0).getPackageName()).isEqualTo(pkg.getName());
 
     // The public lead form can pick the same organization instead of creating a duplicate.
     com.housingplatform.exhibition.dto.ExhibitionInterestRequest lead =
