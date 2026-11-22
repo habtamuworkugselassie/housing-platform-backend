@@ -37,7 +37,14 @@ class ReservationServiceTest {
   private final com.housingplatform.reservation.service.BoothService boothService =
       mock(com.housingplatform.reservation.service.BoothService.class);
   private final ReservationService service =
-      new ReservationService(repo, packages, mail, boothService);
+      new ReservationService(
+          repo,
+          packages,
+          mail,
+          boothService,
+          new org.springframework.beans.factory.support.DefaultListableBeanFactory()
+              .getBeanProvider(
+                  com.housingplatform.reservation.service.ReservationPaymentService.class));
 
   private static Sponsorship gold(UUID id) {
     Sponsorship s =

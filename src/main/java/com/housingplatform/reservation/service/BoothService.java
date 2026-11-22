@@ -139,6 +139,14 @@ public class BoothService {
     booths.saveAll(held);
   }
 
+  /** A deposit was paid: the hold no longer expires. */
+  @Transactional
+  public void firmUp(UUID reservationId) {
+    List<Booth> held = booths.findByReservationId(reservationId);
+    for (Booth b : held) b.setHoldExpiresAt(null);
+    booths.saveAll(held);
+  }
+
   @Transactional
   public void sell(UUID reservationId) {
     List<Booth> held = booths.findByReservationId(reservationId);

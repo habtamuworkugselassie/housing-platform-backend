@@ -23,6 +23,9 @@ public interface VisitorRegistrationRepository
 
   long countByStatus(VisitorRegistration.Status status);
 
+  List<VisitorRegistration> findTop200ByStatusAndReminderSentAtIsNullOrderByCreatedAtAsc(
+      VisitorRegistration.Status status);
+
   long countByCreatedAtGreaterThanEqual(LocalDateTime since);
 
   long countByCheckedInAtGreaterThanEqual(LocalDateTime since);

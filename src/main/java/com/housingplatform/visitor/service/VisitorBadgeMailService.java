@@ -52,6 +52,60 @@ public class VisitorBadgeMailService {
     }
   }
 
+  /** The pre-expo reminder: same badge, different words. Marks the row once sent. */
+  public boolean sendReminder(VisitorRegistration v) {
+    if (!sender.configured()) return false;
+    boolean ok = sender.send(reminder(v));
+    if (ok) {
+      repository
+          .findById(v.getId())
+          .ifPresent(
+              fresh -> {
+                fresh.setReminderSentAt(LocalDateTime.now());
+                repository.save(fresh);
+              });
+    }
+    return ok;
+  }
+
+  BrandedMail reminder(VisitorRegistration v) {
+    byte[] qr = QrCodes.png(badgeUrl(v), 440);
+    boolean am = MailLocale.isAmharic(v.getLocale());
+    String first = firstName(v.getFullName());
+    if (am) {
+      return BrandedMail.create()
+          .lang("am")
+          .to(v.getEmail())
+          .replyTo(replyTo)
+          .subject("ኤክስፖው በዚህ ሳምንት ነው · ባጅዎ " + v.getCode())
+          .preheader("ጥር 01–05 · AICC · ከ9:00 ጀምሮ። QR ኮዱን በመግቢያው ያሳዩ።")
+          .title("በዚህ ሳምንት እንገናኝ፣ " + first + "!")
+          .greeting("ሰላም " + first + "፣")
+          .paragraph("ኢትዮ ቢልድ ኮኔክት ኤክስፖ በዚህ ሳምንት ይጀምራል። ባጅዎ እነሆ፤ በመግቢያው ላይ ከስልክዎ ላይ QR ኮዱን ያሳዩ።")
+          .detail("ቀን", "ጥር 01–05, 2019 ዓ.ም (9–13 January 2027)")
+          .detail("ቦታ", "አዲስ ዓለም አቀፍ ኮንቬንሽን ሴንተር (AICC)፣ አዲስ አበባ")
+          .detail("የባጅ ኮድ", v.getCode())
+          .inlineImage("badge", qr, "የመግቢያ QR ኮድ", v.getCode())
+          .cta("ባጅዎን ይክፈቱ", badgeUrl(v))
+          .closing("መግቢያ ነፃ ነው። ከዋናው መግቢያ የምዝገባ ሎቢ ይጀምሩ።");
+    }
+    return BrandedMail.create()
+        .to(v.getEmail())
+        .replyTo(replyTo)
+        .subject("The expo is this week · your badge " + v.getCode())
+        .preheader("9–13 January · AICC · doors from 9:00. Show the QR at the gate.")
+        .title("See you this week, " + first + "!")
+        .greeting("Hello " + first + ",")
+        .paragraph(
+            "Ethio Build Connect Expo opens this week. Here is your badge again; show the QR code on your phone at the entrance.")
+        .detail("Dates", "9–13 January 2027 (Tir 01–05, 2019 E.C.)")
+        .detail("Venue", "Addis International Convention Center (AICC), Addis Ababa")
+        .detail("Badge code", v.getCode())
+        .inlineImage("badge", qr, "Entry QR code", v.getCode())
+        .cta("Open your badge", badgeUrl(v))
+        .closing("Entry is free. Start at the registration lobby by the main entrance.");
+  }
+
   BrandedMail build(VisitorRegistration v) {
     byte[] qr = QrCodes.png(badgeUrl(v), 440);
     boolean am = MailLocale.isAmharic(v.getLocale());

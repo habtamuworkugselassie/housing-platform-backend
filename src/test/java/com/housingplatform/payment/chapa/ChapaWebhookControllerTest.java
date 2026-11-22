@@ -26,7 +26,14 @@ class ChapaWebhookControllerTest {
     depositService = mock(PurchaseDepositService.class);
     balanceService = mock(com.housingplatform.purchase.service.PurchaseBalanceService.class);
     controller =
-        new ChapaWebhookController(properties, depositService, balanceService, new ObjectMapper());
+        new ChapaWebhookController(
+            properties,
+            depositService,
+            balanceService,
+            new ObjectMapper(),
+            new org.springframework.beans.factory.support.DefaultListableBeanFactory()
+                .getBeanProvider(
+                    com.housingplatform.reservation.service.ReservationPaymentService.class));
   }
 
   @Test

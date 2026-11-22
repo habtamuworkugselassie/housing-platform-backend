@@ -80,4 +80,7 @@ public class VisitorRegistration extends BaseEntity {
 
   @Column(name = "badge_sent_at")
   private LocalDateTime badgeSentAt;
+
+  @Column(name = "reminder_sent_at")
+  private LocalDateTime reminderSentAt;
 }
