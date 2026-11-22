@@ -60,6 +60,11 @@ public class ExhibitionInterest extends BaseEntity {
   @Column(name = "reserve_invited_at")
   private LocalDateTime reserveInvitedAt;
 
+  /** Automatic reserve nudges sent so far (manual invitations count too). */
+  @Column(name = "nudge_count", nullable = false)
+  @lombok.Builder.Default
+  private int nudgeCount = 0;
+
   /** Language the registrant used (en / am); the receipt is sent in it. */
   @Column(length = 8)
   private String locale;

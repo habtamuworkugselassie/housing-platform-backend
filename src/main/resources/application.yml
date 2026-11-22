@@ -172,6 +172,14 @@ app:
     # Window in which registered visitors get the "this week" reminder with their badge (Addis dates).
     reminder-from: ${VISITOR_REMINDER_FROM:2027-01-07}
     reminder-until: ${VISITOR_REMINDER_UNTIL:2027-01-12}
+  lead-nudge:
+    # Exhibitor and partner leads that chose a package but never reserved get "Reserve your
+    # place" by email: first after FIRST business days, once more AGAIN business days after any
+    # invitation, then never again. Skipped for opted-out or bounced outreach contacts.
+    enabled: ${LEAD_NUDGE_ENABLED:true}
+    first-after-days: ${LEAD_NUDGE_FIRST_DAYS:3}
+    again-after-days: ${LEAD_NUDGE_AGAIN_DAYS:7}
+    max: ${LEAD_NUDGE_MAX:2}
   reservation:
     # Share of the package price that locks the booths when paid online through Chapa.
     deposit-percent: ${RESERVATION_DEPOSIT_PERCENT:30}

@@ -44,6 +44,7 @@ public class AdminExhibitionInterestResponse {
   private java.util.List<LeadReservation> reservations;
 
   private LocalDateTime reserveInvitedAt;
+  private int nudgeCount;
 
   @lombok.Data
   @lombok.Builder
