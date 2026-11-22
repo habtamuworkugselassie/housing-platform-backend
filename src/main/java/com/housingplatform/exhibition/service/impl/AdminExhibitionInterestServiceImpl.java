@@ -65,6 +65,7 @@ public class AdminExhibitionInterestServiceImpl implements AdminExhibitionIntere
         .primaryContactUserId(primaryId)
         .reservations(reservationsFor(e))
         .reserveInvitedAt(e.getReserveInvitedAt())
+        .nudgeCount(e.getNudgeCount())
         .build();
   }
 
@@ -96,6 +97,7 @@ public class AdminExhibitionInterestServiceImpl implements AdminExhibitionIntere
             .findById(interestId)
             .orElseThrow(() -> new ResourceNotFoundException("ExhibitionInterest", interestId));
     e.setReserveInvitedAt(java.time.LocalDateTime.now());
+    e.setNudgeCount(e.getNudgeCount() + 1);
     ExhibitionInterest saved = repository.save(e);
     reservationMail.sendReserveInvite(saved);
     return toResponse(saved);

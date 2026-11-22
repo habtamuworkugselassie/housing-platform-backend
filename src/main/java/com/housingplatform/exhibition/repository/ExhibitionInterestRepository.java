@@ -26,5 +26,13 @@ public interface ExhibitionInterestRepository extends JpaRepository<ExhibitionIn
 
   java.util.List<ExhibitionInterest> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+  /** Exhibitor and partner leads with a package, nudged fewer than {@code max} times. */
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT e FROM ExhibitionInterest e JOIN FETCH e.sponsorship s LEFT JOIN FETCH e.organization"
+          + " WHERE e.interestType IN ('exhibitor', 'partner') AND e.nudgeCount < :max ORDER BY"
+          + " e.createdAt ASC")
+  java.util.List<ExhibitionInterest> findNudgeCandidates(
+      @org.springframework.data.repository.query.Param("max") int max);
+
   Optional<ExhibitionInterest> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 }

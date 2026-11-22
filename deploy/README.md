@@ -484,3 +484,16 @@ emailed when an item is approved or rejected. Admin uploads stay approved on sav
 
 Password resets now also activate a `PENDING_VERIFICATION` user, so the invitation link is enough
 to sign in.
+
+## 16. Lead nudges and test-data cleanup
+
+Exhibitor and partner leads that chose a package but never reserved get the "Reserve your
+place" email automatically (weekdays 10:00 Addis): first `LEAD_NUDGE_FIRST_DAYS` business days
+after registration (default 3), once more `LEAD_NUDGE_AGAIN_DAYS` business days after any
+invitation (default 7), at most `LEAD_NUDGE_MAX` times (default 2). A reservation on the lead's
+organization or email, an outreach opt-out or bounce, or a manual "Invite to reserve" in the
+meantime all count. `LEAD_NUDGE_ENABLED=false` switches it off.
+
+`deploy/cleanup-test-data.sql` removes test organizations, leads, reservations, payments, media
+and placeholder users. It runs as a dry run (reports, then `ROLLBACK`); edit the name and
+reference lists at the top, check the report, then change the last line to `COMMIT`.
