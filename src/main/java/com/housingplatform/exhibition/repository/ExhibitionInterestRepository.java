@@ -24,5 +24,7 @@ public interface ExhibitionInterestRepository extends JpaRepository<ExhibitionIn
 
   Optional<ExhibitionInterest> findFirstByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+  java.util.List<ExhibitionInterest> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
+
   Optional<ExhibitionInterest> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 }

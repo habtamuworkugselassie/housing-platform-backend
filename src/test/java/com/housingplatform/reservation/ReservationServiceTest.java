@@ -46,7 +46,8 @@ class ReservationServiceTest {
               .getBeanProvider(
                   com.housingplatform.reservation.service.ReservationPaymentService.class),
           mock(org.springframework.context.ApplicationEventPublisher.class),
-          mock(com.housingplatform.reservation.service.ReservationOrganizationLinker.class));
+          mock(com.housingplatform.reservation.service.ReservationOrganizationLinker.class),
+          mock(com.housingplatform.exhibition.repository.ExhibitionInterestRepository.class));
 
   private static Sponsorship gold(UUID id) {
     Sponsorship s =

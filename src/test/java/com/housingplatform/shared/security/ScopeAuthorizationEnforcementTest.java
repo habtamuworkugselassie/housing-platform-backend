@@ -79,6 +79,7 @@ class ScopeAuthorizationEnforcementTest extends BaseIntegrationTest {
             "/api/v1/admin/visitors/stats",
             "/api/v1/admin/sponsorship-reservations",
             "/api/v1/admin/sponsorship-reservations/pipeline",
+            "/api/v1/admin/sponsorship-reservations/organization/00000000-0000-0000-0000-000000000000",
             "/api/v1/organizations/media-reviews/pending",
             "/api/v1/organizations/mine",
             "/api/v1/sponsorship-reservations/mine")) {

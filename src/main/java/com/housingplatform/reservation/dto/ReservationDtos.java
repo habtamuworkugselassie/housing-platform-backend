@@ -269,6 +269,27 @@ public final class ReservationDtos {
     LocalDateTime exhibitorInvitedAt;
   }
 
+  /** Everything expo-related about one organization, for the admin organization pane. */
+  @Data
+  @Builder
+  public static class OrganizationExpo {
+    List<AdminRow> reservations;
+    List<Lead> leads;
+  }
+
+  @Data
+  @Builder
+  public static class Lead {
+    UUID id;
+    LocalDateTime createdAt;
+    String email;
+    String phone;
+    String interestType;
+    UUID sponsorshipId;
+    String packageName;
+    LocalDateTime reserveInvitedAt;
+  }
+
   /** What a signed-in exhibitor sees of its own reservations. */
   @Data
   @Builder
