@@ -185,6 +185,69 @@ public class ReservationMailService {
     return m;
   }
 
+  /** An admin invites a lead to reserve; the link lands on the form with everything prefilled. */
+  @Async
+  public void sendReserveInvite(com.housingplatform.exhibition.domain.ExhibitionInterest lead) {
+    if (!sender.configured()) {
+      log.warn("Mail not configured; reserve invite for {} not sent", lead.getEmail());
+      return;
+    }
+    sender.send(reserveInvite(lead));
+  }
+
+  BrandedMail reserveInvite(com.housingplatform.exhibition.domain.ExhibitionInterest lead) {
+    boolean am = MailLocale.isAmharic(lead.getLocale());
+    StringBuilder url =
+        new StringBuilder(frontendBaseUrl.replaceAll("/$", ""))
+            .append(am ? "/am" : "")
+            .append("/reserve?src=invite&email=")
+            .append(
+                java.net.URLEncoder.encode(
+                    lead.getEmail(), java.nio.charset.StandardCharsets.UTF_8));
+    if (lead.getSponsorship() != null)
+      url.append("&package=").append(lead.getSponsorship().getId());
+    if (lead.getOrganization() != null) url.append("&org=").append(lead.getOrganization().getId());
+    if (lead.getCompany() != null && !lead.getCompany().isBlank())
+      url.append("&company=")
+          .append(
+              java.net.URLEncoder.encode(
+                  lead.getCompany(), java.nio.charset.StandardCharsets.UTF_8));
+    String pkg = lead.getSponsorship() != null ? lead.getSponsorship().getName() : null;
+    BrandedMail m =
+        am
+            ? BrandedMail.create()
+                .lang("am")
+                .to(lead.getEmail())
+                .replyTo(replyTo)
+                .subject("ቦታዎን ያስይዙ – Ethio Build Connect Expo 2027")
+                .title("ቦታዎን ያስይዙ")
+                .greeting("ሰላም፣")
+                .paragraph(
+                    "ለ Ethio Build Connect Expo 2027 ፍላጎት ስላሳዩ እናመሰግናለን። ቦታዎች ውስን ሲሆኑ እንደ መጡበት"
+                        + " ቅደም ተከተል ይሰጣሉ። ከታች ባለው አገናኝ በሁለት ደቂቃ ውስጥ "
+                        + (pkg != null ? pkg + " ጥቅል" : "ጥቅልዎን")
+                        + " ያስይዙ፤ ውሉና የባንክ ዝርዝሮች ወዲያውኑ በኢሜይል ይደርስዎታል።")
+                .cta("አሁን ያስይዙ", url.toString())
+                .closing("ጥያቄ ካለዎት ይህን ኢሜይል ይመልሱ።")
+            : BrandedMail.create()
+                .to(lead.getEmail())
+                .replyTo(replyTo)
+                .subject("Reserve your place – Ethio Build Connect Expo 2027")
+                .title("Reserve your place")
+                .greeting("Hello,")
+                .paragraph(
+                    "Thank you for your interest in Ethio Build Connect Expo 2027. Places are limited"
+                        + " and allocated first come, first served. The link below reserves "
+                        + (pkg != null ? "the " + pkg + " package" : "your package")
+                        + " in about two minutes; the agreement and bank details follow by email"
+                        + " straight away.")
+                .cta("Reserve now", url.toString())
+                .closing("Reply to this email if you have any questions.");
+    if (pkg != null) m.detail(am ? "ጥቅል" : "Package", pkg);
+    if (notifyEmail != null && !notifyEmail.isBlank()) m.bcc(notifyEmail.split("\\s*,\\s*"));
+    return m;
+  }
+
   BrandedMail reminder(SponsorshipReservation r) {
     boolean am = MailLocale.isAmharic(r.getLocale());
     BrandedMail m =

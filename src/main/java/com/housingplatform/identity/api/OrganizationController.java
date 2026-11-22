@@ -69,6 +69,18 @@ public class OrganizationController {
     return ResponseEntity.ok(bank);
   }
 
+  @GetMapping("/lookup")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Public organization lookup",
+      description =
+          "Name typeahead for the reservation and lead forms. Returns id, name, city, type and"
+              + " status for pending and approved organizations; at least two characters.")
+  public ResponseEntity<List<com.housingplatform.identity.dto.OrganizationLookupItem>> lookup(
+      @RequestParam(required = false) String q) {
+    return ResponseEntity.ok(organizationService.lookup(q));
+  }
+
   @GetMapping("/mine")
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
   @Operation(

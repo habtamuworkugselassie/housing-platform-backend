@@ -94,7 +94,9 @@ public class AdminReservationController {
   @io.swagger.v3.oas.annotations.Operation(
       summary = "Attach an organization to every reservation that still has none")
   public ResponseEntity<java.util.Map<String, Integer>> linkOrganizations() {
-    return ResponseEntity.ok(java.util.Map.of("linked", linker.linkAllMissing()));
+    int orgs = linker.linkAllMissing();
+    int leads = linker.linkAllMissingLeads();
+    return ResponseEntity.ok(java.util.Map.of("linked", orgs, "leads", leads));
   }
 
   @PostMapping("/{id}/exhibitor-account")

@@ -21,6 +21,15 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
   List<Organization> findByNameIgnoreCase(String name);
 
+  /** Public lookup for the reservation and lead forms: name match, limited statuses. */
+  @Query(
+      "SELECT o FROM Organization o WHERE LOWER(o.name) LIKE LOWER(CONCAT('%', :q, '%')) AND"
+          + " o.status IN :statuses ORDER BY o.name ASC")
+  List<Organization> lookupByName(
+      @Param("q") String q,
+      @Param("statuses") Collection<Organization.OrganizationStatus> statuses,
+      org.springframework.data.domain.Pageable pageable);
+
   List<Organization> findByType(Organization.OrganizationType type);
 
   List<Organization> findByStatus(Organization.OrganizationStatus status);

@@ -56,6 +56,10 @@ public class ExhibitionInterest extends BaseEntity {
   @Column(name = "contact_verified_at")
   private LocalDateTime contactVerifiedAt;
 
+  /** When an admin last emailed this lead a link to reserve a package. */
+  @Column(name = "reserve_invited_at")
+  private LocalDateTime reserveInvitedAt;
+
   /** Language the registrant used (en / am); the receipt is sent in it. */
   @Column(length = 8)
   private String locale;

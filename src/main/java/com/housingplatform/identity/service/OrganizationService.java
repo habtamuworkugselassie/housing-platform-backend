@@ -94,6 +94,9 @@ public interface OrganizationService {
    */
   Optional<OrganizationResponse> getCurrentUserOrganization();
 
+  /** Public typeahead for the reservation and lead forms: id, name, city, type, status only. */
+  List<com.housingplatform.identity.dto.OrganizationLookupItem> lookup(String q);
+
   /**
    * Upload an organization document (e.g. business registration, license, VAT, TIN). Replaces
    * existing document if present. Allowed types: BUSINESS_REGISTRATION, LICENSE, VAT_REGISTRATION,

@@ -45,11 +45,18 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
         resolveSponsorshipForInterest(interestType, request.getSponsorshipId());
 
     String email = request.getEmail().trim().toLowerCase();
+    Organization chosen =
+        request.getOrganizationId() == null
+            ? null
+            : organizationRepository
+                .findById(request.getOrganizationId())
+                .orElseThrow(() -> new BusinessException("That organization no longer exists"));
     userRepository
         .findByEmail(email)
         .ifPresent(
             u -> {
-              if (u.getOrganization() != null) {
+              if (u.getOrganization() != null
+                  && (chosen == null || !u.getOrganization().getId().equals(chosen.getId()))) {
                 throw new BusinessException(
                     "An account with this email already exists. Please sign in or use a different email to register.");
               }
@@ -59,28 +66,32 @@ public class ExhibitionInterestServiceImpl implements ExhibitionInterestService 
     String orgName = (company != null && !company.isEmpty()) ? company : ("Exhibition: " + email);
 
     Organization organization =
-        Organization.builder()
-            .name(orgName)
-            .type(Organization.OrganizationType.fromValue(request.getOrganizationType()))
-            .status(Organization.OrganizationStatus.PENDING_APPROVAL)
-            .description(
-                request.getMessage() != null && !request.getMessage().trim().isEmpty()
-                    ? request.getMessage().trim()
-                    : null)
-            .build();
-    OrganizationContact contact =
-        OrganizationContact.builder().organization(organization).email(email).build();
-    organization.setContact(contact);
-    contact
-        .getPhones()
-        .add(
-            OrganizationPhone.builder()
-                .contact(contact)
-                .countryCode("+251")
-                .number(phoneNumber != null ? phoneNumber : "")
-                .displayOrder(0)
-                .build());
-    organization = organizationRepository.save(organization);
+        chosen != null
+            ? chosen
+            : Organization.builder()
+                .name(orgName)
+                .type(Organization.OrganizationType.fromValue(request.getOrganizationType()))
+                .status(Organization.OrganizationStatus.PENDING_APPROVAL)
+                .description(
+                    request.getMessage() != null && !request.getMessage().trim().isEmpty()
+                        ? request.getMessage().trim()
+                        : null)
+                .build();
+    if (chosen == null) {
+      OrganizationContact contact =
+          OrganizationContact.builder().organization(organization).email(email).build();
+      organization.setContact(contact);
+      contact
+          .getPhones()
+          .add(
+              OrganizationPhone.builder()
+                  .contact(contact)
+                  .countryCode("+251")
+                  .number(phoneNumber != null ? phoneNumber : "")
+                  .displayOrder(0)
+                  .build());
+      organization = organizationRepository.save(organization);
+    }
 
     primaryUserProvisioningService.linkExhibitionLeadUser(organization, email, phoneNumber);
 
