@@ -71,6 +71,11 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
     req.setLocale("en");
     String reference = reservations.reserve(req).getReference();
     SponsorshipReservation r = reservationRepo.findByReferenceIgnoreCase(reference).orElseThrow();
+    // Linked from the first minute, long before any payment.
+    assertThat(r.getOrganization()).isNotNull();
+    assertThat(r.getOrganization().getName()).isEqualTo("Abay Steel PLC");
+    assertThat(r.getOrganization().getStatus())
+        .isEqualTo(Organization.OrganizationStatus.PENDING_APPROVAL);
 
     // Before any payment the account is refused.
     try {
@@ -190,6 +195,36 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
             .andReturn();
     assertThat(edit.getResponse().getStatus()).isEqualTo(200);
     assertThat(edit.getResponse().getContentAsString()).contains("Steel for builders");
+  }
+
+  @Test
+  void manualReservationAttachesTheChosenOrganization() {
+    Organization existing =
+        organizations.save(
+            Organization.builder()
+                .name("Existing Cement SC")
+                .type(Organization.OrganizationType.SUPPLIER)
+                .status(Organization.OrganizationStatus.APPROVED)
+                .build());
+    Sponsorship pkg =
+        packages.save(
+            Sponsorship.builder()
+                .name("IT Gold " + System.nanoTime())
+                .type(Sponsorship.SponsorshipType.GOLD)
+                .basePrice(new BigDecimal("900000"))
+                .status(Sponsorship.SponsorshipStatus.ACTIVE)
+                .build());
+    com.housingplatform.reservation.dto.ReservationDtos.AdminCreate c =
+        new com.housingplatform.reservation.dto.ReservationDtos.AdminCreate();
+    c.setSponsorshipId(pkg.getId());
+    c.setOrganizationId(existing.getId());
+    c.setCompany("Existing Cement");
+    c.setContactName("Dawit");
+    c.setEmail("dawit-" + System.nanoTime() + "@example.com");
+    c.setSendEmail(false);
+    AdminRow row = reservations.createManual(c, "admin");
+    assertThat(row.getOrganizationId()).isEqualTo(existing.getId());
+    assertThat(row.getOrganizationName()).isEqualTo("Existing Cement SC");
   }
 
   @Test

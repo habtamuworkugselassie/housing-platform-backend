@@ -19,6 +19,8 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
           + " o.createdAt DESC")
   List<Organization> findByContactEmail(@Param("email") String email);
 
+  List<Organization> findByNameIgnoreCase(String name);
+
   List<Organization> findByType(Organization.OrganizationType type);
 
   List<Organization> findByStatus(Organization.OrganizationStatus status);
