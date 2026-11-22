@@ -166,7 +166,7 @@ public final class OutreachHtml {
           .append("</a></td>")
           .append("<td style=\"padding-left:14px;font-size:13px;\"><a href=\"")
           .append(esc(siteUrl))
-          .append(am ? "/am/#sponsorship" : "/#sponsorship")
+          .append(am ? "/am/reserve" : "/reserve")
           .append("\" style=\"color:#6d28d9;text-decoration:none;font-weight:600;\">")
           .append(am ? "ፓኬጆችን በድረ-ገጹ ላይ ይመልከቱ" : "See the packages online")
           .append("</a></td></tr></table>")

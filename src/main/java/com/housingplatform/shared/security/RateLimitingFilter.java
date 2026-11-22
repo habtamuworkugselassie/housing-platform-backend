@@ -62,7 +62,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             && (path.equals("/api/v1/enquiries")
                 || path.equals("/api/v1/exhibition/interest")
                 || path.equals("/api/v1/visitors/register")
-                || path.equals("/api/v1/sponsorship-reservations"));
+                || path.equals("/api/v1/sponsorship-reservations")
+                || (path.startsWith("/api/v1/sponsorship-reservations/")
+                    && path.endsWith("/checkout")));
     if (authPath || leadForm) {
       String clientIdentifier = getClientIdentifier(request);
       String rateLimitKey = (authPath ? "rate_limit:auth:" : "rate_limit:lead:") + clientIdentifier;

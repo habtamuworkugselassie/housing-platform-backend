@@ -28,6 +28,9 @@ public class ChapaWebhookController {
   private final PurchaseDepositService depositService;
   private final PurchaseBalanceService balanceService;
   private final ObjectMapper objectMapper;
+  private final org.springframework.beans.factory.ObjectProvider<
+          com.housingplatform.reservation.service.ReservationPaymentService>
+      reservationPayments;
 
   @PostMapping("/webhook")
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
@@ -58,7 +61,11 @@ public class ChapaWebhookController {
       return ResponseEntity.badRequest().build();
     }
     try {
-      if (balanceService.ownsTxRef(txRef)) {
+      com.housingplatform.reservation.service.ReservationPaymentService rp =
+          reservationPayments.getIfAvailable();
+      if (rp != null && rp.ownsTxRef(txRef)) {
+        rp.handleProviderNotification(txRef);
+      } else if (balanceService.ownsTxRef(txRef)) {
         balanceService.handleProviderNotification(txRef);
       } else {
         depositService.handleProviderNotification(txRef);

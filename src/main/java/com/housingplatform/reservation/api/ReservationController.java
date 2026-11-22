@@ -23,6 +23,39 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReservationController {
 
   private final ReservationService service;
+  private final com.housingplatform.reservation.service.ReservationPaymentService payments;
+
+  @org.springframework.web.bind.annotation.GetMapping("/{reference}")
+  @Operation(summary = "A reservation's status and payments (reference + the sponsor's email)")
+  public ResponseEntity<com.housingplatform.reservation.dto.ReservationDtos.StatusView> status(
+      @org.springframework.web.bind.annotation.PathVariable String reference,
+      @org.springframework.web.bind.annotation.RequestParam String email,
+      @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false")
+          boolean refresh) {
+    return ResponseEntity.ok(payments.status(reference, email, refresh));
+  }
+
+  @PostMapping("/{reference}/checkout")
+  @Operation(summary = "Start a Chapa checkout for the deposit or the balance")
+  public ResponseEntity<com.housingplatform.reservation.dto.ReservationDtos.CheckoutResponse>
+      checkout(
+          @org.springframework.web.bind.annotation.PathVariable String reference,
+          @Valid @RequestBody
+              com.housingplatform.reservation.dto.ReservationDtos.CheckoutRequest body) {
+    com.housingplatform.reservation.domain.ReservationPayment.Purpose purpose =
+        body.getPurpose() == null || body.getPurpose().isBlank()
+            ? com.housingplatform.reservation.domain.ReservationPayment.Purpose.DEPOSIT
+            : com.housingplatform.reservation.domain.ReservationPayment.Purpose.valueOf(
+                body.getPurpose().trim().toUpperCase());
+    com.housingplatform.payment.chapa.ChapaPaymentMethod method = null;
+    if (body.getMethod() != null && !body.getMethod().isBlank()) {
+      method =
+          com.housingplatform.payment.chapa.ChapaPaymentMethod.valueOf(
+              body.getMethod().trim().toUpperCase());
+    }
+    return ResponseEntity.ok(payments.startCheckout(reference, body.getEmail(), purpose, method));
+  }
+
   private final com.housingplatform.reservation.service.BoothService boothService;
 
   @org.springframework.web.bind.annotation.GetMapping("/booths")

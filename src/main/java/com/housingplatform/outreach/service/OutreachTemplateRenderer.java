@@ -50,7 +50,7 @@ public class OutreachTemplateRenderer {
     v.put("project_or_company", nz(c.getName()));
     v.put("hook", nz(c.getHook()).isBlank() ? defaultHook(c, am) : c.getHook().trim());
     v.put("site_url", site);
-    v.put("sponsorship_url", prefix + "/#sponsorship");
+    v.put("sponsorship_url", prefix + "/reserve");
     v.put("register_url", prefix + "/?interest=" + key.interest());
     v.put("sender_name", props.getSenderName());
     v.put("sender_title", props.getSenderTitle());

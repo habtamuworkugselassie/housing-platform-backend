@@ -49,6 +49,8 @@ public class ReservationService {
   private final SponsorshipRepository sponsorships;
   private final ReservationMailService mail;
   private final BoothService boothService;
+  private final org.springframework.beans.factory.ObjectProvider<ReservationPaymentService>
+      paymentService;
 
   @Transactional
   public Confirmation reserve(ReserveRequest r) {
@@ -376,7 +378,7 @@ public class ReservationService {
     throw new IllegalStateException("Could not allocate a reservation reference");
   }
 
-  static Confirmation toConfirmation(SponsorshipReservation r, List<String> boothCodes) {
+  Confirmation toConfirmation(SponsorshipReservation r, List<String> boothCodes) {
     return Confirmation.builder()
         .reference(r.getReference())
         .packageName(r.getPackageName())
@@ -391,6 +393,13 @@ public class ReservationService {
         .payee(SponsorshipPaymentDetails.PAYEE)
         .boothCodes(boothCodes)
         .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
+        .depositAmount(
+            paymentService.getIfAvailable() == null
+                ? null
+                : paymentService.getIfAvailable().depositFor(r))
+        .checkoutAvailable(
+            paymentService.getIfAvailable() != null
+                && paymentService.getIfAvailable().checkoutAvailable())
         .build();
   }
 

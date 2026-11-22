@@ -48,7 +48,7 @@ class OutreachTemplateRendererTest {
         .contains("Dear Noah Real Estate team,")
         .contains("I saw your Bole Atlas launch last week.")
         .contains("https://ethiobuildconnect.et/?interest=exhibitor")
-        .contains("https://ethiobuildconnect.et/#sponsorship")
+        .contains("https://ethiobuildconnect.et/reserve")
         .contains("Kind regards,\nHabtamu Worku\nFounder, Ethio Build Connect")
         .contains("+251 913 504 097 · ethiobuildconnectexpo@gmail.com")
         .endsWith("reply \"no thanks\" and we will not write again.");

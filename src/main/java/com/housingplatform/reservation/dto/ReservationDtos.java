@@ -154,9 +154,70 @@ public final class ReservationDtos {
     String payee;
     List<String> boothCodes;
     int boothsIncluded;
+    BigDecimal depositAmount;
+    boolean checkoutAvailable;
   }
 
   public record BankAccount(String bank, String number) {}
+
+  @Data
+  public static class CheckoutRequest {
+    @NotBlank private String email;
+
+    /** DEPOSIT or BALANCE; default DEPOSIT. */
+    private String purpose;
+
+    /** TELEBIRR, CBE_BIRR, MPESA, AWASH_BIRR or CARD. */
+    private String method;
+  }
+
+  @Value
+  @Builder
+  public static class CheckoutResponse {
+    String txRef;
+    String checkoutUrl;
+    BigDecimal amount;
+    String currency;
+    String purpose;
+  }
+
+  @Value
+  @Builder
+  public static class PaymentView {
+    String txRef;
+    String purpose;
+    BigDecimal amount;
+    String currency;
+    String status;
+    String checkoutUrl;
+    String method;
+    LocalDateTime paidAt;
+    LocalDateTime createdAt;
+  }
+
+  /** What a sponsor sees on the reservation page (reference + email). */
+  @Value
+  @Builder
+  public static class StatusView {
+    String reference;
+    String packageName;
+    String company;
+    String contactName;
+    BigDecimal amount;
+    BigDecimal amountPaid;
+    BigDecimal outstanding;
+    BigDecimal depositAmount;
+    int depositPercent;
+    boolean depositPaid;
+    String currency;
+    String status;
+    String locale;
+    List<String> boothCodes;
+    boolean checkoutAvailable;
+    List<PaymentView> payments;
+    List<BankAccount> bankAccounts;
+    String payee;
+  }
 
   @Value
   @Builder

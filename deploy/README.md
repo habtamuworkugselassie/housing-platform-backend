@@ -451,3 +451,12 @@ paid, released if cancelled. Admin > Reservations has the map to change a booth'
 it, or assign booths to a reservation. The public map (`GET /api/v1/sponsorship-reservations/booths`)
 shows status only, never who holds a booth.
 
+### Online payments and reminders
+
+A sponsor can pay the deposit (`RESERVATION_DEPOSIT_PERCENT`, default 30) or the balance through
+the existing Chapa checkout from the reservation page (`/reserve/<reference>?email=...`). A paid
+deposit makes the booth hold permanent; full payment marks the booths sold. The Chapa webhook is
+shared with property deposits, and pending checkouts are re-verified every 15 minutes in case a
+webhook is missed. Registered visitors get a "this week" reminder with their badge between
+`VISITOR_REMINDER_FROM` and `VISITOR_REMINDER_UNTIL` (defaults 7–12 January 2027), 200 per hour.
+

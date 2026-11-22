@@ -69,6 +69,55 @@ public class ReservationMailService {
   }
 
   @Async
+  public void sendPaymentReceipt(
+      SponsorshipReservation r, com.housingplatform.reservation.domain.ReservationPayment p) {
+    if (!sender.configured()) return;
+    boolean am = MailLocale.isAmharic(r.getLocale());
+    boolean full = r.getStatus() == SponsorshipReservation.Status.PAID;
+    BrandedMail m =
+        BrandedMail.create()
+            .lang(am ? "am" : "en")
+            .to(r.getEmail())
+            .replyTo(replyTo)
+            .subject((am ? "ክፍያ ደርሶናል · " : "Payment received · ") + r.getReference())
+            .title(
+                am
+                    ? (full ? "ሙሉ ክፍያዎ ደርሶናል፤ ቦታዎ ተረጋግጧል" : "ቅድመ ክፍያዎ ደርሶናል፤ ቦታዎ ተይዟል")
+                    : (full
+                        ? "Paid in full: your place is confirmed"
+                        : "Deposit received: your booths are secured"))
+            .greeting((am ? "ሰላም " : "Hello ") + r.getContactName() + (am ? "፣" : ","))
+            .paragraph(
+                am
+                    ? "ለ"
+                        + r.getPackageName()
+                        + " ፓኬጅ "
+                        + money(p.getAmount())
+                        + " "
+                        + p.getCurrency()
+                        + " በመስመር ላይ ተቀብለናል።"
+                        + (full ? "" : " ቀሪው ክፍያ ውሉ ከተፈረመ በ10 የስራ ቀናት ውስጥ ይፈጸማል።")
+                    : "We received "
+                        + money(p.getAmount())
+                        + " "
+                        + p.getCurrency()
+                        + " online for the "
+                        + r.getPackageName()
+                        + " package."
+                        + (full
+                            ? ""
+                            : " The balance is due within 10 working days of signing the agreement."))
+            .detail(am ? "ማጣቀሻ" : "Reference", r.getReference())
+            .detail(am ? "የተከፈለ" : "Paid so far", money(r.getAmountPaid()) + " " + r.getCurrency())
+            .detail(
+                am ? "ቀሪ" : "Outstanding",
+                money(r.getAmount().subtract(r.getAmountPaid())) + " " + r.getCurrency())
+            .detail(am ? "የክፍያ መለያ" : "Transaction", p.getTxRef());
+    if (notifyEmail != null && !notifyEmail.isBlank()) m.bcc(notifyEmail.split("\\s*,\\s*"));
+    sender.send(m);
+  }
+
+  @Async
   public void sendReminder(SponsorshipReservation r) {
     if (!sender.configured()) return;
     sender.send(reminder(r));
