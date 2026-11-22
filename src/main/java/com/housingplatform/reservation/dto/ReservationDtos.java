@@ -208,6 +208,11 @@ public final class ReservationDtos {
     BigDecimal outstanding;
     BigDecimal depositAmount;
     int depositPercent;
+
+    /** Chapa's per-transaction ceiling; the next online payment is capped at it. */
+    BigDecimal onlineMax;
+
+    BigDecimal nextOnlineAmount;
     boolean depositPaid;
     String currency;
     String status;

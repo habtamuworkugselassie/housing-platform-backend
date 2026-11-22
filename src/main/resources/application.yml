@@ -175,6 +175,9 @@ app:
   reservation:
     # Share of the package price that locks the booths when paid online through Chapa.
     deposit-percent: ${RESERVATION_DEPOSIT_PERCENT:30}
+    # Chapa accepts at most this much per transaction (ETB); the deposit and each online
+    # instalment are capped here, the rest goes by bank transfer.
+    online-max: ${RESERVATION_ONLINE_MAX:75000}
   exhibition:
     # Comma-separated addresses told about every interest registration; empty = no notice.
     notify-email: ${EXHIBITION_NOTIFY_EMAIL:}
