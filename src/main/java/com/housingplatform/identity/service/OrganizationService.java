@@ -98,6 +98,13 @@ public interface OrganizationService {
   List<com.housingplatform.identity.dto.OrganizationLookupItem> lookup(String q);
 
   /**
+   * Public "is this already us?" check for the forms: exact name, contact email or phone. The first
+   * match wins, email before phone before name. Empty when nothing matches.
+   */
+  Optional<com.housingplatform.identity.dto.OrganizationLookupItem> match(
+      String name, String email, String phone);
+
+  /**
    * Upload an organization document (e.g. business registration, license, VAT, TIN). Replaces
    * existing document if present. Allowed types: BUSINESS_REGISTRATION, LICENSE, VAT_REGISTRATION,
    * TIN_REGISTRATION.

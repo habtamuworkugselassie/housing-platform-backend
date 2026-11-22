@@ -81,6 +81,23 @@ public class OrganizationController {
     return ResponseEntity.ok(organizationService.lookup(q));
   }
 
+  @GetMapping("/match")
+  @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
+  @Operation(
+      summary = "Public organization match",
+      description =
+          "Tells a form whether the typed company, email or phone already belongs to a pending or"
+              + " approved organization; 204 when nothing matches.")
+  public ResponseEntity<com.housingplatform.identity.dto.OrganizationLookupItem> match(
+      @RequestParam(required = false) String name,
+      @RequestParam(required = false) String email,
+      @RequestParam(required = false) String phone) {
+    return organizationService
+        .match(name, email, phone)
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.noContent().build());
+  }
+
   @GetMapping("/mine")
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
   @Operation(

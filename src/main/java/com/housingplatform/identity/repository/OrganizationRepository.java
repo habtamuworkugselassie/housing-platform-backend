@@ -21,6 +21,13 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
   List<Organization> findByNameIgnoreCase(String name);
 
+  @Query(
+      "SELECT DISTINCT o FROM Organization o JOIN o.contact c JOIN c.phones p WHERE p.number LIKE"
+          + " CONCAT('%', :tail) AND o.status IN :statuses ORDER BY o.createdAt DESC")
+  List<Organization> findByPhoneTail(
+      @Param("tail") String tail,
+      @Param("statuses") Collection<Organization.OrganizationStatus> statuses);
+
   /** Public lookup for the reservation and lead forms: name match, limited statuses. */
   @Query(
       "SELECT o FROM Organization o WHERE LOWER(o.name) LIKE LOWER(CONCAT('%', :q, '%')) AND"

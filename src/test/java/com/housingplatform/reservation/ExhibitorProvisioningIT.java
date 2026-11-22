@@ -87,6 +87,19 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
     assertThat(lookup.getResponse().getContentAsString())
         .contains("Abay Steel PLC")
         .contains("PENDING_APPROVAL");
+    MvcResult byEmail =
+        mockMvc.perform(get("/api/v1/organizations/match").param("email", email)).andReturn();
+    assertThat(byEmail.getResponse().getContentAsString())
+        .contains("Abay Steel PLC")
+        .contains("\"matchedBy\":\"email\"");
+    MvcResult byPhone =
+        mockMvc
+            .perform(get("/api/v1/organizations/match").param("phone", "+251 911 000 000"))
+            .andReturn();
+    assertThat(byPhone.getResponse().getContentAsString()).contains("\"matchedBy\":\"phone\"");
+    MvcResult none =
+        mockMvc.perform(get("/api/v1/organizations/match").param("name", "Nobody Ltd")).andReturn();
+    assertThat(none.getResponse().getStatus()).isEqualTo(204);
 
     // Before any payment the account is refused.
     try {

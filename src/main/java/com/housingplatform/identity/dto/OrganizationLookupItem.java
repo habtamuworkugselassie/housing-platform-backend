@@ -17,4 +17,7 @@ public class OrganizationLookupItem {
   private String city;
   private String type;
   private String status;
+
+  /** For a match: email, phone or name. */
+  private String matchedBy;
 }
