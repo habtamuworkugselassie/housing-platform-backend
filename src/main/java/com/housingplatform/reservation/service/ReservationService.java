@@ -56,6 +56,16 @@ public class ReservationService {
   private final ReservationOrganizationLinker linker;
   private final com.housingplatform.exhibition.repository.ExhibitionInterestRepository interests;
 
+  @org.springframework.beans.factory.annotation.Value("${app.reservation.payment-due-days:10}")
+  private int paymentDueDays = 10;
+
+  @org.springframework.beans.factory.annotation.Value(
+      "${app.reservation.payment-reminder-every-days:3}")
+  private int paymentReminderEveryDays = 3;
+
+  @org.springframework.beans.factory.annotation.Value("${app.reservation.payment-reminder-max:3}")
+  private int paymentReminderMax = 3;
+
   @Transactional
   public Confirmation reserve(ReserveRequest r) {
     if (r.getWebsite() != null && !r.getWebsite().isBlank()) {
@@ -162,6 +172,10 @@ public class ReservationService {
                         ? now
                         : null)
                 .paidAt(status == Status.PAID ? now : null)
+                .paymentDueAt(
+                    status == Status.SIGNED || status == Status.DEPOSIT_PAID
+                        ? plusBusinessDays(now, paymentDueDays)
+                        : null)
                 .build());
     linker.link(saved, c.getOrganizationId());
     linker.linkLead(saved);
@@ -227,10 +241,22 @@ public class ReservationService {
         paidValue = paidValue.add(paid);
       }
     }
+    LocalDateTime now = LocalDateTime.now();
+    long overdueCount = 0;
+    BigDecimal overdueValue = BigDecimal.ZERO;
+    for (SponsorshipReservation r :
+        repository.findByStatusInAndPaymentDueAtBefore(
+            List.of(Status.SIGNED, Status.DEPOSIT_PAID), now)) {
+      if (!r.overdue(now)) continue;
+      overdueCount++;
+      overdueValue = overdueValue.add(r.outstanding());
+    }
     return Pipeline.builder()
         .openCount(openCount)
         .openValue(openValue)
         .paidValue(paidValue)
+        .overdueCount(overdueCount)
+        .overdueValue(overdueValue)
         .byStatus(by)
         .booths(boothService.counts())
         .build();
@@ -249,6 +275,8 @@ public class ReservationService {
         if (next == Status.AGREEMENT_SENT && r.getAgreementSentAt() == null)
           r.setAgreementSentAt(now);
         if (next == Status.SIGNED && r.getSignedAt() == null) r.setSignedAt(now);
+        if ((next == Status.SIGNED || next == Status.DEPOSIT_PAID) && r.getPaymentDueAt() == null)
+          r.setPaymentDueAt(plusBusinessDays(now, paymentDueDays));
         if (next == Status.PAID) {
           r.setPaidAt(now);
           if (r.getAmountPaid() == null || r.getAmountPaid().signum() == 0)
@@ -272,9 +300,24 @@ public class ReservationService {
               || r.getStatus() == Status.SIGNED)) {
         r.setStatus(Status.DEPOSIT_PAID);
         r.setStatusChangedAt(now);
+        if (r.getPaymentDueAt() == null) r.setPaymentDueAt(plusBusinessDays(now, paymentDueDays));
       }
     }
     if (u.getAmount() != null && u.getAmount().signum() >= 0) r.setAmount(u.getAmount());
+    if (u.getPaymentDueAt() != null) {
+      String v = u.getPaymentDueAt().trim();
+      if (v.isEmpty()) r.setPaymentDueAt(null);
+      else {
+        try {
+          r.setPaymentDueAt(
+              v.length() <= 10
+                  ? java.time.LocalDate.parse(v).atTime(17, 0)
+                  : LocalDateTime.parse(v));
+        } catch (java.time.format.DateTimeParseException e) {
+          throw new BusinessException("Payment due date must be a date like 2026-12-05");
+        }
+      }
+    }
     if (u.getAdminNotes() != null) r.setAdminNotes(blankToNull(u.getAdminNotes()));
     if (u.getAssignedTo() != null) r.setAssignedTo(blankToNull(u.getAssignedTo()));
     if (u.getBoothPreference() != null) r.setBoothPreference(blankToNull(u.getBoothPreference()));
@@ -351,13 +394,38 @@ public class ReservationService {
     int sent = 0;
     for (SponsorshipReservation r :
         repository.findByStatusInAndStatusChangedAtBefore(
-            List.of(Status.REQUESTED, Status.AGREEMENT_SENT, Status.SIGNED), cutoff)) {
+            List.of(Status.REQUESTED, Status.AGREEMENT_SENT), cutoff)) {
       if (r.getReminderCount() >= maxReminders) continue;
       if (r.getLastReminderAt() != null && r.getLastReminderAt().isAfter(cutoff)) continue;
       r.setLastReminderAt(LocalDateTime.now());
       r.setReminderCount(r.getReminderCount() + 1);
       SponsorshipReservation saved = repository.save(r);
       afterCommit(() -> mail.sendReminder(saved));
+      sent++;
+    }
+    return sent;
+  }
+
+  /**
+   * "Payment due" emails for signed or part-paid reservations past their due date: the first on the
+   * day after it passes, then every few business days, at most a few times.
+   */
+  @Transactional
+  public int sendPaymentDueReminders() {
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime cutoff = minusBusinessDays(now, paymentReminderEveryDays);
+    int sent = 0;
+    for (SponsorshipReservation r :
+        repository.findByStatusInAndPaymentDueAtBefore(
+            List.of(Status.SIGNED, Status.DEPOSIT_PAID), now)) {
+      if (!r.overdue(now)) continue;
+      if (r.getPaymentReminderCount() >= paymentReminderMax) continue;
+      if (r.getLastPaymentReminderAt() != null && r.getLastPaymentReminderAt().isAfter(cutoff))
+        continue;
+      r.setLastPaymentReminderAt(now);
+      r.setPaymentReminderCount(r.getPaymentReminderCount() + 1);
+      SponsorshipReservation saved = repository.save(r);
+      afterCommit(() -> mail.sendPaymentDue(saved));
       sent++;
     }
     return sent;
@@ -451,6 +519,10 @@ public class ReservationService {
         .organizationId(r.getOrganization() != null ? r.getOrganization().getId() : null)
         .organizationName(r.getOrganization() != null ? r.getOrganization().getName() : null)
         .interestId(r.getInterest() != null ? r.getInterest().getId() : null)
+        .paymentDueAt(r.getPaymentDueAt())
+        .paymentReminderCount(r.getPaymentReminderCount())
+        .overdue(r.overdue(LocalDateTime.now()))
+        .outstanding(r.outstanding())
         .exhibitorInvitedAt(r.getExhibitorInvitedAt())
         .build();
   }

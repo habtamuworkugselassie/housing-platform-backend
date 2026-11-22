@@ -327,6 +327,8 @@ public class ReservationPaymentService {
     BigDecimal paid = r.getAmountPaid() == null ? BigDecimal.ZERO : r.getAmountPaid();
     boolean depositDone = paid.compareTo(depositFor(r)) >= 0;
     return StatusView.builder()
+        .paymentDueAt(r.getPaymentDueAt())
+        .overdue(r.overdue(LocalDateTime.now()))
         .reference(r.getReference())
         .packageName(r.getPackageName())
         .company(r.getCompany())

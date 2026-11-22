@@ -497,3 +497,17 @@ meantime all count. `LEAD_NUDGE_ENABLED=false` switches it off.
 `deploy/cleanup-test-data.sql` removes test organizations, leads, reservations, payments, media
 and placeholder users. It runs as a dry run (reports, then `ROLLBACK`); edit the name and
 reference lists at the top, check the report, then change the last line to `COMMIT`.
+
+## 17. Payment follow-up and the public exhibitor directory
+
+Signing a reservation (stage SIGNED, or a deposit recorded) starts the payment clock:
+`payment_due_at` = `RESERVATION_PAYMENT_DUE_DAYS` business days later (default 10; editable per
+reservation in the Edit dialog). Past that date with money outstanding, the reservation is
+overdue: the pipeline shows an "Overdue payments" total, the row and the public status page say
+so, and the morning job emails "Payment due" (bank details plus the online link) every
+`RESERVATION_PAYMENT_REMINDER_EVERY_DAYS` business days (default 3), at most
+`RESERVATION_PAYMENT_REMINDER_MAX` times (default 3). Idle reminders now stop at AGREEMENT_SENT.
+
+`GET /api/v1/sponsorship-reservations/exhibitors` is the public directory behind `/exhibitors`:
+every organization with an active approved sponsorship (paid reservations create one), with its
+approved logo and the booths of its paid reservation.

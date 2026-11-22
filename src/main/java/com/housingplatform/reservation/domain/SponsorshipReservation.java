@@ -110,6 +110,30 @@ public class SponsorshipReservation extends BaseEntity {
   @Column(name = "status_changed_at", nullable = false)
   private LocalDateTime statusChangedAt;
 
+  /** When the money is due: set at signing (business days after), editable by an admin. */
+  @Column(name = "payment_due_at")
+  private LocalDateTime paymentDueAt;
+
+  @Column(name = "payment_reminder_count", nullable = false)
+  private int paymentReminderCount;
+
+  @Column(name = "last_payment_reminder_at")
+  private LocalDateTime lastPaymentReminderAt;
+
+  public BigDecimal outstanding() {
+    BigDecimal paid = amountPaid == null ? BigDecimal.ZERO : amountPaid;
+    BigDecimal total = amount == null ? BigDecimal.ZERO : amount;
+    return total.subtract(paid).max(BigDecimal.ZERO);
+  }
+
+  /** Signed or part-paid, past the due date, and money still outstanding. */
+  public boolean overdue(LocalDateTime now) {
+    return (status == Status.SIGNED || status == Status.DEPOSIT_PAID)
+        && paymentDueAt != null
+        && paymentDueAt.isBefore(now)
+        && outstanding().signum() > 0;
+  }
+
   /** The exhibitor account provisioned from this reservation, once a payment is in. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "organization_id")

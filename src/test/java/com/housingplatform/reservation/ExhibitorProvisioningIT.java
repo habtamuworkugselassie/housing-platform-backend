@@ -109,6 +109,18 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
     } catch (com.housingplatform.shared.exception.BusinessException expected) {
     }
 
+    AdminUpdate signed = new AdminUpdate();
+    signed.setStatus("SIGNED");
+    AdminRow signedRow = reservations.update(r.getId(), signed);
+    assertThat(signedRow.getStatus()).isEqualTo("SIGNED");
+    // Signing starts the payment clock: ten business days, not yet overdue.
+    assertThat(signedRow.getPaymentDueAt()).isAfter(java.time.LocalDateTime.now().plusDays(9));
+    assertThat(signedRow.isOverdue()).isFalse();
+    AdminUpdate due = new AdminUpdate();
+    due.setPaymentDueAt("2026-01-05");
+    assertThat(reservations.update(r.getId(), due).isOverdue()).isTrue();
+    assertThat(reservations.pipeline().getOverdueCount()).isGreaterThanOrEqualTo(1);
+
     AdminUpdate u = new AdminUpdate();
     u.setAmountPaid(new BigDecimal("75000"));
     AdminRow row = reservations.update(r.getId(), u);
@@ -133,6 +145,13 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
             a ->
                 a.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED
                     && a.getSponsorship().getId().equals(pkg.getId()));
+
+    // It is now listed publicly as an exhibitor.
+    MvcResult dir = mockMvc.perform(get("/api/v1/sponsorship-reservations/exhibitors")).andReturn();
+    assertThat(dir.getResponse().getStatus()).isEqualTo(200);
+    assertThat(dir.getResponse().getContentAsString())
+        .contains("Abay Steel PLC")
+        .contains("SILVER");
 
     // Second run without a re-invite leaves everything as it is.
     AdminRow again = provisioning.provision(r.getId(), false);

@@ -241,4 +241,56 @@ class ReservationServiceTest {
     assertThat(row.getBoothCodes()).containsExactly("B104");
     verify(mail, never()).sendConfirmation(any(), anyBoolean(), anyBoolean());
   }
+
+  @Test
+  void paymentDueRemindersGoToOverdueSignedReservationsOnly() {
+    LocalDateTime now = LocalDateTime.now();
+    SponsorshipReservation overdue =
+        SponsorshipReservation.builder()
+            .reference("RSV-OVER01")
+            .packageName("Gold")
+            .amount(new BigDecimal("900000"))
+            .amountPaid(BigDecimal.ZERO)
+            .currency("ETB")
+            .status(SponsorshipReservation.Status.SIGNED)
+            .paymentDueAt(now.minusDays(2))
+            .statusChangedAt(now.minusDays(20))
+            .build();
+    overdue.setId(UUID.randomUUID());
+    SponsorshipReservation settled =
+        SponsorshipReservation.builder()
+            .reference("RSV-PAID01")
+            .packageName("Gold")
+            .amount(new BigDecimal("900000"))
+            .amountPaid(new BigDecimal("900000"))
+            .currency("ETB")
+            .status(SponsorshipReservation.Status.DEPOSIT_PAID)
+            .paymentDueAt(now.minusDays(2))
+            .statusChangedAt(now.minusDays(20))
+            .build();
+    settled.setId(UUID.randomUUID());
+    SponsorshipReservation remindedToday =
+        SponsorshipReservation.builder()
+            .reference("RSV-RECENT")
+            .packageName("Gold")
+            .amount(new BigDecimal("900000"))
+            .amountPaid(BigDecimal.ZERO)
+            .currency("ETB")
+            .status(SponsorshipReservation.Status.SIGNED)
+            .paymentDueAt(now.minusDays(5))
+            .lastPaymentReminderAt(now.minusHours(2))
+            .paymentReminderCount(1)
+            .statusChangedAt(now.minusDays(20))
+            .build();
+    remindedToday.setId(UUID.randomUUID());
+    when(repo.findByStatusInAndPaymentDueAtBefore(any(), any()))
+        .thenReturn(List.of(overdue, settled, remindedToday));
+    when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+    assertThat(service.sendPaymentDueReminders()).isEqualTo(1);
+    assertThat(overdue.getPaymentReminderCount()).isEqualTo(1);
+    assertThat(overdue.getLastPaymentReminderAt()).isNotNull();
+    assertThat(settled.overdue(now)).isFalse();
+    assertThat(overdue.outstanding()).isEqualByComparingTo("900000");
+  }
 }
