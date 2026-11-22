@@ -38,7 +38,9 @@ public record DisplaySettingsUpdateRequest(
                     + " exhibition landing page",
             example = "true")
         Boolean exhibitionSponsorshipPackagePricesVisible,
-    @Schema(description = "Show the live broadcast section on the exhibition page", example = "false")
+    @Schema(
+            description = "Show the live broadcast section on the exhibition page",
+            example = "false")
         Boolean exhibitionLiveVisible,
     @Schema(description = "Live video source: EXTERNAL_EMBED or HLS", example = "EXTERNAL_EMBED")
         String liveSourceType,
@@ -49,10 +51,12 @@ public record DisplaySettingsUpdateRequest(
     @Schema(description = "Watch-on YouTube link for the live zone") String liveYoutubeUrl,
     @Schema(description = "Watch-on TikTok link for the live zone") String liveTiktokUrl,
     @Schema(description = "Watch-on Facebook link for the live zone") String liveFacebookUrl,
-    @Schema(description = "Show the visitor video-feedback section on the exhibition page", example = "false")
+    @Schema(
+            description = "Show the visitor video-feedback section on the exhibition page",
+            example = "false")
         Boolean exhibitionFeedbackVisible,
     @Schema(
             description = "Publish submitted feedback videos immediately (else hold for review)",
             example = "false")
         Boolean exhibitionFeedbackAutoPublish,
-        Boolean exhibitionLiveAutoSimulcast) {}
+    Boolean exhibitionLiveAutoSimulcast) {}

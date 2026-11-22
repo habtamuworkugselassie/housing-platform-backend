@@ -72,9 +72,9 @@ public class DisplaySettingsServiceImpl implements DisplaySettingsService {
         .liveTiktokUrl(parseString(map, KEY_LIVE_TIKTOK_URL, ""))
         .liveFacebookUrl(parseString(map, KEY_LIVE_FACEBOOK_URL, ""))
         .exhibitionFeedbackVisible(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_VISIBLE, false))
-        .exhibitionFeedbackAutoPublish(parseBoolean(map, KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH, false))
-        .exhibitionLiveAutoSimulcast(
-            parseBoolean(map, KEY_EXHIBITION_LIVE_AUTO_SIMULCAST, false))
+        .exhibitionFeedbackAutoPublish(
+            parseBoolean(map, KEY_EXHIBITION_FEEDBACK_AUTO_PUBLISH, false))
+        .exhibitionLiveAutoSimulcast(parseBoolean(map, KEY_EXHIBITION_LIVE_AUTO_SIMULCAST, false))
         .footer(resolveFooterContact(map))
         .build();
   }

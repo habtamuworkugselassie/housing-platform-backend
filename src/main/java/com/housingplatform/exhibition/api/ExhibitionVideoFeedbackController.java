@@ -46,7 +46,9 @@ public class ExhibitionVideoFeedbackController {
   }
 
   @GetMapping
-  @Operation(summary = "List approved video feedback", description = "Public feed of approved clips.")
+  @Operation(
+      summary = "List approved video feedback",
+      description = "Public feed of approved clips.")
   public ResponseEntity<Page<VideoFeedbackResponse>> listApproved(
       @PageableDefault(size = 12, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

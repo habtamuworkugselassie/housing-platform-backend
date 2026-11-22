@@ -69,6 +69,40 @@ public class OrganizationController {
     return ResponseEntity.ok(bank);
   }
 
+  @GetMapping("/mine")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @Operation(
+      summary = "Get the organization the signed-in user manages",
+      description =
+          "Primary contact, member or super agent view, including media still waiting for review."
+              + " 404 when the user has no organization.")
+  public ResponseEntity<OrganizationResponse> getMine() {
+    return organizationService
+        .getCurrentUserOrganization()
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.notFound().build());
+  }
+
+  @GetMapping("/media-reviews/pending")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(summary = "Organization media waiting for admin review")
+  public ResponseEntity<List<com.housingplatform.identity.dto.OrganizationMediaItem>>
+      pendingMediaReviews() {
+    return ResponseEntity.ok(organizationService.listPendingOrganizationMedia());
+  }
+
+  @PatchMapping("/{id}/media/{attachmentId}/review")
+  @AuthPolicyScope(AuthPolicyScope.Policy.ADMIN_SECURED)
+  @Operation(summary = "Approve or reject an organization media item")
+  public ResponseEntity<OrganizationResponse> reviewOrganizationMedia(
+      @PathVariable UUID id,
+      @PathVariable UUID attachmentId,
+      @RequestBody com.housingplatform.identity.dto.MediaReviewRequest body) {
+    return ResponseEntity.ok(
+        organizationService.reviewOrganizationMedia(
+            id, attachmentId, body.getStatus(), body.getNote()));
+  }
+
   @GetMapping("/marketplace")
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
   @Operation(

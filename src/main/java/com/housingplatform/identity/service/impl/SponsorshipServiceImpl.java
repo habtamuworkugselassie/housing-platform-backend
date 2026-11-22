@@ -379,6 +379,62 @@ public class SponsorshipServiceImpl implements SponsorshipService {
     return approveApplicationInternal(id, notes, true);
   }
 
+  @Override
+  @Transactional
+  @CacheEvict(
+      value = {"sponsoredOrganizations", "exclusiveOrganizations"},
+      allEntries = true)
+  public SponsorshipApplicationResponse grantFromReservation(
+      UUID organizationId, UUID sponsorshipId, String notes) {
+    Organization organization =
+        organizationRepository
+            .findById(organizationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
+    Sponsorship sponsorship =
+        sponsorshipRepository
+            .findById(sponsorshipId)
+            .orElseThrow(() -> new ResourceNotFoundException("Sponsorship", sponsorshipId));
+    LocalDateTime now = LocalDateTime.now();
+    List<SponsorshipApplication> existing =
+        applicationRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
+    for (SponsorshipApplication app : existing) {
+      if (app.getStatus() == SponsorshipApplication.ApplicationStatus.APPROVED
+          && app.getSponsorship() != null
+          && sponsorshipId.equals(app.getSponsorship().getId())
+          && app.getEndDate() != null
+          && app.getEndDate().isAfter(now)) {
+        if (organization.getStatus() != Organization.OrganizationStatus.APPROVED) {
+          organization.setStatus(Organization.OrganizationStatus.APPROVED);
+          organizationRepository.save(organization);
+          organizationService.evictListingCachesForOrganization(organizationId);
+        }
+        return toApplicationResponse(app);
+      }
+    }
+    for (SponsorshipApplication app : existing) {
+      if (app.getStatus() == SponsorshipApplication.ApplicationStatus.PENDING) {
+        app.setStatus(SponsorshipApplication.ApplicationStatus.CANCELLED);
+        applicationRepository.save(app);
+      }
+    }
+    SponsorshipApplication application =
+        applicationRepository.save(
+            SponsorshipApplication.builder()
+                .sponsorship(sponsorship)
+                .organization(organization)
+                .status(SponsorshipApplication.ApplicationStatus.PENDING)
+                .startDate(now)
+                .endDate(now.plusYears(1))
+                .notes(notes)
+                .amount(sponsorship.getBasePrice())
+                .organizationVerifiedAt(now)
+                .userVerifiedAt(now)
+                .organizationWasApprovedBeforeApplication(
+                    organization.getStatus() == Organization.OrganizationStatus.APPROVED)
+                .build());
+    return approveApplicationInternal(application.getId(), notes, false);
+  }
+
   private SponsorshipApplicationResponse approveApplicationInternal(
       UUID id, String notes, boolean requireVerification) {
     SponsorshipApplication application =

@@ -14,6 +14,11 @@ import org.springframework.stereotype.Repository;
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
   Optional<Organization> findByRegistrationNumber(String registrationNumber);
 
+  @Query(
+      "SELECT o FROM Organization o WHERE LOWER(o.contact.email) = LOWER(:email) ORDER BY"
+          + " o.createdAt DESC")
+  List<Organization> findByContactEmail(@Param("email") String email);
+
   List<Organization> findByType(Organization.OrganizationType type);
 
   List<Organization> findByStatus(Organization.OrganizationStatus status);

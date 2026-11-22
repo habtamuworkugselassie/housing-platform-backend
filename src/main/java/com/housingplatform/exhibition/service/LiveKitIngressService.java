@@ -49,10 +49,7 @@ public class LiveKitIngressService {
 
     JsonNode res = post("CreateIngress", body);
     return new IngressResponse(
-        text(res, "ingress_id"),
-        whip ? "WHIP" : "RTMP",
-        text(res, "url"),
-        text(res, "stream_key"));
+        text(res, "ingress_id"), whip ? "WHIP" : "RTMP", text(res, "url"), text(res, "stream_key"));
   }
 
   public void deleteIngress(String ingressId) {

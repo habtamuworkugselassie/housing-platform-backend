@@ -29,4 +29,13 @@ public interface MediaAttachmentRepository extends JpaRepository<MediaAttachment
   void deleteByPropertyId(UUID propertyId);
 
   void deleteByOrganizationId(UUID organizationId);
+
+  @Query(
+      "SELECT m FROM MediaAttachment m JOIN FETCH m.organization o WHERE m.reviewStatus ="
+          + " com.housingplatform.media.domain.MediaAttachment$ReviewStatus.PENDING ORDER BY"
+          + " m.createdAt ASC")
+  List<MediaAttachment> findPendingOrganizationMedia();
+
+  long countByReviewStatusAndOrganizationIsNotNull(
+      com.housingplatform.media.domain.MediaAttachment.ReviewStatus reviewStatus);
 }

@@ -43,6 +43,14 @@ public interface SponsorshipService {
 
   SponsorshipApplicationResponse approveApplication(UUID id, String notes);
 
+  /**
+   * A paid reservation grants the package outright: any pending application of the organization is
+   * cancelled, an approved one for this package is created (or kept when it already exists), and
+   * the organization becomes publicly listed.
+   */
+  SponsorshipApplicationResponse grantFromReservation(
+      UUID organizationId, UUID sponsorshipId, String notes);
+
   SponsorshipApplicationResponse verifyOrganizationForApplication(UUID id);
 
   SponsorshipApplicationResponse verifyUserForApplication(

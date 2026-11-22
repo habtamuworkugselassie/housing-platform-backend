@@ -257,6 +257,25 @@ public final class ReservationDtos {
     LocalDateTime updatedAt;
     List<String> boothCodes;
     int boothsIncluded;
+    UUID organizationId;
+    LocalDateTime exhibitorInvitedAt;
+  }
+
+  /** What a signed-in exhibitor sees of its own reservations. */
+  @Data
+  @Builder
+  public static class ExhibitorRow {
+    String reference;
+    String packageName;
+    String packageType;
+    BigDecimal amount;
+    BigDecimal amountPaid;
+    String currency;
+    String status;
+    List<String> boothCodes;
+    int boothsIncluded;
+    String email;
+    LocalDateTime paidAt;
   }
 
   @Data

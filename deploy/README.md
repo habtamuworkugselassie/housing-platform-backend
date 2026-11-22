@@ -460,3 +460,27 @@ shared with property deposits, and pending checkouts are re-verified every 15 mi
 webhook is missed. Registered visitors get a "this week" reminder with their badge between
 `VISITOR_REMINDER_FROM` and `VISITOR_REMINDER_UNTIL` (defaults 7–12 January 2027), 200 per hour.
 
+
+## 15. Exhibitor self-service (portal at /exhibitor)
+
+When a reservation reaches DEPOSIT_PAID or PAID (admin edit, manual entry, or a Chapa payment),
+the backend provisions the exhibitor account after the transaction commits:
+
+1. The organization is found through the contact's existing user account or contact email, or
+   created from the reservation (company, TIN, phone; type `SUPPLIER` until the exhibitor changes
+   it in the portal).
+2. The contact becomes the organization's primary user (`PENDING_VERIFICATION` until they set a
+   password) and an approved sponsorship for the reserved package is recorded, so the organization
+   is listed publicly and appears on the sponsor strip once its logo is approved.
+3. An invitation email with a 72-hour set-password link (`/reset-password?token=…&welcome=1`)
+   goes to the contact. An admin can trigger or repeat this from Reservations ("Create exhibitor
+   account" / "Re-send portal invite").
+
+In the portal the exhibitor edits the company profile and uploads a logo, photos and videos.
+Uploads from exhibitor accounts are stored with `review_status = PENDING`; they are hidden from
+public responses (and from the sponsor strip) until an admin approves them under Reservations >
+Exhibitor uploads. Each exhibitor upload emails `EXHIBITION_NOTIFY_EMAIL`, and the exhibitor is
+emailed when an item is approved or rejected. Admin uploads stay approved on save.
+
+Password resets now also activate a `PENDING_VERIFICATION` user, so the invitation link is enough
+to sign in.
