@@ -396,6 +396,57 @@ public class OrganizationServiceImpl implements OrganizationService {
         .toList();
   }
 
+  private static final List<Organization.OrganizationStatus> PUBLIC_MATCH_STATUSES =
+      List.of(
+          Organization.OrganizationStatus.PENDING_APPROVAL,
+          Organization.OrganizationStatus.SPONSORSHIP_PENDING,
+          Organization.OrganizationStatus.APPROVED);
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<com.housingplatform.identity.dto.OrganizationLookupItem> match(
+      String name, String email, String phone) {
+    Organization hit = null;
+    String matchedBy = null;
+    if (email != null && email.contains("@")) {
+      hit =
+          organizationRepository.findByContactEmail(email.trim()).stream()
+              .filter(o -> PUBLIC_MATCH_STATUSES.contains(o.getStatus()))
+              .findFirst()
+              .orElse(null);
+      if (hit != null) matchedBy = "email";
+    }
+    if (hit == null && phone != null) {
+      String digits = phone.replaceAll("\\D", "");
+      if (digits.length() >= 9) {
+        String tail = digits.substring(digits.length() - 9);
+        hit =
+            organizationRepository.findByPhoneTail(tail, PUBLIC_MATCH_STATUSES).stream()
+                .findFirst()
+                .orElse(null);
+        if (hit != null) matchedBy = "phone";
+      }
+    }
+    if (hit == null && name != null && name.trim().length() >= 3) {
+      hit =
+          organizationRepository.findByNameIgnoreCase(name.trim()).stream()
+              .filter(o -> PUBLIC_MATCH_STATUSES.contains(o.getStatus()))
+              .findFirst()
+              .orElse(null);
+      if (hit != null) matchedBy = "name";
+    }
+    if (hit == null) return Optional.empty();
+    return Optional.of(
+        com.housingplatform.identity.dto.OrganizationLookupItem.builder()
+            .id(hit.getId())
+            .name(hit.getName())
+            .city(hit.getCity())
+            .type(hit.getType() != null ? hit.getType().name() : null)
+            .status(hit.getStatus() != null ? hit.getStatus().name() : null)
+            .matchedBy(matchedBy)
+            .build());
+  }
+
   @Override
   @Transactional(readOnly = true)
   public Optional<OrganizationResponse> getCurrentUserOrganization() {
