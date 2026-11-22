@@ -51,6 +51,7 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
   @Autowired PasswordResetTokenRepository tokens;
   @Autowired JwtTokenProvider jwt;
   @Autowired com.housingplatform.exhibition.service.ExhibitionInterestService interestService;
+  @Autowired com.housingplatform.exhibition.service.AdminExhibitionInterestService adminLeads;
 
   @Test
   void paidReservationBecomesAnExhibitorAccountWithReviewedMedia() throws Exception {
@@ -268,6 +269,18 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
         interestService.register(lead);
     assertThat(res.getOrganizationId()).isEqualTo(existing.getId());
     assertThat(organizations.findByNameIgnoreCase("Existing Cement SC")).hasSize(1);
+    org.springframework.data.domain.Page<
+            com.housingplatform.exhibition.dto.AdminExhibitionInterestResponse>
+        found =
+            adminLeads.list(
+                org.springframework.data.domain.PageRequest.of(0, 10),
+                "existing cement",
+                "exhibitor");
+    assertThat(found.getContent()).anyMatch(l -> l.getEmail().equals(lead.getEmail()));
+    assertThat(
+            adminLeads.list(
+                org.springframework.data.domain.PageRequest.of(0, 10), "zzz-nomatch", null))
+        .isEmpty();
   }
 
   @Test

@@ -10,7 +10,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ExhibitionInterestRepository extends JpaRepository<ExhibitionInterest, UUID> {
+public interface ExhibitionInterestRepository
+    extends JpaRepository<ExhibitionInterest, UUID>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<ExhibitionInterest> {
 
   @EntityGraph(
       attributePaths = {

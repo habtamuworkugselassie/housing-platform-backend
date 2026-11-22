@@ -37,6 +37,33 @@ public class AdminExhibitionInterestServiceImpl implements AdminExhibitionIntere
     return repository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public Page<AdminExhibitionInterestResponse> list(Pageable pageable, String q, String type) {
+    boolean hasQ = q != null && !q.isBlank();
+    boolean hasType = type != null && !type.isBlank();
+    if (!hasQ && !hasType) return list(pageable);
+    org.springframework.data.jpa.domain.Specification<ExhibitionInterest> spec =
+        (root, query, cb) -> cb.conjunction();
+    if (hasQ) {
+      String like = "%" + q.trim().toLowerCase(java.util.Locale.ROOT) + "%";
+      spec =
+          spec.and(
+              (root, query, cb) -> {
+                var org = root.join("organization", jakarta.persistence.criteria.JoinType.LEFT);
+                return cb.or(
+                    cb.like(cb.lower(root.get("email")), like),
+                    cb.like(cb.lower(cb.coalesce(root.get("company"), "")), like),
+                    cb.like(cb.lower(cb.coalesce(org.get("name"), "")), like));
+              });
+    }
+    if (hasType) {
+      String t = type.trim().toLowerCase(java.util.Locale.ROOT);
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("interestType"), t));
+    }
+    return repository.findAll(spec, pageable).map(this::toResponse);
+  }
+
   private AdminExhibitionInterestResponse toResponse(ExhibitionInterest e) {
     Organization o = e.getOrganization();
     Sponsorship s = e.getSponsorship();

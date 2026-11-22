@@ -10,6 +10,12 @@ public interface AdminExhibitionInterestService {
 
   Page<AdminExhibitionInterestResponse> list(Pageable pageable);
 
+  /**
+   * @param q matches email, company or organization name (case-insensitive, contains)
+   * @param type exhibitor, partner or visitor
+   */
+  Page<AdminExhibitionInterestResponse> list(Pageable pageable, String q, String type);
+
   AdminExhibitionInterestResponse verifyContact(
       UUID interestId, ProvisionOrganizationPrimaryUserRequest request);
 

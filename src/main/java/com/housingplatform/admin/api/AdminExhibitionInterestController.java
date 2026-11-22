@@ -39,8 +39,10 @@ public class AdminExhibitionInterestController {
           "Paginated list of exhibition leads (exhibitor/visitor, optional package, linked organization). Admin only.")
   public ResponseEntity<Page<AdminExhibitionInterestResponse>> list(
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
-          Pageable pageable) {
-    return ResponseEntity.ok(adminExhibitionInterestService.list(pageable));
+          Pageable pageable,
+      @org.springframework.web.bind.annotation.RequestParam(required = false) String q,
+      @org.springframework.web.bind.annotation.RequestParam(required = false) String type) {
+    return ResponseEntity.ok(adminExhibitionInterestService.list(pageable, q, type));
   }
 
   @org.springframework.web.bind.annotation.PostMapping("/{id}/invite-to-reserve")
