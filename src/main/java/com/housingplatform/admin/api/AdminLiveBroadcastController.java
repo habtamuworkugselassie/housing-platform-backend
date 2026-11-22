@@ -14,7 +14,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/** Organizer moderation of live broadcasts: approve / reject go-live requests and cut live streams. */
+/**
+ * Organizer moderation of live broadcasts: approve / reject go-live requests and cut live streams.
+ */
 @RestController
 @RequestMapping("/api/v1/admin/exhibition/live")
 @Tag(name = "Admin - Exhibition", description = "Moderate live broadcasts")

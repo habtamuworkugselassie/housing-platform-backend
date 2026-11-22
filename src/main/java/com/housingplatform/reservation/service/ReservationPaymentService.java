@@ -48,6 +48,7 @@ public class ReservationPaymentService {
   private final ChapaProperties chapaProperties;
   private final BoothService boothService;
   private final ReservationMailService mail;
+  private final org.springframework.context.ApplicationEventPublisher events;
 
   /** Share of the package price that locks the booths; the rest is due within 10 working days. */
   @Value("${app.reservation.deposit-percent:30}")
@@ -233,6 +234,7 @@ public class ReservationPaymentService {
               + ")";
       r.setAdminNotes(r.getAdminNotes() == null ? note : r.getAdminNotes() + "\n" + note);
       reservations.save(r);
+      events.publishEvent(new ReservationPaidEvent(r.getId()));
       mail.sendPaymentReceipt(r, p);
       log.info(
           "Reservation {} paid {} {} online ({})",

@@ -46,7 +46,9 @@ public interface PurchaseAgreementService {
    * to the Promise to Purchase. Fails if the referenced template is not the current one.
    */
   default void signPromiseToPurchaseAtCreation(
-      PropertyPurchaseOrder order, AgreementSignatureRequest signature, SignatureEvidence evidence) {
+      PropertyPurchaseOrder order,
+      AgreementSignatureRequest signature,
+      SignatureEvidence evidence) {
     signPromiseToPurchaseAtCreation(order, signature, null, evidence);
   }
 

@@ -24,6 +24,20 @@ public class ReservationController {
 
   private final ReservationService service;
   private final com.housingplatform.reservation.service.ReservationPaymentService payments;
+  private final com.housingplatform.identity.service.OrganizationService organizations;
+
+  @org.springframework.web.bind.annotation.GetMapping("/mine")
+  @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
+  @Operation(summary = "Reservations of the signed-in exhibitor's organization")
+  public ResponseEntity<
+          java.util.List<com.housingplatform.reservation.dto.ReservationDtos.ExhibitorRow>>
+      mine() {
+    return ResponseEntity.ok(
+        organizations
+            .getCurrentUserOrganization()
+            .map(o -> service.forOrganization(o.getId()))
+            .orElseGet(java.util.List::of));
+  }
 
   @org.springframework.web.bind.annotation.GetMapping("/{reference}")
   @Operation(summary = "A reservation's status and payments (reference + the sponsor's email)")

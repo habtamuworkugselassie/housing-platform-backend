@@ -44,7 +44,13 @@ class ReservationPaymentServiceTest {
   private final ReservationMailService mail = mock(ReservationMailService.class);
   private final ReservationPaymentService service =
       new ReservationPaymentService(
-          reservations, payments, chapa, new ChapaProperties(), booths, mail);
+          reservations,
+          payments,
+          chapa,
+          new ChapaProperties(),
+          booths,
+          mail,
+          mock(org.springframework.context.ApplicationEventPublisher.class));
 
   private SponsorshipReservation gold() {
     SponsorshipReservation r =

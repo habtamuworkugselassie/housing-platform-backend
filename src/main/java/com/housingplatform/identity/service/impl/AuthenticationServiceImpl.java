@@ -572,6 +572,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
     user.setPasswordSet(true);
+    if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
+      user.setStatus(User.UserStatus.ACTIVE);
+    }
     userRepository.save(user);
 
     resetToken.setUsedAt(now);

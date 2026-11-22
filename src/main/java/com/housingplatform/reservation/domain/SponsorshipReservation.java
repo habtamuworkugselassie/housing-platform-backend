@@ -1,5 +1,6 @@
 package com.housingplatform.reservation.domain;
 
+import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.shared.domain.BaseEntity;
 import jakarta.persistence.*;
@@ -107,4 +108,12 @@ public class SponsorshipReservation extends BaseEntity {
 
   @Column(name = "status_changed_at", nullable = false)
   private LocalDateTime statusChangedAt;
+
+  /** The exhibitor account provisioned from this reservation, once a payment is in. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "organization_id")
+  private Organization organization;
+
+  @Column(name = "exhibitor_invited_at")
+  private LocalDateTime exhibitorInvitedAt;
 }

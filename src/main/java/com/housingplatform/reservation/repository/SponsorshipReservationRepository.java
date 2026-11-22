@@ -26,4 +26,6 @@ public interface SponsorshipReservationRepository
 
   List<SponsorshipReservation> findByStatusInAndStatusChangedAtBefore(
       List<Status> statuses, LocalDateTime before);
+
+  List<SponsorshipReservation> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 }

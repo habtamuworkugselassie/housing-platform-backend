@@ -24,6 +24,7 @@ public class AdminReservationController {
 
   private final ReservationService service;
   private final com.housingplatform.reservation.service.BoothService boothService;
+  private final com.housingplatform.reservation.service.ExhibitorProvisioningService provisioning;
 
   @GetMapping("/booths")
   @Operation(summary = "Every booth with who holds it")
@@ -86,6 +87,13 @@ public class AdminReservationController {
   public ResponseEntity<Void> sendAgreement(@PathVariable UUID id) {
     service.sendAgreement(id);
     return ResponseEntity.accepted().build();
+  }
+
+  @PostMapping("/{id}/exhibitor-account")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Create (or re-invite) the exhibitor account for a paid reservation")
+  public ResponseEntity<AdminRow> exhibitorAccount(@PathVariable UUID id) {
+    return ResponseEntity.ok(provisioning.provision(id, true));
   }
 
   @PostMapping("/{id}/remind")

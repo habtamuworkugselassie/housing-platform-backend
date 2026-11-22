@@ -55,6 +55,25 @@ public class MediaAttachment extends BaseEntity {
   @Builder.Default
   private MediaKind mediaKind = MediaKind.IMAGE;
 
+  /** Exhibitor uploads wait for an admin; admin uploads and legacy rows are approved. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "review_status", nullable = false, length = 20)
+  @Builder.Default
+  private ReviewStatus reviewStatus = ReviewStatus.APPROVED;
+
+  @Column(name = "review_note", columnDefinition = "TEXT")
+  private String reviewNote;
+
+  public boolean isApproved() {
+    return reviewStatus == null || reviewStatus == ReviewStatus.APPROVED;
+  }
+
+  public enum ReviewStatus {
+    PENDING,
+    APPROVED,
+    REJECTED
+  }
+
   public boolean hasFileData() {
     return fileData != null && fileData.length > 0;
   }

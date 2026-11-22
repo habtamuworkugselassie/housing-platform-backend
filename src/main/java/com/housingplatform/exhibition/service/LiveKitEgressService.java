@@ -67,7 +67,8 @@ public class LiveKitEgressService {
   /**
    * Start a RoomComposite <b>file</b> egress that records {@code room} to a single MP4 written into
    * the egress container's {@code livekit.recordingDir}. Returns the relative filename (used to
-   * build the public URL) plus the egress id, or {@code null} if recording is disabled/unconfigured.
+   * build the public URL) plus the egress id, or {@code null} if recording is
+   * disabled/unconfigured.
    *
    * @return a {@link Recording} handle, or {@code null} when recording is off
    */
@@ -106,8 +107,9 @@ public class LiveKitEgressService {
   /**
    * Start a <b>TrackComposite</b> file egress: muxes one audio + one video track into a single MP4
    * with <i>no</i> headless-Chromium web compositor, so it runs on a modest (1 vCPU) host where the
-   * RoomComposite recorder cannot. It records only the given tracks (the broadcaster) — co-hosts are
-   * not composited in. Keep the published video codec H.264 so this is a remux, not a transcode.
+   * RoomComposite recorder cannot. It records only the given tracks (the broadcaster) — co-hosts
+   * are not composited in. Keep the published video codec H.264 so this is a remux, not a
+   * transcode.
    *
    * @return a {@link Recording} handle, or {@code null} when recording is off / no tracks given
    */

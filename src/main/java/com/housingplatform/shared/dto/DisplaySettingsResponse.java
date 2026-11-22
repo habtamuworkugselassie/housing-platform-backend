@@ -49,7 +49,9 @@ public class DisplaySettingsResponse {
   @JsonProperty("exhibitionFeedbackVisible")
   boolean exhibitionFeedbackVisible;
 
-  /** When true, submitted feedback videos are published immediately; when false they await review. */
+  /**
+   * When true, submitted feedback videos are published immediately; when false they await review.
+   */
   @JsonProperty("exhibitionFeedbackAutoPublish")
   boolean exhibitionFeedbackAutoPublish;
 

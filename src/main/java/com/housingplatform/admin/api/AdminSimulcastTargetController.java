@@ -38,7 +38,9 @@ public class AdminSimulcastTargetController {
   }
 
   @PutMapping("/{id}")
-  @Operation(summary = "Update a simulcast destination", description = "Leave the key blank to keep it.")
+  @Operation(
+      summary = "Update a simulcast destination",
+      description = "Leave the key blank to keep it.")
   public ResponseEntity<SimulcastTargetResponse> update(
       @PathVariable UUID id, @Valid @RequestBody SimulcastTargetRequest request) {
     return ResponseEntity.ok(service.update(id, request));

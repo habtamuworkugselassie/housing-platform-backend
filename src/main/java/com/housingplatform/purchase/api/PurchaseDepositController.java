@@ -1,6 +1,5 @@
 package com.housingplatform.purchase.api;
 
-import org.springframework.web.bind.annotation.RequestBody;
 import com.housingplatform.purchase.dto.DepositCheckoutRequest;
 import com.housingplatform.purchase.dto.DepositCheckoutResponse;
 import com.housingplatform.purchase.dto.PurchaseDepositResponse;
@@ -14,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,8 +41,7 @@ public class PurchaseDepositController {
           "Opens a hosted checkout at the payment provider (Chapa) and returns its URL. Cards are"
               + " entered there, never on this platform. Requires the deposit terms to be signed.")
   public ResponseEntity<DepositCheckoutResponse> checkout(
-      @PathVariable UUID orderId,
-      @RequestBody(required = false) DepositCheckoutRequest request) {
+      @PathVariable UUID orderId, @RequestBody(required = false) DepositCheckoutRequest request) {
     return ResponseEntity.ok(
         depositService.startCheckout(
             actors.current(), orderId, request != null ? request.getPaymentMethod() : null));

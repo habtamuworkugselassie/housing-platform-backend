@@ -1,5 +1,6 @@
 package com.housingplatform.identity.dto;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,4 +18,9 @@ public class OrganizationMediaItem {
   private Integer displayOrder;
   private Boolean isPrimary;
   private String mediaKind; // IMAGE, VIDEO, LOGO
+  private String reviewStatus; // PENDING, APPROVED, REJECTED
+  private String reviewNote;
+  private UUID organizationId;
+  private String organizationName;
+  private LocalDateTime createdAt;
 }

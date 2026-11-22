@@ -4,6 +4,7 @@ import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.identity.repository.SponsorshipRepository;
 import com.housingplatform.reservation.domain.SponsorshipReservation;
 import com.housingplatform.reservation.domain.SponsorshipReservation.Status;
+import com.housingplatform.reservation.dto.ReservationDtos;
 import com.housingplatform.reservation.dto.ReservationDtos.AdminCreate;
 import com.housingplatform.reservation.dto.ReservationDtos.AdminRow;
 import com.housingplatform.reservation.dto.ReservationDtos.AdminUpdate;
@@ -51,6 +52,7 @@ public class ReservationService {
   private final BoothService boothService;
   private final org.springframework.beans.factory.ObjectProvider<ReservationPaymentService>
       paymentService;
+  private final org.springframework.context.ApplicationEventPublisher events;
 
   @Transactional
   public Confirmation reserve(ReserveRequest r) {
@@ -160,6 +162,7 @@ public class ReservationService {
       boothService.hold(saved, c.getBoothCodes());
       if (status == Status.PAID) boothService.sell(saved.getId());
     }
+    paid(saved);
     if (c.isSendEmail() && status != Status.CANCELLED) {
       afterCommit(() -> mail.sendConfirmation(saved, status == Status.REQUESTED, false));
     }
@@ -228,6 +231,7 @@ public class ReservationService {
   @Transactional
   public AdminRow update(UUID id, AdminUpdate u) {
     SponsorshipReservation r = load(id);
+    Status before = r.getStatus();
     LocalDateTime now = LocalDateTime.now();
     if (u.getStatus() != null && !u.getStatus().isBlank()) {
       Status next = Status.valueOf(u.getStatus().trim().toUpperCase(Locale.ROOT));
@@ -269,6 +273,7 @@ public class ReservationService {
     SponsorshipReservation saved = repository.save(r);
     if (saved.getStatus() == Status.PAID) boothService.sell(saved.getId());
     if (saved.getStatus() == Status.CANCELLED) boothService.release(saved.getId());
+    if (saved.getStatus() != before) paid(saved);
     return row(saved);
   }
 
@@ -435,7 +440,38 @@ public class ReservationService {
         .updatedAt(r.getUpdatedAt())
         .boothCodes(boothCodes)
         .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
+        .organizationId(r.getOrganization() != null ? r.getOrganization().getId() : null)
+        .exhibitorInvitedAt(r.getExhibitorInvitedAt())
         .build();
+  }
+
+  /** Reservations linked to the signed-in user's organization, newest first. */
+  @Transactional(readOnly = true)
+  public List<ReservationDtos.ExhibitorRow> forOrganization(UUID organizationId) {
+    return repository.findByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
+        .map(
+            r ->
+                ReservationDtos.ExhibitorRow.builder()
+                    .reference(r.getReference())
+                    .packageName(r.getPackageName())
+                    .packageType(r.getPackageType())
+                    .amount(r.getAmount())
+                    .amountPaid(r.getAmountPaid())
+                    .currency(r.getCurrency())
+                    .status(r.getStatus().name())
+                    .boothCodes(boothService.codesFor(r.getId()))
+                    .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
+                    .email(r.getEmail())
+                    .paidAt(r.getPaidAt())
+                    .build())
+        .toList();
+  }
+
+  /** Fires the exhibitor-provisioning listener once the surrounding transaction commits. */
+  private void paid(SponsorshipReservation r) {
+    if (r.getStatus() == Status.PAID || r.getStatus() == Status.DEPOSIT_PAID) {
+      events.publishEvent(new ReservationPaidEvent(r.getId()));
+    }
   }
 
   private static void afterCommit(Runnable run) {

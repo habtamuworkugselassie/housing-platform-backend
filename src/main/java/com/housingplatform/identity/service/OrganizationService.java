@@ -81,6 +81,19 @@ public interface OrganizationService {
 
   OrganizationResponse deleteOrganizationMedia(UUID organizationId, UUID attachmentId);
 
+  /** Admin: approve or reject an item an exhibitor uploaded. */
+  OrganizationResponse reviewOrganizationMedia(
+      UUID organizationId, UUID attachmentId, String status, String note);
+
+  /** Admin: every organization media item still waiting for review, oldest first. */
+  List<com.housingplatform.identity.dto.OrganizationMediaItem> listPendingOrganizationMedia();
+
+  /**
+   * The organization the signed-in user manages (primary contact, member, or super agent), with
+   * unreviewed media included. Empty when the user has none.
+   */
+  Optional<OrganizationResponse> getCurrentUserOrganization();
+
   /**
    * Upload an organization document (e.g. business registration, license, VAT, TIN). Replaces
    * existing document if present. Allowed types: BUSINESS_REGISTRATION, LICENSE, VAT_REGISTRATION,

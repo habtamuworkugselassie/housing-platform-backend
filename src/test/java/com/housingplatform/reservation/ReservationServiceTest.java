@@ -44,7 +44,8 @@ class ReservationServiceTest {
           boothService,
           new org.springframework.beans.factory.support.DefaultListableBeanFactory()
               .getBeanProvider(
-                  com.housingplatform.reservation.service.ReservationPaymentService.class));
+                  com.housingplatform.reservation.service.ReservationPaymentService.class),
+          mock(org.springframework.context.ApplicationEventPublisher.class));
 
   private static Sponsorship gold(UUID id) {
     Sponsorship s =

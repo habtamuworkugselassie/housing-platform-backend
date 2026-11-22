@@ -60,13 +60,14 @@ public class DownloadController {
 
   @GetMapping
   @AuthPolicyScope(AuthPolicyScope.Policy.UNSECURED)
-  @Operation(summary = "Get the app", description = "Redirects to the right store/file for the device.")
+  @Operation(
+      summary = "Get the app",
+      description = "Redirects to the right store/file for the device.")
   public ResponseEntity<Void> get(
       @RequestHeader(value = "User-Agent", required = false) String userAgent) {
     String ua = userAgent == null ? "" : userAgent.toLowerCase();
     boolean ios = ua.contains("iphone") || ua.contains("ipad") || ua.contains("ipod");
-    String target =
-        ios ? "/api/v1/public/download/ios" : "/api/v1/public/download/android";
+    String target = ios ? "/api/v1/public/download/ios" : "/api/v1/public/download/android";
     return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(target)).build();
   }
 
@@ -87,9 +88,7 @@ public class DownloadController {
     }
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(APK_MEDIA_TYPE))
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            "attachment; filename=\"" + androidFile + "\"")
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + androidFile + "\"")
         .header(HttpHeaders.ACCEPT_RANGES, "bytes")
         .contentLength(length)
         .body(new PathResource(file));
