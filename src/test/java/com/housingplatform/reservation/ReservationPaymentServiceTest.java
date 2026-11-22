@@ -65,6 +65,7 @@ class ReservationPaymentServiceTest {
             .build();
     r.setId(UUID.randomUUID());
     ReflectionTestUtils.setField(service, "depositPercent", 30);
+    ReflectionTestUtils.setField(service, "onlineMax", new BigDecimal("75000"));
     ReflectionTestUtils.setField(service, "frontendBaseUrl", "https://ethiobuildconnect.et");
     when(reservations.findByReferenceIgnoreCase("RSV-K7M2PX")).thenReturn(Optional.of(r));
     when(reservations.findById(r.getId())).thenReturn(Optional.of(r));
@@ -82,13 +83,17 @@ class ReservationPaymentServiceTest {
   }
 
   @Test
-  void depositIsThirtyPercentRoundedUpAndTheEmailIsTheKey() {
+  void depositIsThirtyPercentCappedAtChapasLimitAndTheEmailIsTheKey() {
     SponsorshipReservation r = gold();
-    assertThat(service.depositFor(r)).isEqualByComparingTo("270000");
+    assertThat(service.depositFor(r)).isEqualByComparingTo("75000");
+    r.setAmount(new BigDecimal("100000"));
+    assertThat(service.depositFor(r)).isEqualByComparingTo("30000");
+    r.setAmount(new BigDecimal("900000"));
     assertThatThrownBy(() -> service.status("RSV-K7M2PX", "someone@else.et", false))
         .isInstanceOf(ResourceNotFoundException.class);
-    assertThat(service.status("RSV-K7M2PX", "SARA@noah.et", false).getDepositAmount())
-        .isEqualByComparingTo("270000");
+    var view = service.status("RSV-K7M2PX", "SARA@noah.et", false);
+    assertThat(view.getDepositAmount()).isEqualByComparingTo("75000");
+    assertThat(view.getNextOnlineAmount()).isEqualByComparingTo("75000");
   }
 
   @Test
@@ -102,7 +107,7 @@ class ReservationPaymentServiceTest {
             "RSV-K7M2PX", "sara@noah.et", Purpose.DEPOSIT, ChapaPaymentMethod.TELEBIRR);
 
     assertThat(c.getCheckoutUrl()).isEqualTo("https://checkout.chapa.co/x");
-    assertThat(c.getAmount()).isEqualByComparingTo("270000");
+    assertThat(c.getAmount()).isEqualByComparingTo("75000");
     assertThat(c.getTxRef()).matches("RSV-K7M2PX-D-[A-Z2-9]{4}");
     ArgumentCaptor<InitializeRequest> req = ArgumentCaptor.forClass(InitializeRequest.class);
     verify(chapa).initialize(req.capture());
@@ -120,7 +125,7 @@ class ReservationPaymentServiceTest {
             .reservation(r)
             .txRef("RSV-K7M2PX-D-AAAA")
             .purpose(Purpose.DEPOSIT)
-            .amount(new BigDecimal("270000"))
+            .amount(new BigDecimal("75000"))
             .currency("ETB")
             .status(ReservationPayment.Status.PENDING)
             .build();
@@ -129,7 +134,7 @@ class ReservationPaymentServiceTest {
         .thenReturn(
             new VerifyResult(
                 "success",
-                new BigDecimal("270000"),
+                new BigDecimal("75000"),
                 "ETB",
                 "chapa-1",
                 "RSV-K7M2PX-D-AAAA",
@@ -140,16 +145,22 @@ class ReservationPaymentServiceTest {
     service.handleProviderNotification("RSV-K7M2PX-D-AAAA");
 
     assertThat(r.getStatus()).isEqualTo(Status.DEPOSIT_PAID);
-    assertThat(r.getAmountPaid()).isEqualByComparingTo("270000");
+    assertThat(r.getAmountPaid()).isEqualByComparingTo("75000");
     verify(booths).firmUp(r.getId());
     verify(mail).sendPaymentReceipt(r, dep);
+    // A balance instalment online is capped too; the rest goes by transfer.
+    when(chapa.isConfigured()).thenReturn(true);
+    when(chapa.initialize(any())).thenReturn(new InitializeResult("https://checkout.chapa.co/y"));
+    assertThat(
+            service.startCheckout("RSV-K7M2PX", "sara@noah.et", Purpose.BALANCE, null).getAmount())
+        .isEqualByComparingTo("75000");
 
     ReservationPayment bal =
         ReservationPayment.builder()
             .reservation(r)
             .txRef("RSV-K7M2PX-B-BBBB")
             .purpose(Purpose.BALANCE)
-            .amount(new BigDecimal("630000"))
+            .amount(new BigDecimal("825000"))
             .currency("ETB")
             .status(ReservationPayment.Status.PENDING)
             .build();
@@ -158,7 +169,7 @@ class ReservationPaymentServiceTest {
         .thenReturn(
             new VerifyResult(
                 "success",
-                new BigDecimal("630000"),
+                new BigDecimal("825000"),
                 "ETB",
                 "chapa-2",
                 "RSV-K7M2PX-B-BBBB",
@@ -182,7 +193,7 @@ class ReservationPaymentServiceTest {
             .reservation(r)
             .txRef("RSV-K7M2PX-D-CCCC")
             .purpose(Purpose.DEPOSIT)
-            .amount(new BigDecimal("270000"))
+            .amount(new BigDecimal("75000"))
             .currency("ETB")
             .status(ReservationPayment.Status.PENDING)
             .build();

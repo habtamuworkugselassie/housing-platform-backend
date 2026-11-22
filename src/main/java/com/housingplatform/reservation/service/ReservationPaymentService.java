@@ -53,8 +53,16 @@ public class ReservationPaymentService {
   @Value("${app.reservation.deposit-percent:30}")
   private int depositPercent;
 
+  /** Chapa's per-transaction ceiling in ETB; larger amounts go by bank transfer. */
+  @Value("${app.reservation.online-max:75000}")
+  private BigDecimal onlineMax;
+
   @Value("${app.frontend-base-url:http://localhost:5173}")
   private String frontendBaseUrl;
+
+  public BigDecimal onlineMax() {
+    return onlineMax == null || onlineMax.signum() <= 0 ? new BigDecimal("75000") : onlineMax;
+  }
 
   public boolean checkoutAvailable() {
     return chapa.isConfigured();
@@ -62,7 +70,9 @@ public class ReservationPaymentService {
 
   public BigDecimal depositFor(SponsorshipReservation r) {
     BigDecimal pct = BigDecimal.valueOf(Math.max(1, Math.min(100, depositPercent)));
-    return r.getAmount().multiply(pct).divide(BigDecimal.valueOf(100), 0, RoundingMode.CEILING);
+    BigDecimal share =
+        r.getAmount().multiply(pct).divide(BigDecimal.valueOf(100), 0, RoundingMode.CEILING);
+    return share.min(onlineMax()).min(r.getAmount());
   }
 
   public BigDecimal outstanding(SponsorshipReservation r) {
@@ -97,7 +107,9 @@ public class ReservationPaymentService {
       throw new BusinessException("This reservation is already paid in full");
     }
     BigDecimal amount =
-        purpose == Purpose.BALANCE ? outstanding(r) : depositFor(r).min(outstanding(r));
+        purpose == Purpose.BALANCE
+            ? outstanding(r).min(onlineMax())
+            : depositFor(r).min(outstanding(r));
     if (purpose == Purpose.DEPOSIT
         && r.getAmountPaid() != null
         && r.getAmountPaid().compareTo(depositFor(r)) >= 0) {
@@ -322,6 +334,8 @@ public class ReservationPaymentService {
         .outstanding(outstanding(r))
         .depositAmount(depositFor(r))
         .depositPercent(depositPercent)
+        .onlineMax(onlineMax())
+        .nextOnlineAmount(outstanding(r).min(onlineMax()))
         .depositPaid(depositDone)
         .currency(r.getCurrency())
         .status(r.getStatus().name())
