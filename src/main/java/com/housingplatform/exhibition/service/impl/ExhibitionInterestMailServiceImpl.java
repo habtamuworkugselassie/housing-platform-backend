@@ -66,10 +66,16 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
                 "We received your interest in the Ethio Build Connect Expo, 9-13 January 2027 at"
                     + " the Addis Convention Center, Addis Ababa.");
     details(m, i);
-    return m.cta("Explore the expo", base())
-        .closing(
-            "Our team replies to every registration within 2 business days. Until then you can"
-                + " browse the exhibition, sponsorship packages and listings on the site.");
+    String closingEn =
+        "Our team replies to every registration within 2 business days. Until then you can"
+            + " browse the exhibition, sponsorship packages and listings on the site.";
+    if (!"visitor".equals(i.getInterestType())) {
+      m.paragraph(
+          "Ready to go further? Reserve your package online: you get the agreement and bank"
+              + " details at once and can lock booths on the hall plan with a deposit.");
+      return m.cta("Reserve a package", reserveUrl(i, false)).closing(closingEn);
+    }
+    return m.cta("Explore the expo", base()).closing(closingEn);
   }
 
   private BrandedMail receiptAm(ExhibitionInterest i) {
@@ -93,10 +99,14 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
       m.detail("ጥቅል", i.getSponsorship().getName());
     }
     m.message("መልእክት", i.getMessage());
-    return m.cta("ኤክስፖውን ይጎብኙ", base() + "/am")
-        .closing(
-            "ቡድናችን ለእያንዳንዱ ምዝገባ በ2 የሥራ ቀናት ውስጥ ይመልሳል። እስከዚያው ኤግዚቢሽኑን፣ የስፖንሰርሺፕ"
-                + " ጥቅሎችን እና ንብረቶችን በድረ-ገጹ ላይ መመልከት ይችላሉ።");
+    String closingAm =
+        "ቡድናችን ለእያንዳንዱ ምዝገባ በ2 የሥራ ቀናት ውስጥ ይመልሳል። እስከዚያው ኤግዚቢሽኑን፣ የስፖንሰርሺፕ"
+            + " ጥቅሎችን እና ንብረቶችን በድረ-ገጹ ላይ መመልከት ይችላሉ።";
+    if (!"visitor".equals(i.getInterestType())) {
+      m.paragraph("ፓኬጅዎን በመስመር ላይ ያስይዙ፦ ውሉንና የባንክ መረጃውን ወዲያውኑ ያገኛሉ፣ በቅድመ ክፍያም ዳሶችን ማስጠበቅ ይችላሉ።");
+      return m.cta("ፓኬጅ ያስይዙ", reserveUrl(i, true)).closing(closingAm);
+    }
+    return m.cta("ኤክስፖውን ይጎብኙ", base() + "/am").closing(closingAm);
   }
 
   BrandedMail teamNotice(ExhibitionInterest i) {
@@ -125,6 +135,12 @@ public class ExhibitionInterestMailServiceImpl implements ExhibitionInterestMail
 
   private String base() {
     return frontendBaseUrl.replaceAll("/$", "");
+  }
+
+  private String reserveUrl(ExhibitionInterest i, boolean am) {
+    String url = base() + (am ? "/am" : "") + "/reserve?src=interest";
+    if (i.getSponsorship() != null) url += "&package=" + i.getSponsorship().getId();
+    return url;
   }
 
   private static String labelAm(String interestType) {
