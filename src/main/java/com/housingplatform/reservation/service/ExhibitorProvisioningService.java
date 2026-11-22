@@ -1,8 +1,6 @@
 package com.housingplatform.reservation.service;
 
 import com.housingplatform.identity.domain.Organization;
-import com.housingplatform.identity.domain.OrganizationContact;
-import com.housingplatform.identity.domain.OrganizationPhone;
 import com.housingplatform.identity.domain.PasswordResetToken;
 import com.housingplatform.identity.domain.User;
 import com.housingplatform.identity.repository.OrganizationRepository;
@@ -20,8 +18,6 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Base64;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +48,7 @@ public class ExhibitorProvisioningService {
   private final SponsorshipService sponsorships;
   private final BoothService boothService;
   private final ExhibitorMailService mail;
+  private final ReservationOrganizationLinker linker;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -79,12 +76,12 @@ public class ExhibitorProvisioningService {
     if (r.getStatus() != Status.PAID && r.getStatus() != Status.DEPOSIT_PAID) {
       throw new BusinessException("The exhibitor account is created once a payment is recorded");
     }
-    boolean fresh = r.getOrganization() == null;
-    if (!fresh && !resendInvite) {
+    // The organization is linked at reservation time; the invitation marks provisioning done.
+    if (r.getExhibitorInvitedAt() != null && !resendInvite) {
       return ReservationService.toRow(r, boothService.codesFor(r.getId()));
     }
 
-    Organization org = fresh ? findOrCreateOrganization(r) : r.getOrganization();
+    Organization org = r.getOrganization() != null ? r.getOrganization() : linker.link(r, null);
     User user = primaryUsers.linkExhibitionLeadUser(org, r.getEmail(), r.getPhone());
     if (user.getStatus() == User.UserStatus.PENDING_VERIFICATION) {
       String[] names = splitName(r.getContactName());
@@ -110,39 +107,6 @@ public class ExhibitorProvisioningService {
         org.getId(),
         user.getEmail());
     return ReservationService.toRow(saved, boothService.codesFor(saved.getId()));
-  }
-
-  private Organization findOrCreateOrganization(SponsorshipReservation r) {
-    String email = r.getEmail().trim().toLowerCase();
-    Optional<Organization> byUser =
-        users.findByEmail(email).map(User::getOrganization).filter(o -> o != null);
-    if (byUser.isPresent()) return byUser.get();
-    List<Organization> byContact = organizations.findByContactEmail(email);
-    if (!byContact.isEmpty()) return byContact.get(0);
-
-    Organization org =
-        Organization.builder()
-            .name(r.getCompany().trim())
-            .type(Organization.OrganizationType.SUPPLIER)
-            .status(Organization.OrganizationStatus.PENDING_APPROVAL)
-            .tinNumber(r.getTin())
-            .country("Ethiopia")
-            .build();
-    OrganizationContact contact =
-        OrganizationContact.builder().organization(org).email(email).build();
-    org.setContact(contact);
-    if (r.getPhone() != null && !r.getPhone().isBlank()) {
-      contact
-          .getPhones()
-          .add(
-              OrganizationPhone.builder()
-                  .contact(contact)
-                  .countryCode("+251")
-                  .number(r.getPhone().trim())
-                  .displayOrder(0)
-                  .build());
-    }
-    return organizations.save(org);
   }
 
   private String newInviteToken(User user) {

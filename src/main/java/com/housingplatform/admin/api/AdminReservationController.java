@@ -25,6 +25,7 @@ public class AdminReservationController {
   private final ReservationService service;
   private final com.housingplatform.reservation.service.BoothService boothService;
   private final com.housingplatform.reservation.service.ExhibitorProvisioningService provisioning;
+  private final com.housingplatform.reservation.service.ReservationOrganizationLinker linker;
 
   @GetMapping("/booths")
   @Operation(summary = "Every booth with who holds it")
@@ -87,6 +88,13 @@ public class AdminReservationController {
   public ResponseEntity<Void> sendAgreement(@PathVariable UUID id) {
     service.sendAgreement(id);
     return ResponseEntity.accepted().build();
+  }
+
+  @PostMapping("/link-organizations")
+  @io.swagger.v3.oas.annotations.Operation(
+      summary = "Attach an organization to every reservation that still has none")
+  public ResponseEntity<java.util.Map<String, Integer>> linkOrganizations() {
+    return ResponseEntity.ok(java.util.Map.of("linked", linker.linkAllMissing()));
   }
 
   @PostMapping("/{id}/exhibitor-account")

@@ -99,6 +99,9 @@ public final class ReservationDtos {
   public static class AdminCreate {
     private UUID sponsorshipId;
 
+    /** An existing organization to attach; when null one is found by email or created. */
+    private UUID organizationId;
+
     @NotBlank(message = "Company is required")
     @Size(max = 200)
     private String company;
@@ -258,6 +261,7 @@ public final class ReservationDtos {
     List<String> boothCodes;
     int boothsIncluded;
     UUID organizationId;
+    String organizationName;
     LocalDateTime exhibitorInvitedAt;
   }
 

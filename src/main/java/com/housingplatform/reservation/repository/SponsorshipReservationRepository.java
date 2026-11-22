@@ -28,4 +28,6 @@ public interface SponsorshipReservationRepository
       List<Status> statuses, LocalDateTime before);
 
   List<SponsorshipReservation> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
+
+  List<SponsorshipReservation> findByOrganizationIsNull();
 }

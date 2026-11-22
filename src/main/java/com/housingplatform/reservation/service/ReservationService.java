@@ -53,6 +53,7 @@ public class ReservationService {
   private final org.springframework.beans.factory.ObjectProvider<ReservationPaymentService>
       paymentService;
   private final org.springframework.context.ApplicationEventPublisher events;
+  private final ReservationOrganizationLinker linker;
 
   @Transactional
   public Confirmation reserve(ReserveRequest r) {
@@ -90,6 +91,8 @@ public class ReservationService {
                 .reminderCount(0)
                 .statusChangedAt(LocalDateTime.now())
                 .build());
+    linker.link(saved, null);
+    repository.save(saved);
     List<String> held = List.of();
     if (r.getBoothCodes() != null && !r.getBoothCodes().isEmpty()) {
       held = boothService.hold(saved, r.getBoothCodes());
@@ -158,6 +161,8 @@ public class ReservationService {
                         : null)
                 .paidAt(status == Status.PAID ? now : null)
                 .build());
+    linker.link(saved, c.getOrganizationId());
+    repository.save(saved);
     if (c.getBoothCodes() != null && !c.getBoothCodes().isEmpty()) {
       boothService.hold(saved, c.getBoothCodes());
       if (status == Status.PAID) boothService.sell(saved.getId());
@@ -441,6 +446,7 @@ public class ReservationService {
         .boothCodes(boothCodes)
         .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
         .organizationId(r.getOrganization() != null ? r.getOrganization().getId() : null)
+        .organizationName(r.getOrganization() != null ? r.getOrganization().getName() : null)
         .exhibitorInvitedAt(r.getExhibitorInvitedAt())
         .build();
   }
