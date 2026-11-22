@@ -33,6 +33,7 @@ CREATE TEMP TABLE cleanup_reservations ON COMMIT DROP AS
   WHERE r.organization_id IN (SELECT id FROM cleanup_orgs)
      OR upper(r.reference) IN (SELECT upper(reference) FROM cleanup_refs);
 
+-- Leads of the kept reservations are listed too, so you can see what the relink will recreate.
 -- Users that belong only to these organizations and have never set a password.
 CREATE TEMP TABLE cleanup_users ON COMMIT DROP AS
   SELECT u.id, u.email FROM users u
@@ -54,6 +55,13 @@ DELETE FROM reservation_payment WHERE reservation_id IN (SELECT id FROM cleanup_
 UPDATE booth SET status = 'AVAILABLE', reservation_id = NULL, hold_expires_at = NULL
   WHERE reservation_id IN (SELECT id FROM cleanup_reservations);
 DELETE FROM sponsorship_reservation WHERE id IN (SELECT id FROM cleanup_reservations);
+-- A kept reservation may still point at a lead of a test organization: detach it first.
+-- (Re-run POST /api/v1/admin/sponsorship-reservations/link-organizations afterwards, or click
+-- "link now" on the Reservations page, to give it a fresh lead.)
+UPDATE sponsorship_reservation SET exhibition_interest_id = NULL
+  WHERE exhibition_interest_id IN (SELECT id FROM exhibition_interest WHERE organization_id IN (SELECT id FROM cleanup_orgs));
+UPDATE sponsorship_reservation SET organization_id = NULL
+  WHERE organization_id IN (SELECT id FROM cleanup_orgs);
 DELETE FROM exhibition_interest WHERE organization_id IN (SELECT id FROM cleanup_orgs);
 DELETE FROM sponsorship_applications WHERE organization_id IN (SELECT id FROM cleanup_orgs);
 DELETE FROM media_attachments WHERE organization_id IN (SELECT id FROM cleanup_orgs);
