@@ -20,6 +20,8 @@ public class ReservationReminderJob {
       if (freed > 0) log.info("Booth holds expired on {} reservation(s)", freed);
       int n = service.sendDueReminders(5, 2);
       if (n > 0) log.info("Sent {} sponsorship reservation reminder(s)", n);
+      int due = service.sendPaymentDueReminders();
+      if (due > 0) log.info("Sent {} payment-due email(s)", due);
     } catch (Exception e) {
       log.error("Reservation reminders failed: {}", e.getMessage());
     }

@@ -34,4 +34,10 @@ public interface SponsorshipReservationRepository
   List<SponsorshipReservation> findByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 
   List<SponsorshipReservation> findByInterestIsNull();
+
+  List<SponsorshipReservation> findByStatusInOrderByCreatedAtDesc(
+      java.util.Collection<SponsorshipReservation.Status> statuses);
+
+  List<SponsorshipReservation> findByStatusInAndPaymentDueAtBefore(
+      java.util.Collection<SponsorshipReservation.Status> statuses, java.time.LocalDateTime before);
 }

@@ -224,6 +224,8 @@ public final class ReservationDtos {
     String status;
     String locale;
     List<String> boothCodes;
+    LocalDateTime paymentDueAt;
+    boolean overdue;
     boolean checkoutAvailable;
     List<PaymentView> payments;
     List<BankAccount> bankAccounts;
@@ -267,6 +269,10 @@ public final class ReservationDtos {
     String organizationName;
     UUID interestId;
     LocalDateTime exhibitorInvitedAt;
+    LocalDateTime paymentDueAt;
+    int paymentReminderCount;
+    boolean overdue;
+    BigDecimal outstanding;
   }
 
   /** Everything expo-related about one organization, for the admin organization pane. */
@@ -288,6 +294,20 @@ public final class ReservationDtos {
     UUID sponsorshipId;
     String packageName;
     LocalDateTime reserveInvitedAt;
+  }
+
+  /** One card on the public exhibitor directory. */
+  @Data
+  @Builder
+  public static class ExhibitorCard {
+    UUID organizationId;
+    String name;
+    String logoUrl;
+    String organizationType;
+    String city;
+    String packageType;
+    String partnerRole;
+    List<String> boothCodes;
   }
 
   /** What a signed-in exhibitor sees of its own reservations. */
@@ -315,6 +335,9 @@ public final class ReservationDtos {
     private String assignedTo;
     private String boothPreference;
     private BigDecimal amount;
+
+    /** ISO date-time; an empty string clears the due date. */
+    private String paymentDueAt;
   }
 
   @Value
@@ -323,6 +346,8 @@ public final class ReservationDtos {
     long openCount;
     BigDecimal openValue;
     BigDecimal paidValue;
+    long overdueCount;
+    BigDecimal overdueValue;
     Map<String, StatusTotal> byStatus;
     Map<String, Long> booths;
   }

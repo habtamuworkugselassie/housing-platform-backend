@@ -248,6 +248,83 @@ public class ReservationMailService {
     return m;
   }
 
+  @Async
+  public void sendPaymentDue(SponsorshipReservation r) {
+    if (!sender.configured()) {
+      log.warn("Mail not configured; payment-due email for {} not sent", r.getReference());
+      return;
+    }
+    sender.send(paymentDue(r));
+  }
+
+  BrandedMail paymentDue(SponsorshipReservation r) {
+    boolean am = MailLocale.isAmharic(r.getLocale());
+    String payUrl =
+        frontendBaseUrl.replaceAll("/$", "")
+            + (am ? "/am" : "")
+            + "/reserve/"
+            + r.getReference()
+            + "?email="
+            + java.net.URLEncoder.encode(r.getEmail(), java.nio.charset.StandardCharsets.UTF_8);
+    String due =
+        r.getPaymentDueAt() == null
+            ? ""
+            : r.getPaymentDueAt()
+                .toLocalDate()
+                .format(
+                    java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH));
+    String outstanding = money(r.outstanding()) + " " + r.getCurrency();
+    BrandedMail m =
+        am
+            ? BrandedMail.create()
+                .lang("am")
+                .to(r.getEmail())
+                .replyTo(replyTo)
+                .subject("ክፍያ ይጠበቃል፦ " + r.getPackageName() + " · " + r.getReference())
+                .title("የቦታ ማስያዣዎ ክፍያ ይጠበቃል")
+                .greeting("ሰላም " + r.getContactName() + "፣")
+                .paragraph(
+                    "ለ"
+                        + r.getPackageName()
+                        + " ጥቅል የፈረሙት ውል ክፍያ ቀን "
+                        + due
+                        + " አልፏል። ቀሪው "
+                        + outstanding
+                        + " እንደደረሰን ቦታዎ (እና ዳስዎ) ይረጋገጣል። ከታች ባለው አገናኝ በመስመር ላይ (በክፍያ ከ75,000 ብር"
+                        + " ያልበለጠ) ወይም በባንክ ዝውውር መክፈል ይችላሉ።")
+                .detail("ማጣቀሻ", r.getReference())
+                .detail("ቀሪ ክፍያ", outstanding)
+                .detail("የክፍያ ቀን", due)
+                .cta("አሁን ይክፈሉ", payUrl)
+            : BrandedMail.create()
+                .to(r.getEmail())
+                .replyTo(replyTo)
+                .subject("Payment due: " + r.getPackageName() + " · " + r.getReference())
+                .title("Your reservation payment is due")
+                .greeting("Hello " + r.getContactName() + ",")
+                .paragraph(
+                    "The payment for your signed "
+                        + r.getPackageName()
+                        + " agreement was due on "
+                        + due
+                        + ". Your place (and booth) is confirmed as soon as the outstanding "
+                        + outstanding
+                        + " reaches us. You can pay online below (up to 75,000 ETB per transaction)"
+                        + " or by bank transfer to the accounts listed.")
+                .detail("Reference", r.getReference())
+                .detail("Outstanding", outstanding)
+                .detail("Due date", due)
+                .cta("Pay now", payUrl);
+    bankDetails(m, am);
+    m.closing(
+        am
+            ? "ከከፈሉ ይህን ኢሜይል ችላ ይበሉ ወይም ደረሰኙን ይመልሱልን። ጥያቄ ካለዎት ይህን ኢሜይል ይመልሱ።"
+            : "If you have already paid, ignore this or reply with the transfer slip. Reply to this"
+                + " email with any question.");
+    if (notifyEmail != null && !notifyEmail.isBlank()) m.bcc(notifyEmail.split("\\s*,\\s*"));
+    return m;
+  }
+
   BrandedMail reminder(SponsorshipReservation r) {
     boolean am = MailLocale.isAmharic(r.getLocale());
     BrandedMail m =

@@ -181,6 +181,12 @@ app:
     again-after-days: ${LEAD_NUDGE_AGAIN_DAYS:7}
     max: ${LEAD_NUDGE_MAX:2}
   reservation:
+    # Business days after signing by which payment is due; the pipeline marks later ones
+    # overdue and "payment due" emails go out every PAYMENT_REMINDER_EVERY business days, at most
+    # PAYMENT_REMINDER_MAX times.
+    payment-due-days: ${RESERVATION_PAYMENT_DUE_DAYS:10}
+    payment-reminder-every-days: ${RESERVATION_PAYMENT_REMINDER_EVERY_DAYS:3}
+    payment-reminder-max: ${RESERVATION_PAYMENT_REMINDER_MAX:3}
     # Share of the package price that locks the booths when paid online through Chapa.
     deposit-percent: ${RESERVATION_DEPOSIT_PERCENT:30}
     # Chapa accepts at most this much per transaction (ETB); the deposit and each online

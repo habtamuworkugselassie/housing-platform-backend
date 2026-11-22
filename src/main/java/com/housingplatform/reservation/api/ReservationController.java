@@ -25,6 +25,15 @@ public class ReservationController {
   private final ReservationService service;
   private final com.housingplatform.reservation.service.ReservationPaymentService payments;
   private final com.housingplatform.identity.service.OrganizationService organizations;
+  private final com.housingplatform.reservation.service.ExhibitorDirectoryService directory;
+
+  @org.springframework.web.bind.annotation.GetMapping("/exhibitors")
+  @Operation(summary = "Public exhibitor directory: confirmed exhibitors and sponsors with booths")
+  public ResponseEntity<
+          java.util.List<com.housingplatform.reservation.dto.ReservationDtos.ExhibitorCard>>
+      exhibitors() {
+    return ResponseEntity.ok(directory.list());
+  }
 
   @org.springframework.web.bind.annotation.GetMapping("/mine")
   @AuthPolicyScope(AuthPolicyScope.Policy.AUTHENTICATED)
