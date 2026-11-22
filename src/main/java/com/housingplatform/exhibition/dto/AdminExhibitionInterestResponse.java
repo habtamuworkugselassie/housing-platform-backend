@@ -39,4 +39,22 @@ public class AdminExhibitionInterestResponse {
 
   /** Platform user id when a primary contact user exists for the linked organization. */
   private UUID primaryContactUserId;
+
+  /** Reservations of this lead's organization (or contact), newest first. */
+  private java.util.List<LeadReservation> reservations;
+
+  private LocalDateTime reserveInvitedAt;
+
+  @lombok.Data
+  @lombok.Builder
+  @lombok.NoArgsConstructor
+  @lombok.AllArgsConstructor
+  public static class LeadReservation {
+    private UUID id;
+    private String reference;
+    private String status;
+    private String packageName;
+    private java.math.BigDecimal amount;
+    private java.math.BigDecimal amountPaid;
+  }
 }

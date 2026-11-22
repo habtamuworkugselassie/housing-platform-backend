@@ -50,6 +50,9 @@ public class ExhibitionInterestRequest {
   private String company;
   private String message;
 
+  /** An existing organization picked from the public lookup; when set no new one is created. */
+  private UUID organizationId;
+
   /** Required for exhibitors; optional for partners that already know a suitable package. */
   private UUID sponsorshipId;
 

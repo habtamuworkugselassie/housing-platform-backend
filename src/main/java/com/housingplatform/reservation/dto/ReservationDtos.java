@@ -20,6 +20,9 @@ public final class ReservationDtos {
     /** Package id from /sponsorships/active. */
     private UUID sponsorshipId;
 
+    /** An existing organization picked from the public lookup (pending ones allowed). */
+    private UUID organizationId;
+
     @NotBlank(message = "Company is required")
     @Size(max = 200)
     private String company;
@@ -262,6 +265,7 @@ public final class ReservationDtos {
     int boothsIncluded;
     UUID organizationId;
     String organizationName;
+    UUID interestId;
     LocalDateTime exhibitorInvitedAt;
   }
 

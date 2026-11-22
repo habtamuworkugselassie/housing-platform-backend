@@ -50,6 +50,7 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
   @Autowired SponsorshipApplicationRepository applications;
   @Autowired PasswordResetTokenRepository tokens;
   @Autowired JwtTokenProvider jwt;
+  @Autowired com.housingplatform.exhibition.service.ExhibitionInterestService interestService;
 
   @Test
   void paidReservationBecomesAnExhibitorAccountWithReviewedMedia() throws Exception {
@@ -76,6 +77,16 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
     assertThat(r.getOrganization().getName()).isEqualTo("Abay Steel PLC");
     assertThat(r.getOrganization().getStatus())
         .isEqualTo(Organization.OrganizationStatus.PENDING_APPROVAL);
+    // ...and it is a lead too, so the Leads page lists every contact.
+    assertThat(r.getInterest()).isNotNull();
+    assertThat(r.getInterest().getInterestType()).isEqualTo("exhibitor");
+    assertThat(r.getInterest().getOrganization().getId()).isEqualTo(r.getOrganization().getId());
+    MvcResult lookup =
+        mockMvc.perform(get("/api/v1/organizations/lookup").param("q", "abay")).andReturn();
+    assertThat(lookup.getResponse().getStatus()).isEqualTo(200);
+    assertThat(lookup.getResponse().getContentAsString())
+        .contains("Abay Steel PLC")
+        .contains("PENDING_APPROVAL");
 
     // Before any payment the account is refused.
     try {
@@ -225,6 +236,20 @@ class ExhibitorProvisioningIT extends BaseIntegrationTest {
     AdminRow row = reservations.createManual(c, "admin");
     assertThat(row.getOrganizationId()).isEqualTo(existing.getId());
     assertThat(row.getOrganizationName()).isEqualTo("Existing Cement SC");
+    assertThat(row.getInterestId()).isNotNull();
+
+    // The public lead form can pick the same organization instead of creating a duplicate.
+    com.housingplatform.exhibition.dto.ExhibitionInterestRequest lead =
+        new com.housingplatform.exhibition.dto.ExhibitionInterestRequest();
+    lead.setEmail("sales-" + System.nanoTime() + "@example.com");
+    lead.setInterestType("exhibitor");
+    lead.setOrganizationType("SUPPLIER");
+    lead.setSponsorshipId(pkg.getId());
+    lead.setOrganizationId(existing.getId());
+    com.housingplatform.exhibition.dto.ExhibitionInterestResponse res =
+        interestService.register(lead);
+    assertThat(res.getOrganizationId()).isEqualTo(existing.getId());
+    assertThat(organizations.findByNameIgnoreCase("Existing Cement SC")).hasSize(1);
   }
 
   @Test

@@ -1,5 +1,6 @@
 package com.housingplatform.reservation.domain;
 
+import com.housingplatform.exhibition.domain.ExhibitionInterest;
 import com.housingplatform.identity.domain.Organization;
 import com.housingplatform.identity.domain.Sponsorship;
 import com.housingplatform.shared.domain.BaseEntity;
@@ -116,4 +117,9 @@ public class SponsorshipReservation extends BaseEntity {
 
   @Column(name = "exhibitor_invited_at")
   private LocalDateTime exhibitorInvitedAt;
+
+  /** The lead this reservation came from, or the one created for it. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "exhibition_interest_id")
+  private ExhibitionInterest interest;
 }

@@ -373,6 +373,31 @@ public class OrganizationServiceImpl implements OrganizationService {
 
   @Override
   @Transactional(readOnly = true)
+  public List<com.housingplatform.identity.dto.OrganizationLookupItem> lookup(String q) {
+    if (q == null || q.trim().length() < 2) return List.of();
+    return organizationRepository
+        .lookupByName(
+            q.trim(),
+            List.of(
+                Organization.OrganizationStatus.PENDING_APPROVAL,
+                Organization.OrganizationStatus.SPONSORSHIP_PENDING,
+                Organization.OrganizationStatus.APPROVED),
+            org.springframework.data.domain.PageRequest.of(0, 8))
+        .stream()
+        .map(
+            o ->
+                com.housingplatform.identity.dto.OrganizationLookupItem.builder()
+                    .id(o.getId())
+                    .name(o.getName())
+                    .city(o.getCity())
+                    .type(o.getType() != null ? o.getType().name() : null)
+                    .status(o.getStatus() != null ? o.getStatus().name() : null)
+                    .build())
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Optional<OrganizationResponse> getCurrentUserOrganization() {
     UUID userId = UserContext.getCurrentUserId();
     Organization org = null;

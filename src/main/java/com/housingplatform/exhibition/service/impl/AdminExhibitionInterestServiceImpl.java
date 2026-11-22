@@ -27,6 +27,9 @@ public class AdminExhibitionInterestServiceImpl implements AdminExhibitionIntere
   private final ExhibitionInterestRepository repository;
   private final OrganizationRepository organizationRepository;
   private final OrganizationPrimaryUserProvisioningService primaryUserProvisioningService;
+  private final com.housingplatform.reservation.repository.SponsorshipReservationRepository
+      reservations;
+  private final com.housingplatform.reservation.service.ReservationMailService reservationMail;
 
   @Override
   @Transactional(readOnly = true)
@@ -60,7 +63,42 @@ public class AdminExhibitionInterestServiceImpl implements AdminExhibitionIntere
         .sponsorshipPackageName(s != null ? s.getName() : null)
         .contactVerifiedAt(e.getContactVerifiedAt())
         .primaryContactUserId(primaryId)
+        .reservations(reservationsFor(e))
+        .reserveInvitedAt(e.getReserveInvitedAt())
         .build();
+  }
+
+  private java.util.List<AdminExhibitionInterestResponse.LeadReservation> reservationsFor(
+      ExhibitionInterest e) {
+    java.util.List<com.housingplatform.reservation.domain.SponsorshipReservation> list =
+        e.getOrganization() != null
+            ? reservations.findByOrganizationIdOrderByCreatedAtDesc(e.getOrganization().getId())
+            : reservations.findByEmailIgnoreCaseOrderByCreatedAtDesc(e.getEmail());
+    return list.stream()
+        .map(
+            r ->
+                AdminExhibitionInterestResponse.LeadReservation.builder()
+                    .id(r.getId())
+                    .reference(r.getReference())
+                    .status(r.getStatus().name())
+                    .packageName(r.getPackageName())
+                    .amount(r.getAmount())
+                    .amountPaid(r.getAmountPaid())
+                    .build())
+        .toList();
+  }
+
+  @Override
+  @Transactional
+  public AdminExhibitionInterestResponse inviteToReserve(UUID interestId) {
+    ExhibitionInterest e =
+        repository
+            .findById(interestId)
+            .orElseThrow(() -> new ResourceNotFoundException("ExhibitionInterest", interestId));
+    e.setReserveInvitedAt(java.time.LocalDateTime.now());
+    ExhibitionInterest saved = repository.save(e);
+    reservationMail.sendReserveInvite(saved);
+    return toResponse(saved);
   }
 
   @Override

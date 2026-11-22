@@ -91,7 +91,8 @@ public class ReservationService {
                 .reminderCount(0)
                 .statusChangedAt(LocalDateTime.now())
                 .build());
-    linker.link(saved, null);
+    linker.link(saved, r.getOrganizationId());
+    linker.linkLead(saved);
     repository.save(saved);
     List<String> held = List.of();
     if (r.getBoothCodes() != null && !r.getBoothCodes().isEmpty()) {
@@ -162,6 +163,7 @@ public class ReservationService {
                 .paidAt(status == Status.PAID ? now : null)
                 .build());
     linker.link(saved, c.getOrganizationId());
+    linker.linkLead(saved);
     repository.save(saved);
     if (c.getBoothCodes() != null && !c.getBoothCodes().isEmpty()) {
       boothService.hold(saved, c.getBoothCodes());
@@ -447,6 +449,7 @@ public class ReservationService {
         .boothsIncluded(BoothService.boothsForPackage(r.getPackageType()))
         .organizationId(r.getOrganization() != null ? r.getOrganization().getId() : null)
         .organizationName(r.getOrganization() != null ? r.getOrganization().getName() : null)
+        .interestId(r.getInterest() != null ? r.getInterest().getId() : null)
         .exhibitorInvitedAt(r.getExhibitorInvitedAt())
         .build();
   }

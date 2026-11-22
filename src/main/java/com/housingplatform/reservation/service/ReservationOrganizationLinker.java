@@ -31,6 +31,7 @@ public class ReservationOrganizationLinker {
   private final OrganizationRepository organizations;
   private final UserRepository users;
   private final SponsorshipReservationRepository reservations;
+  private final com.housingplatform.exhibition.repository.ExhibitionInterestRepository interests;
 
   @Transactional
   public Organization link(SponsorshipReservation r, UUID chosenOrganizationId) {
@@ -41,8 +42,76 @@ public class ReservationOrganizationLinker {
                 .orElseThrow(
                     () -> new ResourceNotFoundException("Organization", chosenOrganizationId))
             : findOrCreate(r);
+    if (org.getStatus() == Organization.OrganizationStatus.SUSPENDED
+        || org.getStatus() == Organization.OrganizationStatus.REJECTED) {
+      throw new com.housingplatform.shared.exception.BusinessException(
+          "That organization cannot take reservations; please contact the team");
+    }
     r.setOrganization(org);
     return org;
+  }
+
+  /**
+   * Every reservation is also a lead: reuse the organization's (or contact's) latest interest
+   * registration, else record one so the Leads page stays the complete contact list.
+   */
+  @Transactional
+  public com.housingplatform.exhibition.domain.ExhibitionInterest linkLead(
+      SponsorshipReservation r) {
+    if (r.getInterest() != null) return r.getInterest();
+    Organization org = r.getOrganization();
+    Optional<com.housingplatform.exhibition.domain.ExhibitionInterest> existing =
+        org != null
+            ? interests.findFirstByOrganizationIdOrderByCreatedAtDesc(org.getId())
+            : Optional.empty();
+    if (existing.isEmpty()) {
+      existing = interests.findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(r.getEmail().trim());
+    }
+    com.housingplatform.exhibition.domain.ExhibitionInterest lead =
+        existing.orElseGet(
+            () -> {
+              boolean partner =
+                  r.getSponsorship() != null
+                      && r.getSponsorship().getPartnerRole()
+                          == com.housingplatform.identity.domain.Sponsorship.PartnerRole
+                              .MEDIA_PARTNER;
+              return interests.save(
+                  com.housingplatform.exhibition.domain.ExhibitionInterest.builder()
+                      .email(r.getEmail().trim().toLowerCase())
+                      .phoneNumber(r.getPhone())
+                      .interestType(partner ? "partner" : "exhibitor")
+                      .partnerRole(partner ? r.getSponsorship().getPartnerRole() : null)
+                      .visibilityScope(partner ? r.getSponsorship().getVisibilityScope() : null)
+                      .contributionMode(partner ? r.getSponsorship().getContributionMode() : null)
+                      .company(r.getCompany())
+                      .message("Reserved " + r.getReference() + " (" + r.getPackageName() + ")")
+                      .organization(org)
+                      .sponsorship(r.getSponsorship())
+                      .locale(r.getLocale())
+                      .build());
+            });
+    if (lead.getOrganization() == null && org != null) {
+      lead.setOrganization(org);
+      interests.save(lead);
+    }
+    r.setInterest(lead);
+    return lead;
+  }
+
+  /** Links a lead to every reservation that still has none; returns how many were linked. */
+  @Transactional
+  public int linkAllMissingLeads() {
+    int n = 0;
+    for (SponsorshipReservation r : reservations.findByInterestIsNull()) {
+      try {
+        linkLead(r);
+        reservations.save(r);
+        n++;
+      } catch (RuntimeException e) {
+        log.warn("Reservation {} lead not linked: {}", r.getReference(), e.getMessage());
+      }
+    }
+    return n;
   }
 
   /** Links every reservation that still has no organization; returns how many were linked. */

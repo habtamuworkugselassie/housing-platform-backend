@@ -1,6 +1,7 @@
 package com.housingplatform.exhibition.repository;
 
 import com.housingplatform.exhibition.domain.ExhibitionInterest;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,4 +21,8 @@ public interface ExhibitionInterestRepository extends JpaRepository<ExhibitionIn
         "sponsorship"
       })
   Page<ExhibitionInterest> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+  Optional<ExhibitionInterest> findFirstByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
+
+  Optional<ExhibitionInterest> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 }

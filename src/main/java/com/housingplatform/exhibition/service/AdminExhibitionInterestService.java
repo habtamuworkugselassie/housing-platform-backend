@@ -12,4 +12,7 @@ public interface AdminExhibitionInterestService {
 
   AdminExhibitionInterestResponse verifyContact(
       UUID interestId, ProvisionOrganizationPrimaryUserRequest request);
+
+  /** Emails the lead a link to reserve (package, organization and contact prefilled). */
+  AdminExhibitionInterestResponse inviteToReserve(UUID interestId);
 }

@@ -30,4 +30,8 @@ public interface SponsorshipReservationRepository
   List<SponsorshipReservation> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
   List<SponsorshipReservation> findByOrganizationIsNull();
+
+  List<SponsorshipReservation> findByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
+
+  List<SponsorshipReservation> findByInterestIsNull();
 }

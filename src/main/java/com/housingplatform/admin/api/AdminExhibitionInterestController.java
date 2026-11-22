@@ -43,6 +43,14 @@ public class AdminExhibitionInterestController {
     return ResponseEntity.ok(adminExhibitionInterestService.list(pageable));
   }
 
+  @org.springframework.web.bind.annotation.PostMapping("/{id}/invite-to-reserve")
+  @Operation(
+      summary = "Email the lead a link to reserve a package",
+      description = "Package, organization and contact are prefilled in the link.")
+  public ResponseEntity<AdminExhibitionInterestResponse> inviteToReserve(@PathVariable UUID id) {
+    return ResponseEntity.ok(adminExhibitionInterestService.inviteToReserve(id));
+  }
+
   @PutMapping("/{id}/verify-contact")
   @Operation(
       summary = "Verify exhibition lead and provision organization primary user",
